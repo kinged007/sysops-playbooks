@@ -1,0 +1,44 @@
+# workspace-docker — per-remote Docker daemon for Coder
+#
+# Deploy this through the remote's management UI (Dokploy OR Coolify).
+# See docs/plans/2026-08-07-remote-docker-onboarding.md for the full runbook.
+#
+# > BEFORE deploying: replace the bind IP with the remote's Tailscale IP.
+#   Never leave it as "127.0.0.1" (only local processes can reach it) and never
+#   as ":2376" on all interfaces (Docker API exposed to the public internet).
+#
+# The port bind is deliberately constrained to the Tailscale IP so the Docker
+# API is reachable ONLY from the tailnet — not the public internet.
+
+services:
+  workspace-docker:
+    image: docker:29.7.1-dind
+    container_name: workspace-docker
+    restart: unless-stopped
+    # WHY privileged: dind needs to run its own dockerd, create nested
+    # containers/volumes/networks, and manage iptables inside the container.
+    # Without it, dockerd fails to start. Workspace containers created via
+    # Coder then inherit this, which is what gives each Coder workspace its
+    # own Docker-in-Docker ability (the template's init-docker-in-docker.sh).
+    privileged: true
+
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+      # REQUIRED: dind's server cert must include the Tailscale IP in its SAN,
+      # otherwise the Coder host's TLS client will reject it.
+      # Replace with the target remote's Tailscale IP.
+      DOCKER_TLS_SAN: "IP:100.100.10.20"
+
+    volumes:
+      - workspace-docker-data:/var/lib/docker
+      - workspace-docker-certs-ca:/certs/ca
+      - workspace-docker-certs-client:/certs/client
+
+    # >> FILL IN: replace 100.100.10.20 with the remote's Tailscale IP <<
+    ports:
+      - "100.100.10.20:2376:2376"
+
+volumes:
+  workspace-docker-data:
+  workspace-docker-certs-ca:
+  workspace-docker-certs-client:

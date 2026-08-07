@@ -1,0 +1,32 @@
+# ---- Secrets: NEVER commit certificate/key material ----
+*.pem
+*.key
+*.crt
+*.csr
+
+# ---- Tailscale pre-auth keys (expiring credentials) ----
+secrets/
+
+# ---- Private fleet operations (real hostnames/IPs) ----
+servers/
+
+# ---- Local editor/agent state ----
+.opencode/
+
+# ---- Coder template variable files (contain certs) ----
+templates/**/.tfvars
+templates/**/*.tfvars.json
+.tfvars
+*.tfvars
+
+# ---- Local scratch ----
+*.local
+.env
+.env.*
+!.env.example
+
+# ---- OS / editor noise ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

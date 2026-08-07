@@ -1,0 +1,8 @@
+# Keep shell scripts and Terraform/HCL files as LF even on Windows checkouts.
+# CRLF line endings break bash scripts and embedded heredocs (see AGENTS.md G11).
+*.sh   text eol=lf
+*.tf   text eol=lf
+*.hcl  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
