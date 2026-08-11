@@ -10,6 +10,9 @@ secrets/
 # ---- Private fleet operations (real hostnames/IPs) ----
 servers/
 
+# ---- Per-run execution folders (self-contained: plans, secrets, logs) ----
+executions/
+
 # ---- Local editor/agent state ----
 .opencode/
 
