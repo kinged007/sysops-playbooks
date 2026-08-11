@@ -46,7 +46,7 @@ executions/             ← per-run state (GITIGNORED)
 | Path | What it is |
 |------|------------|
 | `playbooks/_playbook-template/` | Skeleton for authoring new playbooks |
-| `playbooks/coder-remote-servers/` | Coder workspace fleet: remote dind daemons, Tailscale, mTLS, wildcard app subdomains |
+| `playbooks/coder-remote-servers/` | Coder workspace fleet: remote `docker:dind` daemons, Tailscale, mTLS, wildcard app subdomains |
 | `playbooks/wordpress-migration/` | (scaffolded) WordPress site migration between servers |
 | `playbooks/mail-server-config/` | (scaffolded) mail server configuration |
 | `executions/` | **Private** per-run state — gitignored, never committed |
