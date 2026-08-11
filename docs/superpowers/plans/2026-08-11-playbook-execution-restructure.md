@@ -172,8 +172,9 @@ Remove-Item -Path docs\plans -Recurse -Force
 Run: `git status --short`
 Expected: `D  docs/plans/2026-08-07-remote-docker-onboarding.md` (renamed to ignored `executions/...`). The move must NOT leave a tracked copy behind: `git ls-files | Select-String 'remote-docker-onboarding'` → empty.
 
+Note: `git mv` has already staged the rename. Do NOT use `git add -A` here — the working tree contains an unrelated uncommitted `AGENTS.md` edit (pre-existing G2 netdata note) that must NOT enter this commit.
+
 ```bash
-git add -A
 git commit -m "chore: archive historical onboarding plan into gitignored execution"
 ```
 
@@ -615,8 +616,12 @@ Expected: renames of the 5 migrated paths + `docs/runbooks/` deletions + new
 playbook files untracked. `git ls-files | Select-String 'compose/|scripts/|docs/runbooks|templates/'`
 must show only the NEW paths.
 
+Note: do NOT use `git add -A` — the unrelated uncommitted `AGENTS.md` edit must
+not enter this commit. The `git mv` renames are already staged; stage the new
+playbook files and the `docs/runbooks/` deletions explicitly:
+
 ```bash
-git add -A
+git add playbooks/coder-remote-servers docs/runbooks
 git commit -m "feat: migrate Coder content into playbooks/coder-remote-servers"
 ```
 
