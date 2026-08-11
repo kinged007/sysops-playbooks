@@ -46,8 +46,8 @@ coder templates push "docker-devcontainer-remote-a" ./templates/docker-devcontai
 The three cert variables are marked **sensitive** — Coder stores them encrypted
 and never displays them. No files are mounted into the Coder container.
 
-See the fleet runbook (`docs/runbooks/onboarding-a-new-remote.md`) and
-`servers/inventory.md` for each remote's endpoint + cert staging path.
+See the playbook (`playbooks/coder-remote-servers/playbook.md`) and the
+execution's `inventory.md` for each remote's endpoint + cert staging path.
 
 ## Modules Included
 

@@ -1,7 +1,7 @@
 # workspace-docker — per-remote Docker daemon for Coder
 #
 # Deploy this through the remote's management UI (Dokploy OR Coolify).
-# See docs/plans/2026-08-07-remote-docker-onboarding.md for the full runbook.
+# See playbooks/coder-remote-servers/playbook.md for the full procedure.
 #
 # > BEFORE deploying: replace the bind IP with the remote's Tailscale IP.
 #   Never leave it as "127.0.0.1" (only local processes can reach it) and never

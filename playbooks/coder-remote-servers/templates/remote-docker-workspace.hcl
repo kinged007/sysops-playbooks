@@ -15,7 +15,7 @@ terraform {
 # Remote Docker daemon endpoint + mutual-TLS material.
 #
 # One template per remote server. The variable VALUES are set at the
-# template level (sensitive) — see docs/plans/.../onboarding runbook.
+# template level (sensitive) — see playbooks/coder-remote-servers/playbook.md.
 # The cert/key are NEVER committed to this repo; they live only in
 # Coder's encrypted template variable store.
 # ------------------------------------------------------------------
