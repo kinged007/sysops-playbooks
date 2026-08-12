@@ -69,11 +69,14 @@ PostgreSQL backend. Pick the matching compose template.
       `docker compose ps` — every container `healthy`/`running`. Check logs:
       `docker compose logs --tail=50` for errors. Rollback: `docker compose
       down` (fresh install, no data loss).
-- [ ] **WRITE** — Create the admin account (password from run `secrets/`):
-      `docker exec mailu-admin flask mailu admin <ADMIN_USER> <ADMIN_PASSWORD>`.
-      Enable **2FA (TOTP)** on it in the admin UI before proceeding
-      (security baseline). Rollback: `docker exec mailu-admin flask mailu
-      admin --remove <ADMIN_USER>` if miscreated.
+- [ ] **WRITE** — Create the admin account: the `INITIAL_ADMIN_*` variables
+      in `mailu.env` (from run `secrets/`) provision it automatically at
+      first start. Verify it exists in the admin UI. Fallback (any Mailu
+      version): `docker exec mailu-admin flask mailu admin <ADMIN_USER>
+      <ADMIN_PASSWORD>`. Enable **2FA (TOTP)** on it in the admin UI before
+      proceeding (security baseline). Rollback:
+      `docker exec mailu-admin flask mailu admin --remove <ADMIN_USER>` if
+      miscreated.
 
 ## 2. DNS phase (WRITE at the DNS provider — every record is a WRITE)
 

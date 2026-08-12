@@ -1,0 +1,112 @@
+# Mailu docker-compose — SMALL scale (SQLite backend), single instance.
+# Placeholder template: fill <PLACEHOLDER>s from plan.md, then
+#   docker compose -p mailu up -d
+# Version pin: set MAILU_VERSION in mailu.env (e.g. 2.0) and keep images in
+# lockstep. Env values come from mailu.env (env_file).
+# Rollback (fresh install): docker compose -p mailu down
+
+services:
+  front:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-nginx}:${MAILU_VERSION:-<MAILU_VERSION>}
+    restart: always
+    ports:
+      - "25:25"
+      - "465:465"
+      - "587:587"
+      - "143:143"
+      - "993:993"
+      - "110:110"      # POP3 — disable in mailu.env (POP3=false) if unused
+      - "995:995"
+      - "80:80"
+      - "443:443"
+      - "4190:4190"    # ManageSieve — used by Roundcube filters
+    volumes:
+      - "${ROOT:-<MAILU_DIR>}/certs:/certs:ro"
+      - "${ROOT:-<MAILU_DIR>}/overrides:/overrides:ro"
+    depends_on:
+      - smtp
+      - imap
+    env_file: mailu.env
+
+  resolver:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-unbound}:${MAILU_VERSION:-<MAILU_VERSION>}
+    restart: always
+    env_file: mailu.env
+
+  redis:
+    image: redis:alpine
+    restart: always
+    volumes:
+      - mailu-redis:/data
+    env_file: mailu.env
+
+  smtp:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-postfix}:${MAILU_VERSION:-<MAILU_VERSION>}
+    restart: always
+    volumes:
+      - mailu-data:/mailu:Z
+    depends_on:
+      - resolver
+      - redis
+      - front
+    env_file: mailu.env
+
+  imap:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-dovecot}:${MAILU_VERSION:-<MAILU_VERSION>}
+    restart: always
+    volumes:
+      - mailu-data:/mailu:Z
+    depends_on:
+      - front
+      - redis
+    env_file: mailu.env
+
+  antispam:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-rspamd}:${MAILU_VERSION:-<MAILU_VERSION>}
+    restart: always
+    volumes:
+      - mailu-data:/mailu:Z
+    depends_on:
+      - front
+      - redis
+      - smtp
+      - imap
+      - resolver
+    env_file: mailu.env
+
+  # Virus scanning (only when ANTIVIRUS=true in mailu.env)
+  antivirus:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-clamav}:${MAILU_VERSION:-<MAILU_VERSION>}
+    restart: always
+    volumes:
+      - mailu-data:/mailu:Z
+    depends_on:
+      - antispam
+    env_file: mailu.env
+
+  # Webmail (only when WEBMAIL=roundcube in mailu.env)
+  webmail:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-roundcube}:${MAILU_VERSION:-<MAILU_VERSION>}
+    restart: always
+    volumes:
+      - mailu-data:/mailu:Z
+    depends_on:
+      - front
+      - imap
+    env_file: mailu.env
+
+  admin:
+    image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-admin}:${MAILU_VERSION:-<MAILU_VERSION>}
+    restart: always
+    volumes:
+      - mailu-data:/mailu:Z
+      - "${ROOT:-<MAILU_DIR>}/overrides:/overrides:ro"
+    depends_on:
+      - redis
+    env_file: mailu.env
+
+volumes:
+  mailu-data:
+    name: mailu-data   # maildir lives here — sizing decided in setup.md §0
+  mailu-redis:
+    name: mailu-redis
