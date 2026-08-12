@@ -1,13 +1,15 @@
 # Runbook: <RUN NAME>
 
-Snapshot of `playbooks/<name>/playbook.md` being executed, with real values
-filled in. State lives here and in `logs/` — a run can be resumed by any agent
-session from these files alone.
+Snapshot of the **active branch** (`playbooks/mail-server-config/branches/<branch>.md`)
+being executed, with real values filled in. Referenced `common.md` sections
+are reproduced inline in the step logs. State lives here and in `logs/` — a
+run can be resumed by any agent session from these files alone.
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | <playbook-name> |
+| Playbook | `mail-server-config` |
+| Branch file(s) | `branches/<branch>.md` (+ `branches/common.md`) |
 | Client | <client> |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
