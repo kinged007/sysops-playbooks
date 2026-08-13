@@ -1,0 +1,12 @@
+{
+  "mcp": {
+    "netdata-<ALIAS>": {
+      "type": "remote",
+      "url": "http://<NODE_ADDRESS>:19999/mcp",
+      "enabled": true,
+      "headers": {
+        "Authorization": "Bearer {env:NETDATA_MCP_KEY_<ALIAS>}"
+      }
+    }
+  }
+}
