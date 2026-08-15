@@ -108,7 +108,7 @@ executions/<run>/   ← gitignored, self-contained per-run state (plans, secrets
 6. DEVIATION    anything not in the plan → STOP, ask, get approval; never
                 improvise on production
 7. CLOSE        mark runbook complete/parked; findings → notes.md; propose
-                lesson promotion to the playbook's notes/
+                lesson promotion to the playbook's notes/ (IMPORTANT: DO NOT USE CONFIDENTIAL INFORMATION IN NOTES!)
 ```
 
 Runbook steps carry status (`pending` / `in-progress` / `done` / `blocked`).

@@ -1,30 +1,70 @@
 # SysOps Playbook Repository
 
 A publishable repository of **reusable server procedures** ("playbooks") —
-Coder remote workspace fleets, WordPress migrations, mail server
-configuration, and more — each executed against real servers with strictly
-segregated, per-run state.
+from workspace fleet setup to site migrations to mail server configuration —
+each executed against real servers with strictly segregated, per-run state.
+
+## What this is
+
+This repo stores **procedures, not state**. Each playbook captures one
+subject as a canonical, copy-paste executable procedure with placeholder
+values only, plus the templates, scripts, and lessons learned that go with
+it. Nothing in the committed repo contains real IPs, hostnames, usernames,
+or credentials.
+
+When a procedure is run against a real client's servers, it is executed from
+a **separate, gitignored execution folder** that holds the plan, the runbook
+(the procedure with real values filled in), an inventory of the servers
+involved, per-run credentials, and logs. Each run is fully self-contained;
+runs for different clients never mix.
+
+## Use cases
+
+- **Scheduled or repeatable server work** — anything you do more than once
+  becomes a playbook: standing up workspaces, migrating services between
+  servers, configuring services, applying security hardening.
+- **Operator-supervised automation** — every playbook is executed by an
+  agent under a strict permission model. Production servers are read-only by
+  default; every write requires explicit operator permission.
+- **Segregated client work** — each run against a client's servers lives in
+  its own folder with its own credentials and inventory. Nothing is shared
+  between runs.
+- **Institutional memory** — lessons learned from every run are captured and
+  promoted back into the playbook's `notes/`, so the procedure improves over
+  time without ever touching a live system mid-run.
+
+## Repository layout
 
 ```
 playbooks/              ← static, reusable procedures (committed)
-  _playbook-template/      skeleton for new playbooks
-  coder-remote-servers/    Coder workspaces across remote servers (Tailscale + mTLS)
-  wordpress-migration/     scaffolded
-  mail-server-config/      scaffolded
+  _playbook-template/      skeleton for authoring new playbooks
+  <name>/                  one folder per subject: README, playbook.md,
+                           plan/runbook templates, templates/, scripts/,
+                           notes/
 executions/             ← per-run state (GITIGNORED)
-  <date>-<client>-<playbook>-<tag>/
+  <YYYY-MM-DD>-<client>-<playbook>-<tag>/
     plan.md  runbook.md  inventory.md  notes.md  secrets/  logs/
 ```
 
+- **[`playbooks/`](playbooks/)** is the only tracked operational content.
+  Each playbook folder has its own README describing what it does, when to
+  use it, its prerequisites, risk level, and the servers involved — browse
+  the folders for details on any specific procedure.
+- **`executions/`** holds per-run state and is fully gitignored. Never
+  committed.
+- **`AGENTS.md`** is the full admin guide: safety doctrine, execution
+  lifecycle, folder discipline, and committing rules. Agents read it before
+  touching anything.
+
 ## How it works
 
-- **Playbooks are static.** Each playbook is one subject: a canonical
-  procedure (`playbook.md`, placeholders only), templates, scripts, and a
-  `notes/` folder of lessons learned. Playbooks are never edited during a run.
+- **Playbooks are static.** A playbook is one subject: a canonical procedure
+  (`playbook.md`, placeholders only), templates, scripts, and a `notes/`
+  folder of lessons learned. Playbooks are never edited during a run.
 - **Executions are self-contained.** Every run gets one gitignored folder
-  holding its plan, runbook (the playbook being executed, with real values and
-  step statuses), inventory of the servers it touches, credentials, and logs.
-  Runs for different clients never mix.
+  holding its plan, runbook (the playbook being executed, with real values
+  and step statuses), inventory of the servers it touches, credentials, and
+  logs.
 - **Safety doctrine.** Production servers are read-only by default; every
   write — including any non-`SELECT` database query — requires explicit
   permission; permission mode (per-write confirm or plan-as-approved) is set
@@ -40,18 +80,6 @@ executions/             ← per-run state (GITIGNORED)
 4. Present the plan for approval; the operator sets the permission mode
 5. Execute against the runbook, capture logs, record findings
 6. Close out: mark steps done, write `notes.md`, propose lesson promotion
-
-## Repository layout
-
-| Path | What it is |
-|------|------------|
-| `playbooks/_playbook-template/` | Skeleton for authoring new playbooks |
-| `playbooks/coder-remote-servers/` | Coder workspace fleet: remote `docker:dind` daemons, Tailscale, mTLS, wildcard app subdomains |
-| `playbooks/wordpress-migration/` | (scaffolded) WordPress site migration between servers |
-| `playbooks/mail-server-config/` | (scaffolded) mail server configuration |
-| `executions/` | **Private** per-run state — gitignored, never committed |
-| `AGENTS.md` | Full admin guide: doctrine, lifecycle, folder discipline |
-| `docs/` | Plans, specs, design docs |
 
 ## Security rules
 
