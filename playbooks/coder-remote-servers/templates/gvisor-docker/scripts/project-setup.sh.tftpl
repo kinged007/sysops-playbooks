@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+
+# Runs the user-supplied setup_command (from the setup_command template
+# parameter) once per command value. Change the parameter to re-run.
+setup_cmd='${replace(setup_command, "'", "'\\''")}'
+
+if [ -z "$setup_cmd" ]; then
+  echo "No setup_command configured - project setup skipped."
+  exit 0
+fi
+
+marker="$HOME/.coder_setup_done"
+if [ -f "$marker" ] && [ "$(cat "$marker")" = "$setup_cmd" ]; then
+  echo "Project setup already completed for this command."
+  echo "Delete $marker to force a re-run."
+  exit 0
+fi
+
+echo "Running project setup: $setup_cmd"
+eval "$setup_cmd"
+
+printf '%s' "$setup_cmd" > "$marker"
+echo "Project setup complete."

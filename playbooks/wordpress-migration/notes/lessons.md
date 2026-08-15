@@ -139,3 +139,21 @@ Partial import failure (one bad table) → re-import with `mysql --force`,
 then verify per-table row counts against source. `--add-drop-table` makes
 the whole dump idempotent, so re-running is always safe. (Anchors playbook
 §5.3.)
+
+## L13 — SERVER_NAME is unreliable after a Docker/nginx migration
+
+Any application logic keyed on `$_SERVER['SERVER_NAME']` breaks on the new
+stack: nginx catch-all vhosts (`server_name _;`) pass `_` for web requests,
+and CLI/cron (wp-cli) has SERVER_NAME unset. In this case if `$_SERVER['SERVER_NAME']` is required
+to check anything, like the environment or correct domain, it will appear empty.
+
+Rules:
+- During Phase 0, grep the site's plugins/themes for
+  `$_SERVER['SERVER_NAME']` (and `HTTP_HOST`) used in environment/
+  email/URL logic: `grep -rn "SERVER_NAME" wp-content/plugins wp-content/themes`.
+- Prefer environment detection derived from `home_url()` (the DB value,
+  correct in web, CLI, and cron contexts) instead of request headers.
+- Note: with a catch-all vhost, the Host header is the only per-request
+  signal — `$host` in nginx, `$_SERVER['HTTP_HOST']` in PHP. (Anchors
+  playbook §6.1/§6.2; mirrors `coder-remote-servers` G11.)
+

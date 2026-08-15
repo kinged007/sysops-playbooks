@@ -9,7 +9,7 @@ Provision Docker containers as Coder workspaces with Docker-in-Docker support an
 - **Code Server (VS Code in the browser)** — the [code-server](https://registry.coder.com/modules/coder/code-server) module is pre-configured with the Dracula theme. Available immediately in the workspace dashboard.
 - **Persistent home volume** — `/home/coder` is backed by a Docker volume that survives workspace restarts.
 - **Persistent Docker volume** — `/var/lib/docker` is persisted so devcontainer caches and pulled images are reused across restarts.
-- **Startup & shutdown scripts** — Docker is cleaned up on stop (`docker system prune -a -f`) and the environment is initialised on start.
+- **Startup script** — the environment is initialised on start. There is deliberately NO shutdown cleanup: a workspace must never run daemon-wide docker commands (`docker system prune`) against a shared/host daemon — see `main.tf`.
 - **Git ready** — `GIT_AUTHOR_NAME` and `GIT_AUTHOR_EMAIL` are set automatically from the Coder user profile.
 - **Resource monitoring** — CPU, RAM, disk, and host-level metrics are displayed in the workspace dashboard.
 
@@ -109,7 +109,7 @@ If `repo_url` is left empty, no auth prompt and no clone — just a blank home.
 ### 4. Workspace lifecycle
 
 - **Start** — Docker daemon is started, any repo is cloned, and the devcontainer is launched.
-- **Stop** — unused Docker resources are pruned and the Docker service is stopped.
+- **Stop** — the agent stops. No docker daemon commands are issued from the workspace (daemon-wide pruning is prohibited — it would hit shared/host containers).
 - **Delete** — the workspace container and both volumes (home + Docker) are destroyed.
 
 ## Prerequisites
