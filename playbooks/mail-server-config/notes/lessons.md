@@ -30,5 +30,36 @@
 
 ## Confirmed lessons (from runs — newest first)
 
-*(None yet. After a run: `## YYYY-MM-DD <run tag> — <one-line summary>`, then
-bulleted lessons.)*
+### 2026-08-24 `remote-b-mail-server-config-repair` — mailu behind Dokploy/Traefik
+
+1. **HTTP-01 through Traefik is impossible.** Traefik's internal `acme-http` router
+   (PathPrefix `/.well-known/acme-challenge/`, priority MAX) 404s every
+   challenge path it isn't actively answering — a certbot inside a proxied
+   container can never complete HTTP-01. Use **DNS-01** (e.g. certbot +
+   Cloudflare plugin) or reuse an existing cert store instead of fighting the
+   router.
+2. **Compose env interpolation mangles `$` in secrets.** `SECRET_KEY` /
+   `INITIAL_ADMIN_PW` containing `$` (e.g. from `tr -dc 'A-Za-z0-9!@#$%^&*'`)
+   produce "variable X is not set" warnings and the rendered value is
+   silently blanked — a password that "was set" never applies. Generate
+   secrets **alphanumeric-only** (base64-style) for compose-managed stacks.
+3. **Docker management suites may prefix volume names with the project name**
+   (Dokploy, Portainer, Coolify, ...): the compose declares `mailu-certs`
+   but the real volume is `mail-server-mailu-2ieime_mailu-certs`. Backup and
+   cert-sync scripts must **discover real volume names** (`docker volume ls`
+   / `docker inspect`), never assume the compose name — a bare-name volume
+   mount silently creates an empty stray volume.
+4. **`clamav/clamav-debian` image has no `ps`, `pgrep`, or pid files.**
+   Healthchecks must not use `pgrep` or `kill $(cat <pidfile>)`. Use
+   `test -S /tmp/clamd.sock` (socket liveness) — clamd creates it at startup
+   and removes it on clean shutdown.
+5. **Cloudflare-proxied mail subdomains mask untrusted origin certs.**
+   Browsers saw Cloudflare's edge cert while the origin served an untrusted
+   Cloudflare **origin cert** (wildcard `*.domain` in Traefik custom-certs).
+   Grey-clouding the record exposed `SEC_E_UNTRUSTED_ROOT` immediately.
+   Audit the origin cert before any grey-cloud/DNS-only change; a real LE
+   cert for the exact hostname beats the wildcard (Traefik exact-match
+   precedence).
+6. **`HOSTNAMES=${DOMAIN}` trap in compose anchors.** Deriving HOSTNAMES from
+   DOMAIN breaks the webmail/TLS hostname the moment DOMAIN changes. Always
+   set `HOSTNAMES` explicitly (e.g. `mail.<DOMAIN>`) independent of `DOMAIN`.
