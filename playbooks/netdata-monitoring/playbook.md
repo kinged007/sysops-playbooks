@@ -10,7 +10,7 @@ confirm / B: plan-as-approved). Rollback is given for every write. Reads are
 free.
 
 ## 0. Pre-flight
-- [ ] Read `notes/gotchas.md` (mandatory) — G1–G16 may change how you plan
+- [ ] Read `notes/gotchas.md` (mandatory) — G1–G18 may change how you plan
 - [ ] Confirm prerequisites (README): SSH alias for each target, operator's
       install command, permission mode set at plan approval
 - [ ] Confirm access: `ssh -o BatchMode=yes <ALIAS> 'hostname'` — one line,
@@ -53,6 +53,10 @@ free.
       version, `active`
 
 ## 4. Harden netdata access (security #1) — **WRITE**, approval required
+- [ ] Check claim state FIRST (G18): `ssh <ALIAS> 'netdatacli aclk-state'` —
+      bearer protection only works on claimed nodes (G17). If unclaimed:
+      keep `bearer token protection = no`, skip to §6 (claim), then come back
+      and enable it — or harden via firewall/IP restriction instead
 - [ ] Enable bearer token protection:
       - **WRITE**: `ssh <ALIAS> 'sudo sed -i "s/^#\? *bearer token protection *= *.*/bearer token protection = yes/" /etc/netdata/netdata.conf'`
         - If the `[web]` section or key is absent, add it under `[web]`:

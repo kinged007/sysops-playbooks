@@ -1,7 +1,7 @@
 # Playbook: Netdata Monitoring
 
 > **Agent: read `notes/` BEFORE any run.** The notes contain lessons learned
-> from previous executions (G1–G16) that may change how you plan. Never skip
+> from previous executions (G1–G18) that may change how you plan. Never skip
 > this.
 
 ## What it does
@@ -44,7 +44,7 @@ live in the execution's `inventory.md` and `secrets/`, never here.
 | `plan-template.md` | Copied to `executions/<run>/plan.md` |
 | `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
 | `templates/mcp-config.json` | Per-node MCP server config template (placeholders) |
-| `notes/gotchas.md` | G1–G16: real pitfalls hit on the fleet, with fixes |
+| `notes/gotchas.md` | G1–G18: real pitfalls hit on the fleet, with fixes |
 
 ## MCP config artifact (per node, per run)
 When a node is confirmed connected, the run writes

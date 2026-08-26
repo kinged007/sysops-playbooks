@@ -157,3 +157,28 @@ a core just syncing state. Local dashboard keeps working.
 - Options: fix the path to app.netdata.cloud, or unclaim/disable the cloud
   link (`claim.conf`; re-claim is kickstart-only, see G9). Ask the operator
   before disconnecting — some teams use the cloud dashboard.
+
+## G17 — bearer token protection requires a CLAIMED agent
+`[web] bearer token protection = yes` only works on nodes claimed to Netdata
+Cloud (the feature integrates Cloud SSO). On an **unclaimed** node:
+- The MCP API key is IGNORED — every `/mcp` request returns 412
+  (`{"error":{"code":-32600,"message":"MCP API key is required..."}}`) with
+  `role=none permissions=0x0` in the access log, even with the correct key in
+  `Authorization: Bearer`
+- Dashboard data APIs also go blank (SSO-only)
+- Correct order for new installs: **install → tune → claim → enable bearer
+  protection → verify keyed MCP = 200 / anonymous = 412**
+- On nodes that must stay unclaimed: keep bearer protection `no`; MCP works
+  in the open-source model (anonymous for non-sensitive ops, API key unlocks
+  sensitive ones); harden access another way (firewall/IP restriction)
+
+## G18 — verify claims with `netdatacli aclk-state`, NOT the API
+`/api/v1/info`'s `claim_id`/`node_id` fields can stay `None` on a node that
+is actually claimed and streaming (observed on v2.11.0 stable). `/api/v3/info`
+`cloud` section can be empty too. This produced a false "stale token"
+diagnosis on a healthy node.
+- Reliable checks: `netdatacli aclk-state` → look at `Claimed:`,
+  `Online:`, `Claimed Id`, `Node ID`, `Alert Streaming Status` — or the
+  website itself
+- Use the same tool after every claim/verify step; never trust a single API
+  field for claim state
