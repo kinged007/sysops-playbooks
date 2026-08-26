@@ -10,7 +10,7 @@ confirm / B: plan-as-approved). Rollback is given for every write. Reads are
 free.
 
 ## 0. Pre-flight
-- [ ] Read `notes/gotchas.md` (mandatory) — G1–G9 may change how you plan
+- [ ] Read `notes/gotchas.md` (mandatory) — G1–G16 may change how you plan
 - [ ] Confirm prerequisites (README): SSH alias for each target, operator's
       install command, permission mode set at plan approval
 - [ ] Confirm access: `ssh -o BatchMode=yes <ALIAS> 'hostname'` — one line,
