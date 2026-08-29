@@ -18,7 +18,6 @@ locals {
 
   has_repo           = data.coder_parameter.repo_url.value != ""
   repo_folder        = try(module.git-clone[0].folder_name, "")
-  workspace_folder   = local.has_repo ? "~/${local.repo_folder}" : "~"
   code_server_folder = local.has_repo ? "/home/coder/${local.repo_folder}" : "/home/coder"
 }
 
@@ -67,6 +66,21 @@ variable "docker_key" {
   sensitive   = true
 }
 
+# ------------------------------------------------------------------
+# Template-level startup command.
+#
+# Baked into the agent startup script (applies to ALL workspaces from
+# this template). Runs FIRST, before any per-workspace setup (the
+# repo clone / devcontainer startup / setup-devcontainer script).
+# Set per template at push time. Empty = no-op.
+# ------------------------------------------------------------------
+
+variable "startup_command" {
+  default     = ""
+  description = "(Template-level) Shell command baked into every workspace's agent startup. Runs first, before per-workspace setup. Empty = no-op."
+  type        = string
+}
+
 data "coder_parameter" "repo_url" {
   type         = "string"
   name         = "repo_url"
@@ -100,11 +114,18 @@ data "coder_workspace" "me" {}
 data "coder_workspace_owner" "me" {}
 
 resource "coder_agent" "main" {
-  arch            = data.coder_provisioner.me.arch
-  os              = "linux"
-  dir             = local.workspace_folder
-  startup_script  = <<-EOT
+  arch           = data.coder_provisioner.me.arch
+  os             = "linux"
+  startup_script = <<-EOT
     set -e
+
+    # Template-level startup command (applies to ALL workspaces from this
+    # template). Runs first, before per-workspace setup. Set via the
+    # template variable startup_command; empty = no-op.
+    %{ if var.startup_command != "" }
+    echo "Running template startup command..."
+    ${var.startup_command}
+    %{ endif }
 
     # Prepare user home with default files on first start.
     if [ ! -f ~/.init_done ]; then
@@ -230,7 +251,10 @@ module "code-server" {
   agent_id = coder_agent.main.id
   folder     = local.code_server_folder
   extensions = [
-    "dracula-theme.theme-dracula"
+    "dracula-theme.theme-dracula",
+    "cweijan.vscode-database-client2",
+    "ms-vscode.live-server",
+    "mathematic.vscode-pdf"
   ]
 }
 

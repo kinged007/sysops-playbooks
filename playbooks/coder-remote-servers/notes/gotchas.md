@@ -89,3 +89,47 @@ CRLF and breaks bash. Write the script with LF endings and `scp` it, then run
 `bash /tmp/script.sh`. Also: PowerShell interpolates `$()` in double-quoted ssh
 commands **locally** — use single quotes or script files for anything with
 `$(...)`.
+
+**G13 — gVisor (runsc) cannot run inside a docker:dind container on cgroup v2.**
+The dind's inner dockerd writes cgroup v1 paths
+(`/sys/fs/cgroup/cpu/.../cpu.cfs_quota_us`, `/sys/fs/cgroup/cpuset/.../cpuset.cpus`)
+that don't exist under a unified cgroup v2 host → `permission denied` /
+`no such file or directory` at container create; runc works fine (so
+`docker-devcontainer` and `runc` workspaces on the shared daemon are
+unaffected). **Fleet standard:** `runc` workspaces on the shared isolated
+dind (one daemon per host, `runc` only) — no per-workspace nested daemon,
+no gVisor syscall gaps. **If you need `runsc`,** point that template at the
+HOST daemon (TLS + runsc registered in the host's `/etc/docker/daemon.json`),
+i.e. topology B. Confirmed 2026-08-27 on Ubuntu 24.04 + docker:dind 29.7.1.
+
+**G14 — Host daemon TLS port 2377 collides with Docker Swarm's manager port.**
+Dokploy-managed remotes are swarm nodes; the swarm manager listens on
+`tcp:2377` (0.0.0.0). A daemon.json TLS listener on 2377 breaks the swarm
+(`manager stopped: failed to listen on remote API address: bind: address
+already in use`). **Use port 2378 for the host daemon TLS listener** — this
+matches the fleet's existing `coder-host → coder-workspace-02` grant
+(`tcp:2376, tcp:2378`). Remember to add `tcp:2378` to the new remote's ACL
+grant too.
+
+**G15 — gVisor "latest" URLs serve stale (2020-era) runsc binaries.**
+`https://storage.googleapis.com/gvisor/releases/nightly/latest/runsc` and
+`.../release/latest/runsc` both returned `release-2020121x.0` builds → any
+container start fails with `runsc did not terminate successfully: exit
+status 1` (and `releases/<version>/amd64/runsc` 404s). **Fix: pin the current
+GitHub release tarball**:
+```bash
+# get the tag from https://api.github.com/repos/google/gvisor/releases/latest
+apt-get install -y bzip2
+wget -qO /tmp/gvisor.tar.bz2 \
+  https://github.com/google/gvisor/releases/download/release-<VERSION>/gvisor-x86_64.tar.bz2
+tar xjf /tmp/gvisor.tar.bz2 -C /tmp && cp /tmp/runsc /usr/local/bin/runsc && chmod +x /usr/local/bin/runsc
+```
+Verified: `release-20260817.0` works (runsc version `release-20260817.0`).
+
+**G16 — Windows-shell quoting mangles JSON written via echo/heredoc over SSH.**
+On a Windows workstation the local shell (PowerShell or mixed WSL modes)
+strips the `"` from heredoc/echo content, producing invalid JSON
+(dockerd: `invalid character 'h' looking for beginning of object key
+string`). **Fix: write config files (daemon.json etc.) locally with LF
+endings and `scp` them to the remote** — never build JSON via echo/heredoc
+through the shell.

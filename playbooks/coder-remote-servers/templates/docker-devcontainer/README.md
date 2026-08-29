@@ -23,6 +23,7 @@ Provision Docker containers as Coder workspaces with Docker-in-Docker support an
 | `docker_key` | `string` (sensitive) | `""` | Remote only: contents of the remote daemon's `key.pem`. |
 | `repo_url` | `string` | `""` | URL of a Git repository to clone. If it contains a `devcontainer.json` (at the root or under `.devcontainer/`), the devcontainer CLI will start it automatically. Leave empty to skip cloning. |
 | `new_branch` | `string` | `""` | Optional: after cloning, checkout or create this branch. |
+| `startup_command` | `string` | `""` | **Template-level.** Shell command baked into every workspace's agent startup, runs FIRST on every start, before per-workspace setup (clone/devcontainer). Empty = no-op |
 
 ## Local vs Remote workspaces
 
@@ -48,6 +49,23 @@ and never displays them. No files are mounted into the Coder container.
 
 See the playbook (`playbooks/coder-remote-servers/playbook.md`) and the
 execution's `inventory.md` for each remote's endpoint + cert staging path.
+
+## Template-level startup command (`startup_command`)
+
+An **admin-defined** shell command baked into the template's agent startup —
+applies to **every** workspace created from it, with no per-workspace input.
+It runs FIRST, before the repo clone / devcontainer startup. Use it for
+things every workspace needs regardless of user (e.g. common tools, env,
+CA cert). Runs on **every** start, not just the first.
+
+```sh
+coder templates push docker-devcontainer ./templates/docker-devcontainer \
+  --var startup_command='echo "bootstrapping..."'
+```
+
+Empty (default) = no-op. It is a **template variable** (fixed per template),
+not a per-workspace parameter — for per-workspace choice, use `repo_url` or
+point the workspace's own devcontainer config at the setup.
 
 ## Modules Included
 

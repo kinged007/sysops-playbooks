@@ -1,0 +1,64 @@
+# OmniRoute + Caddy (auto-TLS) — generic compose template.
+# Copy to the run's folder, fill placeholders, run: docker compose --profile base up -d
+# Data lives on a named volume; secrets come from the run's .env (never commit).
+
+services:
+  omniroute:
+    image: diegosouzapw/omniroute:latest
+    container_name: <CONTAINER_NAME>
+    restart: unless-stopped
+    stop_timeout: 40
+    env_file: <RUN_ENV_FILE>            # run's .env with generated secrets
+    environment:
+      - PORT=20128
+      # Public origin for OAuth callbacks, dashboard links, generated URLs
+      - NEXT_PUBLIC_BASE_URL=https://<PUBLIC_HOST>
+      # Internal server-to-server URL (compose service name)
+      - BASE_URL=http://<CONTAINER_NAME>:20128
+      - AUTH_COOKIE_SECURE=true
+      - DATA_DIR=/app/data
+      # Raise on hosts with headroom; image default is 1024
+      # - OMNIROUTE_MEMORY_MB=2048
+    volumes:
+      - <VOLUME_NAME>:/app/data
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: <CONTAINER_NAME>-redis
+    restart: unless-stopped
+    # Loopback-only by default; add --requirepass if you publish this port.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - <VOLUME_NAME>-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  caddy:
+    image: caddy:latest
+    container_name: <CONTAINER_NAME>-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    command: caddy reverse-proxy --from https://<PUBLIC_HOST> --to http://<CONTAINER_NAME>:20128
+    depends_on:
+      - omniroute
+    # Optional: persist the CA so TLS survives restarts
+    # volumes:
+    #   - <VOLUME_NAME>-caddy:/data
+
+volumes:
+  <VOLUME_NAME>:
+  <VOLUME_NAME>-redis:
+  # <VOLUME_NAME>-caddy:
