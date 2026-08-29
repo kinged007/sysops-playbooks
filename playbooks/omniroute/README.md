@@ -12,9 +12,9 @@ can drive the gateway over MCP. Also generates and records all required secrets
 into the run's `secrets/` folder where the operator can review them.
 
 Covers multiple install targets (see below). **This playbook is generic** —
-it has no preferences for any one instance. Real values for a specific run
-(URLs, hosts, credentials) live only in that run's `executions/<run>/` folder,
-never here.
+it has no preferences for any one instance. Real values for a specific variant
+(URLs, hosts, credentials) live only in that variant's `executions/omniroute/`
+(or `executions/omniroute-<suffix>/`) folder, never here.
 
 ## When to use it
 - Standing up a fresh OmniRoute gateway (Docker or npm) and doing the first-run
@@ -68,16 +68,17 @@ local machine. Real values live in the execution's `inventory.md` and
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical procedure (placeholders only) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
+| `plan-template.md` | Copied to `executions/omniroute/plan.md` on first run (or `executions/omniroute-<suffix>/plan.md`) |
+| `runbook-template.md` | Copied to `executions/omniroute/runbook.md` on first run |
 | `templates/.env.example` | Full env template with `<PLACEHOLDER>` secrets |
 | `templates/docker-compose.yml` | Optional Docker Compose with HTTPS front (Caddy) |
 | `scripts/gen-secrets.ps1` | Generates all secrets + salts, writes them to `secrets/` |
 | `scripts/test-mcp.ps1` | Probes `/api/mcp/sse` + `/api/mcp/status` with the key |
 | `notes/gotchas.md` | Pitfalls hit on real runs, with fixes |
 
-## MCP access artifact (per run)
+## MCP access artifact (per variant)
 When the MCP server is confirmed reachable, the run writes
-`executions/<run>/mcp/<alias>.mcp.json` describing the endpoint, transport, and
+`executions/omniroute/mcp/<alias>.mcp.json` (or `executions/omniroute-<suffix>/mcp/<alias>.mcp.json`) describing the endpoint, transport, and
 the env var (`OMNIROUTE_MCP_KEY_<TAG>`) that references the key stored in
-`secrets/`. The key value itself never appears in committed files.
+`secrets/`. The key value itself never appears in committed files. The artifact
+persists in the same variant folder across invocations.

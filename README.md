@@ -2,7 +2,7 @@
 
 A publishable repository of **reusable server procedures** ("playbooks") —
 from workspace fleet setup to site migrations to mail server configuration —
-each executed against real servers with strictly segregated, per-run state.
+each executed against real servers with strictly segregated, per-variant state.
 
 ## What this is
 
@@ -12,11 +12,14 @@ values only, plus the templates, scripts, and lessons learned that go with
 it. Nothing in the committed repo contains real IPs, hostnames, usernames,
 or credentials.
 
-When a procedure is run against a real client's servers, it is executed from
-a **separate, gitignored execution folder** that holds the plan, the runbook
+When a procedure is run against real servers, it is executed from a
+**persistent, gitignored execution folder** that holds the plan, the runbook
 (the procedure with real values filled in), an inventory of the servers
-involved, per-run credentials, and logs. Each run is fully self-contained;
-runs for different clients never mix.
+involved, per-variant credentials, and an append-only log. All subsequent
+invocations for the same playbook (or playbook+suffix) **append to the same
+folder**, so secrets, inventory, and history are reused — the agent never
+re-asks for values already known, and follow-up questions instantly regain
+context.
 
 ## Use cases
 
@@ -26,9 +29,11 @@ runs for different clients never mix.
 - **Operator-supervised automation** — every playbook is executed by an
   agent under a strict permission model. Production servers are read-only by
   default; every write requires explicit operator permission.
-- **Segregated client work** — each run against a client's servers lives in
-  its own folder with its own credentials and inventory. Nothing is shared
-  between runs.
+- **Segregated, persistent variants** — each playbook variant lives in its
+  own persistent folder (`executions/<playbook>/` by default, or
+  `executions/<playbook>-<suffix>/` for a named variant like `-personal` vs
+  `-company`). Secrets and inventory persist there across invocations. Variants
+  and playbooks never mix.
 - **Institutional memory** — lessons learned from every run are captured and
   promoted back into the playbook's `notes/`, so the procedure improves over
   time without ever touching a live system mid-run.
@@ -39,10 +44,12 @@ runs for different clients never mix.
 playbooks/              ← static, reusable procedures (committed)
   _playbook-template/      skeleton for authoring new playbooks
   <name>/                  one folder per subject: README, playbook.md,
-                           plan/runbook templates, templates/, scripts/,
-                           notes/
-executions/             ← per-run state (GITIGNORED)
-  <YYYY-MM-DD>-<client>-<playbook>-<tag>/
+                            plan/runbook templates, templates/, scripts/,
+                            notes/
+executions/             ← persistent per-variant state (GITIGNORED)
+  <playbook>/              default variant for a playbook
+    plan.md  runbook.md  inventory.md  notes.md  secrets/  logs/
+  <playbook>-<suffix>/     additional variant when a custom suffix is used
     plan.md  runbook.md  inventory.md  notes.md  secrets/  logs/
 ```
 
@@ -50,8 +57,9 @@ executions/             ← per-run state (GITIGNORED)
   Each playbook folder has its own README describing what it does, when to
   use it, its prerequisites, risk level, and the servers involved — browse
   the folders for details on any specific procedure.
-- **`executions/`** holds per-run state and is fully gitignored. Never
-  committed.
+- **`executions/`** holds persistent per-variant state and is fully
+  gitignored. Never committed. The agent discovers existing folders for a
+  playbook on every invocation and asks whether to reuse them.
 - **`AGENTS.md`** is the full admin guide: safety doctrine, execution
   lifecycle, folder discipline, and committing rules. Agents read it before
   touching anything.
@@ -61,25 +69,35 @@ executions/             ← per-run state (GITIGNORED)
 - **Playbooks are static.** A playbook is one subject: a canonical procedure
   (`playbook.md`, placeholders only), templates, scripts, and a `notes/`
   folder of lessons learned. Playbooks are never edited during a run.
-- **Executions are self-contained.** Every run gets one gitignored folder
-  holding its plan, runbook (the playbook being executed, with real values
-  and step statuses), inventory of the servers it touches, credentials, and
-  logs.
+- **Execution folders are persistent and append-only.** Each playbook variant
+  (e.g. `coder-remote-servers` or `coder-remote-servers-personal`) gets one
+  gitignored folder holding its plan, runbook, inventory, credentials, and
+  logs. Logs are never deleted — each session appends timestamped files.
+  Subsequent requests for the same variant reuse the same folder, updating
+  `logs/` and extending `plan.md`/`runbook.md` as needed.
 - **Safety doctrine.** Production servers are read-only by default; every
   write — including any non-`SELECT` database query — requires explicit
   permission; permission mode (per-write confirm or plan-as-approved) is set
   at plan approval; agents never assume, always confirm, and are strictly
   obedient. See `AGENTS.md` §1.
 
-## Starting a run
+## Starting a run (or resuming one)
 
-1. Create `executions/<YYYY-MM-DD>-<client>-<playbook>-<tag>/`
-2. Copy the playbook's `plan-template.md` + `runbook-template.md` into it;
-   fill in real hosts and credentials
-3. Read the playbook's `notes/` (mandatory)
-4. Present the plan for approval; the operator sets the permission mode
-5. Execute against the runbook, capture logs, record findings
-6. Close out: mark steps done, write `notes.md`, propose lesson promotion
+1. **Discover:** agent scans `executions/<playbook>*` for existing folders
+   matching the requested playbook (including any `-<suffix>` variants and
+   legacy dated folders). It presents matches and asks: *"Found previous
+   execution(s) XYZ — reuse, or create new variant?"*
+2. **Bootstrap:** operator confirms reuse of `executions/<playbook>[/-<suffix>]/`
+   or requests a new suffix (e.g. `personal`, `company`). If new, the agent
+   creates the folder and its `secrets/` + `logs/` subfolders.
+3. **Prep:** if new: copy the playbook's `plan-template.md` + `runbook-template.md`
+   into it; fill in real hosts/credentials. If reusing: load existing
+   `plan.md` / `inventory.md` / `secrets/` / `notes.md` as context and propose
+   an updated plan building on them — never overwrite existing secrets or logs.
+4. Read the playbook's `notes/` (mandatory)
+5. Present the plan for approval; the operator sets the permission mode
+6. Execute against the runbook, capture logs (timestamp-prefixed, append-only), record findings
+7. Close out: mark steps done, append to `notes.md`, propose lesson promotion
 
 ## Security rules
 
@@ -89,8 +107,10 @@ executions/             ← per-run state (GITIGNORED)
    `<PLACEHOLDER>` tokens.
 3. **Production is read-only by default.** Writes require explicit permission
    (see `AGENTS.md` §1).
-4. **Per-run secrets.** Credentials are generated per run, never shared
-   across runs.
+4. **Per-variant secrets.** Credentials are generated per variant, stored in
+   that variant's `secrets/`, and **reused across invocations** of the same
+   variant. Rotate them in place inside the same folder; never copy them
+   between variants without explicit approval.
 
 ## Contributing a playbook
 

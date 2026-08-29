@@ -4,8 +4,7 @@
 |---|---|
 | Client | <client> |
 | Playbook | `omniroute` |
-| Date | <YYYY-MM-DD> |
-| Execution folder | `executions/<YYYY-MM-DD>-<client>-omniroute-<tag>/` |
+| Execution folder | `executions/omniroute/` or `executions/omniroute-<suffix>/` |
 | Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
 | Status | draft → approved → executing → closed |
 
@@ -13,15 +12,16 @@
 <remote-instance / local-npm / docker / existing-unconfigured>
 - How the agent reaches it: <public URL / SSH alias+forward / localhost / container>
 
-## Servers involved (THIS run only)
+## Servers involved (THIS variant only)
 | Alias (ssh config) | Role | Purpose | Access key |
 |---|---|---|---|
 | <alias-or-url> | <remote/prod/local> | <OmniRoute host / container / local> | `~/.ssh/<key>` or n/a |
 
-## Credentials / secrets (THIS run only)
+## Credentials / secrets (THIS variant only)
 <Files in `secrets/` of this execution folder; never inline values here>
 - `<file>` — <what it holds, e.g. management API key, INITIAL_PASSWORD>
 - `<file>` — <...>
+Secrets persist in this folder across invocations — update in place when rotating.
 
 ## Base/public URLs (operator-provided at §4)
 - Public URL: <https://host>

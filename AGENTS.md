@@ -52,11 +52,22 @@ each production write, or is it OK to execute the plan as approved?"*
 - Record the chosen mode in `plan.md`. The operator can change modes mid-run.
   **You never pick the mode yourself — always ask.**
 
-### 1.4 Segregation — never cross executions or clients
+### 1.4 Segregation — reuse within a variant, never across variants/playbooks without cause
 
-- Never read from another execution's folder. Never reuse another run's
-  credentials, host aliases, or outputs. Never copy files between executions.
-- Real values for the current run live ONLY in the current execution folder.
+- Each playbook variant has **one persistent execution folder**:
+  `executions/<playbook>/` by default, or `executions/<playbook>-<suffix>/`
+  when the operator provides a custom suffix (e.g. `coder-remote-servers-personal`,
+  `coder-remote-servers-company`). All invocations of that variant **share and
+  append to the same folder** — this is intentional reuse so secrets, inventory,
+  and history stay in one place.
+- **Never read from a different playbook's execution folder**, and never read
+  from a different suffix variant of the same playbook, unless the current task
+  explicitly requires it and the operator approves. Different playbooks and
+  different suffixes remain fully segregated.
+- **Never copy secrets, host aliases, or inventory between execution folders**
+  without explicit operator approval. Each variant's `secrets/` and
+  `inventory.md` are authoritative for that variant only.
+- Real values for the current variant live ONLY in its execution folder.
 - Never improvise steps not in the approved plan. Deviations require a stop,
   a question, and operator approval before continuing.
 
@@ -78,59 +89,115 @@ after the run, with operator approval. Never edit `playbooks/` mid-run.
 ## 2. What this repo is
 
 ```
-playbooks/<name>/   ← committed, static, reusable procedures (the only tracked ops content)
-executions/<run>/   ← gitignored, self-contained per-run state (plans, secrets, logs, inventory)
+playbooks/<name>/                  ← committed, static, reusable procedures (the only tracked ops content)
+executions/<playbook>/             ← gitignored, persistent per-variant state (plans, secrets, logs, inventory)
+executions/<playbook>-<suffix>/    ← same, when a custom suffix is used
 ```
 
 - **Playbook** = one subject (e.g. `coder-remote-servers`, `wordpress-migration`,
   `mail-server-config`): README, canonical `playbook.md` (placeholders only),
   plan/runbook templates, `templates/` (compose/scaffolds/configs), `scripts/`,
   `notes/` (lessons learned — **read before any run**).
-- **Execution** = one run of a playbook against one client's servers. Named
-  `executions/<YYYY-MM-DD>-<client>-<playbook>-<short-tag>/`, fully
-  gitignored, containing `plan.md`, `runbook.md` (playbook snapshot with real
-  values + step statuses), `inventory.md`, `notes.md`, `secrets/`, `logs/`.
-- Executions of different playbooks (or clients) are fully independent; a
-  playbook may be executed any number of times, each with its own folder.
+- **Execution folder** = one **persistent** folder per playbook variant, not per
+  date. Named `executions/<playbook>/` by default; if the operator supplies a
+  custom suffix (client, env, purpose), the folder is
+  `executions/<playbook>-<suffix>/` (e.g. `coder-remote-servers-personal`,
+  `coder-remote-servers-company`). It is gitignored and contains `plan.md`,
+  `runbook.md` (playbook snapshot with real values + step statuses),
+  `inventory.md`, `notes.md`, `secrets/`, `logs/` (append-only, one file per
+  step/session with timestamp prefix). Subsequent requests for the same playbook
+  variant **append to the same folder** — updating logs, extending the runbook,
+  and reusing existing `secrets/` and `inventory.md` so the agent never re-asks
+  for values already known.
+- Multiple variants of the same playbook (different suffixes) are fully
+  independent; different playbooks are fully independent. The suffix is the
+  only disambiguator within a playbook — use it whenever the same playbook
+  targets different clients, environments, or purposes.
 
-## 3. Execution lifecycle — the seven gates
+Legacy note: older runs used dated folders (`executions/<YYYY-MM-DD>-<client>-<playbook>-<tag>/`).
+Those folders remain on disk where they exist but are **not created for new
+work**. The agent should still surface them during discovery if they match the
+requested playbook, and the operator may manually migrate their contents into the
+new persistent folder if desired.
+
+## 3. Execution lifecycle — the seven gates (plus discovery)
+
+Every invocation starts with **discovery of existing state**. The agent must
+always do this — it is how follow-up questions and repeat runs regain context
+without re-asking for secrets.
 
 ```
-1. BOOTSTRAP    operator creates executions/<run>/ folder
-2. PREP         copy plan-template.md + runbook-template.md from the playbook;
-                fill in real hosts/IPs/credentials in plan.md
-3. NOTE-READ    read playbook notes/ (mandatory) + playbook.md; propose the
-                plan.md content (step list; every production WRITE flagged)
-4. APPROVAL     operator reviews plan.md, sets permission mode (A or B, §1.3),
-                approves → plan is frozen; changes require re-approval
-5. EXECUTE      execute; tick off runbook.md steps; capture outputs to logs/
-                (one file per step)
-6. DEVIATION    anything not in the plan → STOP, ask, get approval; never
-                improvise on production
-7. CLOSE        mark runbook complete/parked; findings → notes.md; propose
-                lesson promotion to the playbook's notes/ (IMPORTANT: DO NOT USE CONFIDENTIAL INFORMATION IN NOTES!)
+0. DISCOVER    agent scans executions/ for folders matching <playbook> and
+               <playbook>-* (including legacy dated folders containing the
+               playbook name); reads their inventory/secrets pointers at a
+               high level; presents matches to the operator and asks:
+               "Found previous execution(s) XYZ — reuse, or create new variant?"
+               Never auto-picks; always confirm.
+1. BOOTSTRAP   operator confirms: reuse executions/<playbook>[/-<suffix>]/
+               or create a new executions/<playbook>-<suffix>/ folder. If new,
+               create the folder and its subfolders (secrets/, logs/).
+2. PREP        if new folder: copy plan-template.md + runbook-template.md from
+               the playbook; fill in real hosts/IPs/credentials in plan.md.
+               if reusing: load existing plan.md / inventory.md / secrets/ /
+               notes.md as context; propose an updated plan that builds on them
+               (new steps appended, WRITE flags still required). Never overwrite
+               existing secrets or logs — append/update only.
+3. NOTE-READ   read playbook notes/ (mandatory) + playbook.md; propose the
+               plan.md content (step list; every production WRITE flagged)
+4. APPROVAL    operator reviews plan.md, sets permission mode (A or B, §1.3),
+               approves → plan is frozen; changes require re-approval.
+               Record permission mode in plan.md.
+5. EXECUTE     execute; tick off runbook.md steps; capture outputs to logs/
+               (one file per step, timestamp-prefixed so prior sessions are never
+               overwritten: e.g. logs/2026-08-29T1430-01-discover.log). Append,
+               never delete. Update inventory.md / secrets/ in place if new
+               values are discovered.
+6. DEVIATION   anything not in the plan → STOP, ask, get approval; never
+               improvise on production
+7. CLOSE       mark runbook steps complete/parked; append findings to notes.md
+               (cumulative history, newest at top or bottom with date header);
+               propose lesson promotion to the playbook's notes/ (IMPORTANT: DO NOT USE CONFIDENTIAL INFORMATION IN NOTES!)
 ```
 
 Runbook steps carry status (`pending` / `in-progress` / `done` / `blocked`).
-Any agent session can resume a run from the execution folder alone.
+Because the execution folder is persistent, any agent session can resume from it
+alone — reading `inventory.md`, `secrets/`, `plan.md`, `runbook.md`, and the tail
+of `logs/` is sufficient to reconstruct full context.
 
 ## 4. Folder discipline & segregation rules
 
 1. `playbooks/` is the only tracked operational content. Every other
    operational file is gitignored.
-2. A run touches ONLY its own execution folder. No reads from other runs.
-3. Credentials are generated per run and stored in that run's `secrets/`.
-   There is no shared vault.
-4. Before any commit: `git status` must show no `executions/`, no `.pem`/
+2. A variant touches ONLY its own execution folder (`executions/<playbook>/` or
+   `executions/<playbook>-<suffix>/`). Do not read from other variants or other
+   playbooks without explicit operator approval for that read.
+3. Credentials are generated per variant and stored in that variant's `secrets/`.
+   They are **persistent and reused** across invocations of the same variant —
+   update them in place when rotation is needed; do not duplicate them into
+   another variant without explicit approval. There is no shared vault across
+   playbooks or variants.
+4. `logs/` is **append-only**. Each session writes new timestamped files; never
+   delete or overwrite prior session logs. The full history of the variant lives
+   there.
+5. Before any commit: `git status` must show no `executions/`, no `.pem`/
    `.key`/`.tfvars`, no real IPs/hostnames. See §7.
-5. Parked runs keep their credentials until the operator deletes the folder.
+6. Parked or idle variants keep their credentials until the operator deletes the
+   folder. Deletion is always operator-initiated.
+7. **Naming:** the folder name is exactly the playbook directory name
+   (`playbooks/<name>/`), optionally plus `-<suffix>` where `<suffix>` is a
+   short, slugified token supplied by the operator (lowercase, hyphen-separated,
+   e.g. `personal`, `company`, `prod`, `staging`). Never include dates, client
+   names with spaces, or secrets in the folder name.
 
 ## 5. Access & credentials
 
 - **Never handle passwords.** The user installs SSH keys and provides
-  per-run credentials. You connect with keys only.
-- **Per-run secrets** live in the run's `secrets/` folder. When a run needs a
-  credential (API token, pre-auth key), generate it fresh for that run.
+  per-variant credentials. You connect with keys only.
+- **Per-variant secrets** live in that variant's `secrets/` folder and are
+  **reused across invocations**. When a run needs a new credential (API token,
+  pre-auth key), generate it and store it in that same `secrets/` folder,
+  updating the existing file or adding a new timestamped one — do not create a
+  second execution folder to hold it.
 - **SSH config aliases** (user-managed, `~/.ssh/config`) are the interface:
   the plan references `<alias>`, never raw hostnames.
 - Scoped NOPASSWD sudoers (exactly the binaries a playbook needs, nothing
@@ -152,7 +219,7 @@ Any agent session can resume a run from the execution folder alone.
 - `playbook.md` steps: copy-paste executable with `<PLACEHOLDER>` tokens;
   every step that writes to production flagged **WRITE**; rollback steps for
   every write.
-- **Promotion channel:** run findings go to the run's `notes.md`; after the
+- **Promotion channel:** run findings go to the variant's `notes.md`; after the
   run, propose promotion into the playbook's `notes/` (and rarely its
   `playbook.md`). The operator approves promotions.
 
@@ -184,17 +251,37 @@ rotate the credential if it was ever committed.
 | `README.md` | Public overview | ✅ |
 | `playbooks/_playbook-template/` | Skeleton for new playbooks | ✅ |
 | `playbooks/<name>/` | One folder per subject: README, playbook.md, plan/runbook templates, templates/, scripts/, notes/ | ✅ |
-| `executions/<run>/` | Per-run state: plan, runbook, inventory, notes, secrets, logs | ❌ gitignored |
+| `executions/<playbook>/` | Persistent per-variant state: plan, runbook, inventory, notes, secrets, logs (append-only) | ❌ gitignored |
+| `executions/<playbook>-<suffix>/` | Same, when a custom suffix is used | ❌ gitignored |
 | `docs/` | Plans, specs, design docs | ✅ |
 
 ## 9. Common questions
 
 - **What if the plan doesn't match reality?** Stop. Record the deviation in
   the runbook, ask the operator, get approval before continuing.
-- **Can I reuse a credential from another run?** No. Generate fresh, store in
-  this run's `secrets/`.
-- **Can I read another execution to understand the client?** No. If context
-  is missing, ask the operator.
+- **Can I reuse a credential from another run?** Credentials are per-variant and
+  intentionally reused *within the same execution folder* (`executions/<playbook>[-<suffix>]/secrets/`).
+  Do not copy credentials *between* variants or playbooks without explicit
+  operator approval. If the credential is stale, rotate it in place inside the
+  same variant's `secrets/`.
+- **Can I read another execution to understand the client?** Only the execution
+  folder for the *current* playbook variant. If you need context from a different
+  playbook or a different suffix variant, ask the operator first. At the start
+  of any task, the agent must scan `executions/<playbook>*` and confirm with the
+  operator whether to reuse the found folder — this is how follow-up questions
+  regain context without re-asking for secrets.
+- **How do I pick a suffix?** Use a short slug that disambiguates the target:
+  `personal` vs `company`, `prod` vs `staging`, client short name, or env.
+  Default is no suffix: `executions/<playbook>/`. Examples:
+  `executions/coder-remote-servers/` or `executions/coder-remote-servers-company/`.
+- **How do logs work with reuse?** `logs/` is append-only. Each session writes
+  new files with an ISO-timestamp prefix (e.g. `2026-08-29T143000-01-discover.log`);
+  prior logs are never overwritten. To reconstruct history, read the tail of
+  `logs/` plus `notes.md` and `plan.md`.
+- **What about my old dated execution folders?** They remain on disk and are
+  still gitignored. The agent surfaces them during discovery if their name
+  contains the playbook. You may leave them as archive or manually migrate
+  `inventory.md` / `secrets/` / `logs/` into the new persistent folder.
 - **How do I know a write is allowed?** It must be (a) in the approved plan,
   (b) flagged **WRITE** there, and (c) permitted by the run's permission mode
   (per-write confirm or plan-as-approved). All three, always.

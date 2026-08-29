@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
   Probes an OmniRoute instance's MCP endpoints using a Management-Access API
-  key, and emits the per-run MCP access artifact
-  (executions/<run>/mcp/<tag>.mcp.json).
+  key, and emits the per-variant MCP access artifact
+  (executions/omniroute[/-<suffix>]/mcp/<tag>.mcp.json).
 
 .DESCRIPTION
   Reads-only against the target. Checks:
@@ -19,7 +19,7 @@
 .PARAMETER McpKeyFile
   Path to the secrets/mcp-key-<tag>.txt file containing the bearer key.
 .PARAMETER OutDir
-  executions/<run> folder (logs/ and mcp/ subfolders created).
+  executions/omniroute[/-<suffix>] folder (logs/ and mcp/ subfolders created).
 .PARAMETER RunTag
   Short tag used in filenames and the env var name OMNIROUTE_MCP_KEY_<TAG>.
 .PARAMETER Transport
@@ -143,6 +143,7 @@ $artifactPath = Join-Path $mcpDir "$RunTag.mcp.json"
 $artifact | ConvertTo-Json -Depth 5 | Set-Content -Path $artifactPath -Encoding utf8
 Log "Artifact written: $artifactPath"
 
-$logPath = Join-Path $logDir "09-mcp-test.log"
+$stamp = Get-Date -Format "yyyy-MM-ddTHHmmss"
+$logPath = Join-Path $logDir "$stamp-09-mcp-test.log"
 $log | Set-Content -Path $logPath -Encoding utf8
 Log "Log written: $logPath"

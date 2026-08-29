@@ -41,14 +41,14 @@ live in the execution's `inventory.md` and `secrets/`, never here.
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical procedure (placeholders only) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
+| `plan-template.md` | Copied to `executions/netdata-monitoring/plan.md` on first run (or `executions/netdata-monitoring-<suffix>/plan.md`) |
+| `runbook-template.md` | Copied to `executions/netdata-monitoring/runbook.md` on first run |
 | `templates/mcp-config.json` | Per-node MCP server config template (placeholders) |
 | `notes/gotchas.md` | G1–G18: real pitfalls hit on the fleet, with fixes |
 
-## MCP config artifact (per node, per run)
+## MCP config artifact (per node, per variant)
 When a node is confirmed connected, the run writes
-`executions/<run>/mcp/<alias>.mcp.json` from `templates/mcp-config.json` with
+`executions/netdata-monitoring/mcp/<alias>.mcp.json` (or `executions/netdata-monitoring-<suffix>/mcp/<alias>.mcp.json`) from `templates/mcp-config.json` with
 real values filled in. It is gitignored (inside `executions/`). To use it
 later — e.g. in a dedicated or remote agent — merge the `"mcp"` block into
 that agent's `opencode.json` and set the referenced env var

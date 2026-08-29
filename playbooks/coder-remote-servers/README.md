@@ -35,8 +35,8 @@ Real values live in the execution's `inventory.md`, never here.
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical procedure (placeholders only) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
+| `plan-template.md` | Copied to `executions/coder-remote-servers/plan.md` on first run (or `executions/coder-remote-servers-<suffix>/plan.md`) |
+| `runbook-template.md` | Copied to `executions/coder-remote-servers/runbook.md` on first run |
 | `templates/workspace-docker.yml` | Canonical dind compose (bind IP + `DOCKER_TLS_SAN` = placeholders) |
 | `templates/docker-devcontainer/` | Unified Coder template (local + remote via vars) |
 | `templates/remote-docker-workspace.hcl` | Simpler standalone remote template (code-server only) |

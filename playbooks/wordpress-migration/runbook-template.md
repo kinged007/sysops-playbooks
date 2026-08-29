@@ -1,13 +1,17 @@
 # Runbook: <RUN NAME>
 
-Snapshot of `playbooks/<name>/playbook.md` being executed, with real values
-filled in. State lives here and in `logs/` — a run can be resumed by any agent
-session from these files alone.
+Snapshot of `playbooks/wordpress-migration/playbook.md` being executed, with
+real values filled in. State lives here and in `logs/` — any agent session can
+resume from these files alone. This folder is persistent per playbook variant
+(`executions/wordpress-migration[/-<suffix>]/`); subsequent invocations append
+to it, never replace it. `logs/` is append-only — each session adds
+timestamp-prefixed files.
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | <playbook-name> |
+| Playbook | `wordpress-migration` |
+| Execution folder | `executions/wordpress-migration/` or `executions/wordpress-migration-<suffix>/` |
 | Client | <client> |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
@@ -16,9 +20,9 @@ session from these files alone.
 Status values: `pending` / `in-progress` / `done` / `blocked`.
 
 - [ ] **1. <step>** (read) — status: pending
-  - Log: `logs/01-<short-name>.log`
+  - Log: `logs/<timestamp>-01-<short-name>.log` (append-only; prior logs never overwritten)
 - [ ] **2. <step>** (**WRITE**) — status: pending
-  - Log: `logs/02-<short-name>.log`
+  - Log: `logs/<timestamp>-02-<short-name>.log`
   - Mode A note: operator confirmation required before running.
 
 ## Deviations
@@ -26,5 +30,5 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 
 ## Close-out
 - [ ] Runbook complete (all steps done or blocked+explained)
-- [ ] Findings recorded in `notes.md`
+- [ ] Findings appended to `notes.md` (cumulative history — do not overwrite)
 - [ ] Promotion candidates proposed to operator (→ playbook `notes/`)

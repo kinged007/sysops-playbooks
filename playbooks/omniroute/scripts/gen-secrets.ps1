@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-  Generates all OmniRoute secrets/salts and writes them into the run's
-  secrets/ folder (executions/<run>/secrets/). Local file writes only —
+  Generates all OmniRoute secrets/salts and writes them into the variant's
+  secrets/ folder (executions/omniroute[/-<suffix>]/secrets/). Local file writes only —
   no production write.
 
 .DESCRIPTION
@@ -10,7 +10,7 @@
   generation timestamp. Full values never appear in runbook or logs.
 
 .PARAMETER SecretsDir
-  Target secrets folder (default: <repo>/executions/<run>/secrets).
+  Target secrets folder (default: <repo>/executions/omniroute[/-<suffix>]/secrets).
 .PARAMETER RunTag
   Short tag used for the MCP key filename and env var name (e.g. "demo").
 #>

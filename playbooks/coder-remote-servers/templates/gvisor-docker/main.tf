@@ -279,7 +279,7 @@ resource "coder_agent" "main" {
       GIT_COMMITTER_EMAIL = "${data.coder_workspace_owner.me.email}"
     },
     var.docker_host != "" && var.docker_enabled && data.coder_parameter.enable_docker.value ? {
-      DOCKER_HOST       = var.docker_host
+      DOCKER_HOST       = "tcp://host.docker.internal:${split(":", var.docker_host)[2]}"
       DOCKER_TLS_VERIFY = "1"
       DOCKER_CERT_PATH  = "/certs/docker"
     } : {}

@@ -53,16 +53,26 @@ operator* or *verified by inspection*.
 
 ## Run lifecycle
 
-1. **BOOTSTRAP** — operator creates `executions/<YYYY-MM-DD>-<client>-<playbook>-<tag>/`.
-2. **PREP** — copy `plan-template.md` → `plan.md` and `runbook-template.md` →
-   `runbook.md` from this folder; fill hosts/IPs/credentials in `plan.md`.
+0. **DISCOVER** — agent scans `executions/mail-server-config*` for existing
+   variant folders (including legacy dated folders); presents matches and asks
+   the operator to reuse one or create a new `-<suffix>` variant. Never
+   auto-picks.
+1. **BOOTSTRAP** — operator confirms reuse of `executions/mail-server-config[/-<suffix>]/`
+   or a new `executions/mail-server-config-<suffix>/` folder. If new, create it
+   with `secrets/` and `logs/` subfolders.
+2. **PREP** — if new: copy `plan-template.md` → `plan.md` and
+   `runbook-template.md` → `runbook.md` from this folder; fill hosts/IPs/credentials.
+   If reusing: load existing `plan.md` / `inventory.md` / `secrets/` / `notes.md`
+   as context; propose updated plan building on them — never overwrite existing
+   secrets or logs.
 3. **NOTE-READ** — read `notes/` (mandatory) + the **active branch file**
    (+ `common.md`); propose the step list; flag every production **WRITE**.
 4. **APPROVAL** — operator reviews `plan.md`, sets permission mode (A/B),
    approves → plan frozen.
-5. **EXECUTE** — tick off `runbook.md` steps, one log file per step in `logs/`.
+5. **EXECUTE** — tick off `runbook.md` steps; capture outputs to `logs/` (one
+   timestamp-prefixed file per step, append-only — prior logs never overwritten).
 6. **DEVIATION** — anything not in the plan → STOP, ask, get approval.
-7. **CLOSE** — mark runbook complete/parked; findings → `notes.md`; propose
+7. **CLOSE** — append findings to `notes.md` (cumulative history); propose
    lesson promotion to `notes/lessons.md` (operator approves).
 
 ---

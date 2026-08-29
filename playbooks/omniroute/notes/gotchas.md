@@ -49,11 +49,13 @@ a target (local/Docker/VPS/remote) — the operator picks it at plan approval.
 - `npx omniroute` with no local package cancels with a prompt — never run it
   non-interactively to "check version"; use the real binary or probe the URL.
 
-## G7 — secrets are per-run
+## G7 — secrets are per-variant (persistent)
 Secrets (INITIAL_PASSWORD, JWT_SECRET, API_KEY_SECRET, WS_BRIDGE_SECRET, salts)
-are generated fresh per run into `executions/<run>/secrets/` and never reused
-across executions (repo AGENTS.md §1.5/§4). A public instance's existing
-secrets are never read/rotated without explicit operator approval.
+are generated into `executions/omniroute/secrets/` (or `executions/omniroute-<suffix>/secrets/`)
+and **persist across invocations** of the same variant (repo AGENTS.md §1.4/§4). Each
+variant is isolated — never copy secrets between variants without explicit operator
+approval. A public instance's existing secrets are never read/rotated without
+explicit operator approval.
 
 ## G8 — public URL env vars
 - `NEXT_PUBLIC_BASE_URL` — canonical public origin (OAuth redirects, dashboard

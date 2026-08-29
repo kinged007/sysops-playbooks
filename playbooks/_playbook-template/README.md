@@ -24,8 +24,15 @@ never go here — see plan-template.md>
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical step-by-step procedure (placeholders only) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` at run start |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` at run start |
+| `plan-template.md` | Copied to `executions/<playbook>/plan.md` on first run (or `executions/<playbook>-<suffix>/plan.md`) |
+| `runbook-template.md` | Copied to `executions/<playbook>/runbook.md` on first run |
 | `templates/` | All templates: compose, scaffolds, configs, code templates |
 | `scripts/` | Scripts the playbook uses |
 | `notes/` | Lessons learned, gotchas, pitfalls from past runs |
+
+> Execution folders are **persistent per playbook variant**. The first run creates
+> `executions/<playbook>/` (or `executions/<playbook>-<suffix>/` when the operator
+> supplies a suffix like `personal`/`company`/`prod`). All subsequent invocations
+> for the same variant **reuse and append to the same folder** — `secrets/` and
+> `inventory.md` persist, `logs/` is append-only. The agent always scans for an
+> existing folder before creating a new one and confirms with the operator.

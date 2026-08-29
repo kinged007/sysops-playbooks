@@ -77,10 +77,10 @@ free.
       (`NETDATA_MCP_KEY_<ALIAS>`) for future agent configs
 
 ## 5. Generate the per-node MCP config artifact (local file, no production write)
-- [ ] Copy `templates/mcp-config.json` to `executions/<RUN>/mcp/<ALIAS>.mcp.json`
+- [ ] Copy `templates/mcp-config.json` to `executions/netdata-monitoring/mcp/<ALIAS>.mcp.json` (or `executions/netdata-monitoring-<suffix>/mcp/<ALIAS>.mcp.json` for a named variant)
 - [ ] Fill in real values: server key `netdata-<ALIAS>`, `url`
-      `http://<NODE_ADDRESS>:19999/mcp`, env var name `NETDATA_MCP_KEY_<ALIAS>`
-- [ ] Validate: `python -m json.tool executions/<RUN>/mcp/<ALIAS>.mcp.json`
+       `http://<NODE_ADDRESS>:19999/mcp`, env var name `NETDATA_MCP_KEY_<ALIAS>`
+- [ ] Validate: `python -m json.tool executions/netdata-monitoring/mcp/<ALIAS>.mcp.json`
 - [ ] Note in the runbook: how to install this artifact later (merge into an
       agent's `opencode.json`; set the env var to the key in `secrets/`)
 

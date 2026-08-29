@@ -1,13 +1,17 @@
 # Runbook: <RUN NAME>
 
 Snapshot of `playbooks/omniroute/playbook.md` being executed, with real values
-filled in. State lives here and in `logs/` — a run can be resumed by any agent
-session from these files alone.
+filled in. State lives here and in `logs/` — any agent session can resume from
+these files alone. This folder is persistent per playbook variant
+(`executions/omniroute[/-<suffix>]/`); subsequent invocations append to it,
+never replace it. `logs/` is append-only — each session adds timestamp-prefixed
+files (e.g. `logs/2026-08-29T143000-01-discover.log`).
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
 | Playbook | `omniroute` |
+| Execution folder | `executions/omniroute/` or `executions/omniroute-<suffix>/` |
 | Client | <client> |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
@@ -25,12 +29,12 @@ session from these files alone.
 Status values: `pending` / `in-progress` / `done` / `blocked`.
 
 - [ ] **0. Pre-flight: confirm access, permission mode** (read) — status: pending
-  - Log: `logs/00-preflight.log`
+  - Log: `logs/<timestamp>-00-preflight.log`
 - [ ] **1. Discover current state** (read) — status: pending
-  - Log: `logs/01-discover.log`
+  - Log: `logs/<timestamp>-01-discover.log`
 - [ ] **2. Access & auth: operator-provided key** (read) — status: pending
 - [ ] **3. Generate secrets → `secrets/`** (local) — status: pending
-  - Log: `logs/03-secrets.log`
+  - Log: `logs/<timestamp>-03-secrets.log`
 - [ ] **4. Base/public URLs** (SQ — ask operator) — status: pending
 - [ ] **5. Deploy/wire instance** (**WRITE**) — status: pending
   - Mode A note: operator confirmation required before running.
@@ -40,7 +44,7 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 - [ ] **8. Enable remote MCP + create manage key** (**WRITE**) — status: pending
   - Mode A note: operator confirmation required before running.
 - [ ] **9. Test MCP reachability** (read) — status: pending
-  - Log: `logs/09-mcp-test.log`
+  - Log: `logs/<timestamp>-09-mcp-test.log`
 - [ ] **10. Build MCP access artifact** (local) — status: pending
 - [ ] **11. Verification & rollback** (read) — status: pending
 
@@ -49,5 +53,5 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 
 ## Close-out
 - [ ] Runbook complete (all steps done or blocked+explained)
-- [ ] Findings recorded in `notes.md`
+- [ ] Findings appended to `notes.md` (cumulative history — do not overwrite)
 - [ ] Promotion candidates proposed to operator (→ playbook `notes/`)

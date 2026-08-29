@@ -3,19 +3,19 @@
 | Field | Value |
 |---|---|
 | Client | <client> |
-| Playbook | `<playbook-name>` |
-| Date | <YYYY-MM-DD> |
-| Execution folder | `executions/<YYYY-MM-DD>-<client>-<playbook>-<tag>/` |
+| Playbook | `wordpress-migration` |
+| Execution folder | `executions/wordpress-migration/` or `executions/wordpress-migration-<suffix>/` |
 | Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
 | Status | draft → approved → executing → closed |
 
-## Servers involved (THIS run only)
+## Servers involved (THIS variant only)
 | Alias (ssh config) | Role | Purpose | Access key |
 |---|---|---|---|
 | <alias> | <source/prod/dest> | <what it does in this run> | `~/.ssh/<key>` |
 
-## Credentials / secrets (THIS run only)
+## Credentials / secrets (THIS variant only)
 <Files in `secrets/` of this execution folder; never inline values here>
+Secrets persist in this folder across invocations — update in place when rotating.
 
 ## Steps
 Numbered steps mirroring `runbook.md`, with **WRITE** flags:

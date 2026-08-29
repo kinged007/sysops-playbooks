@@ -43,8 +43,8 @@ The playbook has **two mutually exclusive branches** chosen at Phase 1 —
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical procedure (placeholders only; WRITE flags on every production write) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
+| `plan-template.md` | Copied to `executions/wordpress-migration/plan.md` on first run (or `executions/wordpress-migration-<suffix>/plan.md`) |
+| `runbook-template.md` | Copied to `executions/wordpress-migration/runbook.md` on first run |
 | `templates/` | Compose files, wp-config scaffolds, nginx/vhost templates |
 | `scripts/` | Backup/transfer/restore scripts |
 | `notes/` | Lessons learned from past migrations (verified incidents, gotchas) |

@@ -53,8 +53,8 @@ The mail server(s) + DNS provider. Real values live in the execution's
 | `branches/repair.md` | Diagnose & repair existing servers (any stack) |
 | `branches/migrate.md` | Mailbox migration into new Mailu |
 | `branches/ops.md` | Backup, restore, update, monitor, accounts, storage |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
+| `plan-template.md` | Copied to `executions/mail-server-config/plan.md` on first run (or `executions/mail-server-config-<suffix>/plan.md`) |
+| `runbook-template.md` | Copied to `executions/mail-server-config/runbook.md` on first run |
 | `templates/` | mailu compose (sqlite/postgres), mailu.env, DNS record reference |
 | `scripts/` | dns-audit, mail-diag, backup-mailu, restore-mailu, migrate-mailboxes |
 | `notes/` | Lessons learned (read before any run) |

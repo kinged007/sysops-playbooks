@@ -58,7 +58,7 @@ means "target chosen at plan approval" (remote / local npm / Docker).
 - [ ] Record a **secrets manifest** in `secrets/manifest.md`: names, file
       locations, first-8-chars prefix (to verify without leaking full values),
       generation timestamp, which were applied where.
-- [ ] CRITICAL: `secrets/` is gitignored (`executions/` gitignored). Verify
+- [ ] CRITICAL: `secrets/` is gitignored (`executions/` → `executions/omniroute[/-<suffix>]/` is gitignored). Verify
       nothing is staged before any commit.
 
 ## 4. Configure base & public URLs (SQ — ask the operator)
@@ -160,7 +160,7 @@ Depends on the target the operator chose at approval:
 
 ## 10. Build the MCP access artifact (local file, no production write)
 - [ ] `scripts/test-mcp.ps1` also emits
-      `executions/<run>/mcp/<tag>.mcp.json` with:
+      `executions/omniroute/mcp/<tag>.mcp.json` (or `executions/omniroute-<suffix>/mcp/<tag>.mcp.json`) with:
       - server key suffix, `url = <BASE_URL>/api/mcp/<transport>`,
         transport, and the env var name `OMNIROUTE_MCP_KEY_<TAG>`
 - [ ] Validate the JSON.
@@ -172,7 +172,7 @@ Depends on the target the operator chose at approval:
 - [ ] Confirm every **WRITE** has a rollback recorded in the runbook (URL set,
       HTTPS flags, hardening, MCP enable, key create).
 - [ ] Confirm `secrets/manifest.md` lists every secret and its file, and that
-      `git status` shows no `secrets/`, no `executions/`.
+      `git status` shows no `secrets/`, no `executions/omniroute*`.
 - [ ] Findings → run `notes.md`; propose lesson promotion to `notes/gotchas.md`
       (operator approves promotion, never mid-run).
 

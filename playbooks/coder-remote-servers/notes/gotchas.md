@@ -73,7 +73,7 @@ Always: GET the current policy, edit it, and POST the full content back with
 `Content-Type: application/hujson`; verify with a follow-up GET. Scope required
 is `policy_file`. Fetch the tailnet name from the host's
 `tailscale status --json` (`MagicDNSSuffix`, e.g. `tailcXXXX.ts.net`).
-The key can be stored in gitignored `executions/<run>/secrets/`.
+The key can be stored in gitignored `executions/coder-remote-servers/secrets/` (or `executions/coder-remote-servers-<suffix>/secrets/` for a named variant).
 
 **G9 — Coder CLI session expires.** `coder whoami` → "signed out". User runs
 `coder login <url>` (browser). The CLI URL is stored in the coderv2 config; check
