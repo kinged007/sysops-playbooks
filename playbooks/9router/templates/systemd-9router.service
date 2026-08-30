@@ -1,0 +1,57 @@
+# systemd unit for 9Router (source / non-Docker mode D)
+# Copy to /etc/systemd/system/9router.service on <ALIAS>, fill <USER>,
+# <APP_DIR>, <DATA_DIR>, <PORT>, then:
+#   systemctl daemon-reload
+#   systemctl enable --now 9router
+#   systemctl status 9router
+# Logs: journalctl -u 9router -f  (and DATA_DIR/logs/ if ENABLE_REQUEST_LOGS=true)
+# Ref: README "VPS Deployment" + .env.example
+
+[Unit]
+Description=9Router AI Gateway (OpenAI-compatible proxy)
+After=network.target
+
+[Service]
+Type=simple
+User=<USER>
+Group=<USER>
+WorkingDirectory=<APP_DIR>
+# <APP_DIR> is the git clone root containing package.json + custom-server.js
+# e.g. /opt/9router or /home/<USER>/9router
+
+Environment=NODE_ENV=production
+Environment=PORT=<PORT>
+Environment=HOSTNAME=0.0.0.0
+Environment=DATA_DIR=<DATA_DIR>
+# <DATA_DIR> e.g. /var/lib/9router or /home/<USER>/.9router
+# All other env (JWT_SECRET, INITIAL_PASSWORD, BASE_URL, etc.) comes from:
+EnvironmentFile=<APP_DIR>/.env
+# Ensure <APP_DIR>/.env exists (built from templates/env.example + secrets/)
+
+# The package is "9router-app" (private) — source execution is expected.
+ExecStart=/usr/bin/npm run start
+# Alternative for Bun installs: ExecStart=/usr/bin/bun ./.next/standalone/custom-server.js
+
+Restart=always
+RestartSec=5
+
+# Hardening (adjust if DATA_DIR is elsewhere)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=<DATA_DIR> <APP_DIR>
+# If DATA_DIR is under /home/<USER>, ProtectHome must be off or the path allowed above.
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=9router
+
+[Install]
+WantedBy=multi-user.target
+
+# Post-install verification:
+#   curl -s http://127.0.0.1:<PORT>/api/health   # {"ok":true}
+# Rollback: systemctl disable --now 9router; rm /etc/systemd/system/9router.service; systemctl daemon-reload
+# Update (source mode): cd <APP_DIR> && git pull && npm install && npm run build && systemctl restart 9router

@@ -1,0 +1,271 @@
+{
+  "name": "vision",
+  "description": "Vision cost asc",
+  "generated": "2026-08-30T17:18:17.938325",
+  "source": "models.json + AA Intel+Cost (muse overridden 0.02)",
+  "ordering": "cost asc -> free tie -> intel desc",
+  "models": [
+    "ollama/gemma4:31b",
+    "gemini/gemma-4-31b-it",
+    "openrouter/google/gemma-4-31b-it:free",
+    "ocg/mimo-v2.5",
+    "cmc/xiaomi/mimo-v2.5",
+    "ocg/mimo-v2.5-pro",
+    "cmc/xiaomi/mimo-v2.5-pro",
+    "openrouter/google/gemma-4-26b-a4b-it:free",
+    "gemini/gemini-3.1-flash-lite-preview",
+    "cf/@cf/moonshotai/kimi-k2.5",
+    "cmc/moonshotai/Kimi-K2.5",
+    "openrouter/minimax/minimax-m3:free",
+    "ocg/minimax-m3",
+    "cmc/MiniMaxAI/MiniMax-M3",
+    "cmc/minimax/minimax-m3-free",
+    "ocg/qwen3.7-plus",
+    "ocg/kimi-k2.7-code",
+    "cmc/moonshotai/Kimi-K2.7-Code",
+    "gemini/gemini-3.1-pro-preview",
+    "ocg/qwen3.6-plus",
+    "cmc/Qwen/Qwen3.6-Plus",
+    "cf/@cf/moonshotai/kimi-k2.6",
+    "ocg/kimi-k2.6",
+    "cmc/moonshotai/Kimi-K2.6",
+    "ocg/kimi-k3",
+    "gemini/gemini-3-flash-preview"
+  ],
+  "members": [
+    {
+      "id": "ollama/gemma4:31b",
+      "owned_by": "ollama",
+      "intelligence": 29.6949678165957,
+      "costPerTask": 0,
+      "aa_slug": "gemma-4-31b",
+      "vision": true,
+      "contextWindow": 128000
+    },
+    {
+      "id": "gemini/gemma-4-31b-it",
+      "owned_by": "gemini",
+      "intelligence": 29.6949678165957,
+      "costPerTask": 0,
+      "aa_slug": "gemma-4-31b",
+      "vision": true,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/google/gemma-4-31b-it:free",
+      "owned_by": "openrouter",
+      "intelligence": 29.6949678165957,
+      "costPerTask": 0,
+      "aa_slug": "gemma-4-31b",
+      "vision": true,
+      "contextWindow": 128000
+    },
+    {
+      "id": "ocg/mimo-v2.5",
+      "owned_by": "ocg",
+      "intelligence": 38.0433645155222,
+      "costPerTask": 0.010359306953646182,
+      "aa_slug": "mimo-v2-5-0424",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "cmc/xiaomi/mimo-v2.5",
+      "owned_by": "cmc",
+      "intelligence": 38.0433645155222,
+      "costPerTask": 0.010359306953646182,
+      "aa_slug": "mimo-v2-5-0424",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/mimo-v2.5-pro",
+      "owned_by": "ocg",
+      "intelligence": 42.8796821546836,
+      "costPerTask": 0.03390845289072561,
+      "aa_slug": "mimo-v2-5-pro",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "cmc/xiaomi/mimo-v2.5-pro",
+      "owned_by": "cmc",
+      "intelligence": 42.8796821546836,
+      "costPerTask": 0.03390845289072561,
+      "aa_slug": "mimo-v2-5-pro",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "openrouter/google/gemma-4-26b-a4b-it:free",
+      "owned_by": "openrouter",
+      "intelligence": 26.0656023232983,
+      "costPerTask": 0.03912654124783082,
+      "aa_slug": "gemma-4-26b-a4b",
+      "vision": true,
+      "contextWindow": 128000
+    },
+    {
+      "id": "gemini/gemini-3.1-flash-lite-preview",
+      "owned_by": "gemini",
+      "intelligence": 25.6076097099382,
+      "costPerTask": 0.04324611147116286,
+      "aa_slug": "gemini-3-1-flash-lite-preview",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "cf/@cf/moonshotai/kimi-k2.5",
+      "owned_by": "cf",
+      "intelligence": 36.0227407548798,
+      "costPerTask": 0.09638405919581741,
+      "aa_slug": "kimi-k2-5",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cmc/moonshotai/Kimi-K2.5",
+      "owned_by": "cmc",
+      "intelligence": 36.0227407548798,
+      "costPerTask": 0.09638405919581741,
+      "aa_slug": "kimi-k2-5",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "openrouter/minimax/minimax-m3:free",
+      "owned_by": "openrouter",
+      "intelligence": 45.3968506399702,
+      "costPerTask": 0.13870974901890812,
+      "aa_slug": "minimax-m3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/minimax-m3",
+      "owned_by": "ocg",
+      "intelligence": 45.3968506399702,
+      "costPerTask": 0.13870974901890812,
+      "aa_slug": "minimax-m3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "cmc/MiniMaxAI/MiniMax-M3",
+      "owned_by": "cmc",
+      "intelligence": 45.3968506399702,
+      "costPerTask": 0.13870974901890812,
+      "aa_slug": "minimax-m3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "cmc/minimax/minimax-m3-free",
+      "owned_by": "cmc",
+      "intelligence": 45.3968506399702,
+      "costPerTask": 0.13870974901890812,
+      "aa_slug": "minimax-m3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/qwen3.7-plus",
+      "owned_by": "ocg",
+      "intelligence": 39.3745992994168,
+      "costPerTask": 0.17028705303604513,
+      "aa_slug": "qwen3-7-plus",
+      "vision": true,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ocg/kimi-k2.7-code",
+      "owned_by": "ocg",
+      "intelligence": 43.0244715223736,
+      "costPerTask": 0.22197474982635537,
+      "aa_slug": "kimi-k2-7-code",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cmc/moonshotai/Kimi-K2.7-Code",
+      "owned_by": "cmc",
+      "intelligence": 43.0244715223736,
+      "costPerTask": 0.22197474982635537,
+      "aa_slug": "kimi-k2-7-code",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "gemini/gemini-3.1-pro-preview",
+      "owned_by": "gemini",
+      "intelligence": 47.7383260259131,
+      "costPerTask": 0.3345647504982565,
+      "aa_slug": "gemini-3-1-pro-preview",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/qwen3.6-plus",
+      "owned_by": "ocg",
+      "intelligence": 40.4880703723726,
+      "costPerTask": 0.3568972800744663,
+      "aa_slug": "qwen3-6-plus",
+      "vision": true,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "cmc/Qwen/Qwen3.6-Plus",
+      "owned_by": "cmc",
+      "intelligence": 40.4880703723726,
+      "costPerTask": 0.3568972800744663,
+      "aa_slug": "qwen3-6-plus",
+      "vision": true,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "cf/@cf/moonshotai/kimi-k2.6",
+      "owned_by": "cf",
+      "intelligence": 45.1382483763163,
+      "costPerTask": 0.38861223350545604,
+      "aa_slug": "kimi-k2-6",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "ocg/kimi-k2.6",
+      "owned_by": "ocg",
+      "intelligence": 45.1382483763163,
+      "costPerTask": 0.38861223350545604,
+      "aa_slug": "kimi-k2-6",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cmc/moonshotai/Kimi-K2.6",
+      "owned_by": "cmc",
+      "intelligence": 45.1382483763163,
+      "costPerTask": 0.38861223350545604,
+      "aa_slug": "kimi-k2-6",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "ocg/kimi-k3",
+      "owned_by": "ocg",
+      "intelligence": 59.6994671342592,
+      "costPerTask": 0.8374574917584584,
+      "aa_slug": "kimi-k3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "gemini/gemini-3-flash-preview",
+      "owned_by": "gemini",
+      "intelligence": 27.938225136834387,
+      "costPerTask": null,
+      "aa_slug": "gemini-3-flash",
+      "vision": true,
+      "contextWindow": 1048576
+    }
+  ]
+}

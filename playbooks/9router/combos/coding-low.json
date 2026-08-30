@@ -1,0 +1,511 @@
+{
+  "name": "coding-low",
+  "description": "LOW >=30 cost asc",
+  "generated": "2026-08-30T17:18:17.938325",
+  "source": "models.json + AA Intel+Cost (muse overridden 0.02)",
+  "ordering": "cost asc -> free tie -> intel desc, >=30 (rank re-sequenced, order preserved as edited) (rank re-sequenced, order preserved as edited)",
+  "models": [
+    "cmc/xiaomi/mimo-v2.5",
+    "ocg/mimo-v2.5",
+    "ocg/hy3",
+    "cmc/tencent/hy3-paid",
+    "openrouter/thinkingmachines/inkling-small:free",
+    "openrouter/inclusionai/ling-3.0-flash-fin:free",
+    "cmc/MiniMaxAI/MiniMax-M2.7",
+    "cmc/minimax/minimax-m2.7-free",
+    "ocg/minimax-m2.7",
+    "cmc/z-ai/glm-5.3-flash",
+    "ocg/glm-5.3-flash",
+    "cf/@cf/moonshotai/kimi-k2.5",
+    "cmc/moonshotai/Kimi-K2.5",
+    "ocg/qwen3.8-flash",
+    "cmc/deepseek/deepseek-v4-flash",
+    "ocg/deepseek-v4-flash",
+    "cmc/deepseek/deepseek-v4-flash-vision-exp",
+    "ocg/deepseek-v4-flash-vision-exp",
+    "ocg/longcat-2.0",
+    "openrouter/minimax/minimax-m3:free",
+    "cmc/MiniMaxAI/MiniMax-M3",
+    "cmc/minimax/minimax-m3-free",
+    "ocg/minimax-m3",
+    "ocg/qwen3.7-plus",
+    "cmc/moonshotai/Kimi-K2.7-Code",
+    "ocg/kimi-k2.7-code",
+    "cmc/deepseek/deepseek-v4-pro",
+    "ocg/deepseek-v4-pro",
+    "cmc/zai-org/GLM-5.1",
+    "ocg/glm-5.1",
+    "gemini/gemini-3.1-pro-preview",
+    "openrouter/thinkingmachines/inkling:free",
+    "cmc/Qwen/Qwen3.6-Plus",
+    "ocg/qwen3.6-plus",
+    "ollama/nemotron-3-ultra",
+    "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+    "cf/@cf/moonshotai/kimi-k2.6",
+    "cmc/moonshotai/Kimi-K2.6",
+    "ocg/kimi-k2.6",
+    "openrouter/z-ai/glm-5.2:free",
+    "cmc/zai-org/GLM-5.2-Fast",
+    "ocg/glm-5.2",
+    "ocg/qwen3.7-max",
+    "ocg/glm-5.3",
+    "ocg/kimi-k3",
+    "ocg/qwen3.8-max",
+    "cmc/Qwen/Qwen3.6-Max-Preview",
+    "cmc/zai-org/GLM-5",
+    "cmc/MiniMaxAI/MiniMax-M2.5",
+    "ocg/minimax-m2.5"
+  ],
+  "members": [
+    {
+      "id": "cmc/xiaomi/mimo-v2.5",
+      "owned_by": "cmc",
+      "intelligence": 38.0433645155222,
+      "costPerTask": 0.010359306953646182,
+      "aa_slug": "mimo-v2-5-0424",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/mimo-v2.5",
+      "owned_by": "ocg",
+      "intelligence": 38.0433645155222,
+      "costPerTask": 0.010359306953646182,
+      "aa_slug": "mimo-v2-5-0424",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/hy3",
+      "owned_by": "ocg",
+      "intelligence": 42.2134908724756,
+      "costPerTask": 0.03574070875754976,
+      "aa_slug": "hy3",
+      "vision": false,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cmc/tencent/hy3-paid",
+      "owned_by": "cmc",
+      "intelligence": 42.2134908724756,
+      "costPerTask": 0.03574070875754976,
+      "aa_slug": "hy3",
+      "vision": false,
+      "contextWindow": 262144
+    },
+    {
+      "id": "openrouter/thinkingmachines/inkling-small:free",
+      "owned_by": "openrouter",
+      "intelligence": 41.1806598798293,
+      "costPerTask": 0.07353375676315574,
+      "aa_slug": "inkling-small",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/inclusionai/ling-3.0-flash-fin:free",
+      "owned_by": "openrouter",
+      "intelligence": 37.820825176113,
+      "costPerTask": 0.03766412774562829,
+      "aa_slug": "ling-3-0-flash",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cmc/MiniMaxAI/MiniMax-M2.7",
+      "owned_by": "cmc",
+      "intelligence": 38.8713536464198,
+      "costPerTask": 0.07772914284734003,
+      "aa_slug": "minimax-m2-7",
+      "vision": false,
+      "contextWindow": 204800
+    },
+    {
+      "id": "cmc/minimax/minimax-m2.7-free",
+      "owned_by": "cmc",
+      "intelligence": 38.8713536464198,
+      "costPerTask": 0.07772914284734003,
+      "aa_slug": "minimax-m2-7",
+      "vision": false,
+      "contextWindow": 204800
+    },
+    {
+      "id": "ocg/minimax-m2.7",
+      "owned_by": "ocg",
+      "intelligence": 38.8713536464198,
+      "costPerTask": 0.07772914284734003,
+      "aa_slug": "minimax-m2-7",
+      "vision": false,
+      "contextWindow": 204800
+    },
+    {
+      "id": "cmc/z-ai/glm-5.3-flash",
+      "owned_by": "cmc",
+      "intelligence": 57.4592004791323,
+      "costPerTask": 0.0868525314872083,
+      "aa_slug": "glm-5-3-flash",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/glm-5.3-flash",
+      "owned_by": "ocg",
+      "intelligence": 57.4592004791323,
+      "costPerTask": 0.0868525314872083,
+      "aa_slug": "glm-5-3-flash",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "cf/@cf/moonshotai/kimi-k2.5",
+      "owned_by": "cf",
+      "intelligence": 36.0227407548798,
+      "costPerTask": 0.09638405919581741,
+      "aa_slug": "kimi-k2-5",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cmc/moonshotai/Kimi-K2.5",
+      "owned_by": "cmc",
+      "intelligence": 36.0227407548798,
+      "costPerTask": 0.09638405919581741,
+      "aa_slug": "kimi-k2-5",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "ocg/qwen3.8-flash",
+      "owned_by": "ocg",
+      "intelligence": 55.8139871116362,
+      "costPerTask": 0.09701942971977867,
+      "aa_slug": "qwen3-8-flash-next",
+      "vision": false,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cmc/deepseek/deepseek-v4-flash",
+      "owned_by": "cmc",
+      "intelligence": 51.7665776089032,
+      "costPerTask": 0.11215889736791404,
+      "aa_slug": "deepseek-v4-flash",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ocg/deepseek-v4-flash",
+      "owned_by": "ocg",
+      "intelligence": 51.7665776089032,
+      "costPerTask": 0.11215889736791404,
+      "aa_slug": "deepseek-v4-flash",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "cmc/deepseek/deepseek-v4-flash-vision-exp",
+      "owned_by": "cmc",
+      "intelligence": 51.4736425212072,
+      "costPerTask": 0.11635843000544639,
+      "aa_slug": "deepseek-v4-flash-vision",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ocg/deepseek-v4-flash-vision-exp",
+      "owned_by": "ocg",
+      "intelligence": 51.4736425212072,
+      "costPerTask": 0.11635843000544639,
+      "aa_slug": "deepseek-v4-flash-vision",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ocg/longcat-2.0",
+      "owned_by": "ocg",
+      "intelligence": 33.9692584853255,
+      "costPerTask": 0.12129322742338783,
+      "aa_slug": "longcat-2-0",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "openrouter/minimax/minimax-m3:free",
+      "owned_by": "openrouter",
+      "intelligence": 45.3968506399702,
+      "costPerTask": 0.13870974901890812,
+      "aa_slug": "minimax-m3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "cmc/MiniMaxAI/MiniMax-M3",
+      "owned_by": "cmc",
+      "intelligence": 45.3968506399702,
+      "costPerTask": 0.13870974901890812,
+      "aa_slug": "minimax-m3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "cmc/minimax/minimax-m3-free",
+      "owned_by": "cmc",
+      "intelligence": 45.3968506399702,
+      "costPerTask": 0.13870974901890812,
+      "aa_slug": "minimax-m3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/minimax-m3",
+      "owned_by": "ocg",
+      "intelligence": 45.3968506399702,
+      "costPerTask": 0.13870974901890812,
+      "aa_slug": "minimax-m3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/qwen3.7-plus",
+      "owned_by": "ocg",
+      "intelligence": 39.3745992994168,
+      "costPerTask": 0.17028705303604513,
+      "aa_slug": "qwen3-7-plus",
+      "vision": true,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "cmc/moonshotai/Kimi-K2.7-Code",
+      "owned_by": "cmc",
+      "intelligence": 43.0244715223736,
+      "costPerTask": 0.22197474982635537,
+      "aa_slug": "kimi-k2-7-code",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "ocg/kimi-k2.7-code",
+      "owned_by": "ocg",
+      "intelligence": 43.0244715223736,
+      "costPerTask": 0.22197474982635537,
+      "aa_slug": "kimi-k2-7-code",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cmc/deepseek/deepseek-v4-pro",
+      "owned_by": "cmc",
+      "intelligence": 53.1976849297815,
+      "costPerTask": 0.26526849335458225,
+      "aa_slug": "deepseek-v4-pro",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ocg/deepseek-v4-pro",
+      "owned_by": "ocg",
+      "intelligence": 53.1976849297815,
+      "costPerTask": 0.26526849335458225,
+      "aa_slug": "deepseek-v4-pro",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "cmc/zai-org/GLM-5.1",
+      "owned_by": "cmc",
+      "intelligence": 40.9675355215124,
+      "costPerTask": 0.2866223689319792,
+      "aa_slug": "glm-5-1",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/glm-5.1",
+      "owned_by": "ocg",
+      "intelligence": 40.9675355215124,
+      "costPerTask": 0.2866223689319792,
+      "aa_slug": "glm-5-1",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "gemini/gemini-3.1-pro-preview",
+      "owned_by": "gemini",
+      "intelligence": 47.7383260259131,
+      "costPerTask": 0.3345647504982565,
+      "aa_slug": "gemini-3-1-pro-preview",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "openrouter/thinkingmachines/inkling:free",
+      "owned_by": "openrouter",
+      "intelligence": 42.2947721285326,
+      "costPerTask": 0.3388848141344296,
+      "aa_slug": "inkling",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "cmc/Qwen/Qwen3.6-Plus",
+      "owned_by": "cmc",
+      "intelligence": 40.4880703723726,
+      "costPerTask": 0.3568972800744663,
+      "aa_slug": "qwen3-6-plus",
+      "vision": true,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ocg/qwen3.6-plus",
+      "owned_by": "ocg",
+      "intelligence": 40.4880703723726,
+      "costPerTask": 0.3568972800744663,
+      "aa_slug": "qwen3-6-plus",
+      "vision": true,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ollama/nemotron-3-ultra",
+      "owned_by": "ollama",
+      "intelligence": 38.3185469149774,
+      "costPerTask": 0.38266237297499145,
+      "aa_slug": "nvidia-nemotron-3-ultra-550b-a55b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "owned_by": "openrouter",
+      "intelligence": 38.3185469149774,
+      "costPerTask": 0.38266237297499145,
+      "aa_slug": "nvidia-nemotron-3-ultra-550b-a55b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cf/@cf/moonshotai/kimi-k2.6",
+      "owned_by": "cf",
+      "intelligence": 45.1382483763163,
+      "costPerTask": 0.38861223350545604,
+      "aa_slug": "kimi-k2-6",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cmc/moonshotai/Kimi-K2.6",
+      "owned_by": "cmc",
+      "intelligence": 45.1382483763163,
+      "costPerTask": 0.38861223350545604,
+      "aa_slug": "kimi-k2-6",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "ocg/kimi-k2.6",
+      "owned_by": "ocg",
+      "intelligence": 45.1382483763163,
+      "costPerTask": 0.38861223350545604,
+      "aa_slug": "kimi-k2-6",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "openrouter/z-ai/glm-5.2:free",
+      "owned_by": "openrouter",
+      "intelligence": 52.6409563457385,
+      "costPerTask": 0.4445310520749471,
+      "aa_slug": "glm-5-2",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "cmc/zai-org/GLM-5.2-Fast",
+      "owned_by": "cmc",
+      "intelligence": 52.6409563457385,
+      "costPerTask": 0.4445310520749471,
+      "aa_slug": "glm-5-2",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/glm-5.2",
+      "owned_by": "ocg",
+      "intelligence": 52.6409563457385,
+      "costPerTask": 0.4445310520749471,
+      "aa_slug": "glm-5-2",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/qwen3.7-max",
+      "owned_by": "ocg",
+      "intelligence": 46.71222295444,
+      "costPerTask": 0.67923292156161,
+      "aa_slug": "qwen3-7-max",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ocg/glm-5.3",
+      "owned_by": "ocg",
+      "intelligence": 59.5134408119521,
+      "costPerTask": 0.6829307999945118,
+      "aa_slug": "glm-5-3",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/kimi-k3",
+      "owned_by": "ocg",
+      "intelligence": 59.6994671342592,
+      "costPerTask": 0.8374574917584584,
+      "aa_slug": "kimi-k3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/qwen3.8-max",
+      "owned_by": "ocg",
+      "intelligence": 58.0774404479668,
+      "costPerTask": 0.9133365716363483,
+      "aa_slug": "qwen3-8-max",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "cmc/Qwen/Qwen3.6-Max-Preview",
+      "owned_by": "cmc",
+      "intelligence": 41.074,
+      "costPerTask": null,
+      "aa_slug": "qwen3-6-max",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "cmc/zai-org/GLM-5",
+      "owned_by": "cmc",
+      "intelligence": 40.55415,
+      "costPerTask": null,
+      "aa_slug": "glm-5",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "cmc/MiniMaxAI/MiniMax-M2.5",
+      "owned_by": "cmc",
+      "intelligence": 34.474081034775786,
+      "costPerTask": null,
+      "aa_slug": "minimax-m2-5",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/minimax-m2.5",
+      "owned_by": "ocg",
+      "intelligence": 34.474081034775786,
+      "costPerTask": null,
+      "aa_slug": "minimax-m2-5",
+      "vision": false,
+      "contextWindow": 200000
+    }
+  ]
+}

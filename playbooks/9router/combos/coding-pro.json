@@ -1,0 +1,161 @@
+{
+  "name": "coding-pro",
+  "description": "PRO >=50 cost asc free tie -> intel desc (muse overridden cheapest)",
+  "generated": "2026-08-30T17:18:17.938325",
+  "source": "models.json + AA Intel+Cost (muse overridden 0.02)",
+  "ordering": "cost asc -> free tie -> intel desc, >=50, muse 0.02 top (rank re-sequenced, order preserved as edited) (rank re-sequenced, order preserved as edited)",
+  "models": [
+    "cmc/z-ai/glm-5.3-flash",
+    "ocg/glm-5.3-flash",
+    "ocg/qwen3.8-flash",
+    "cmc/meta/muse-spark-1.2-contributor",
+    "ocg/muse-spark-1.2-contributor",
+    "cmc/deepseek/deepseek-v4-flash",
+    "ocg/deepseek-v4-flash",
+    "cmc/deepseek/deepseek-v4-pro",
+    "ocg/deepseek-v4-pro",
+    "openrouter/z-ai/glm-5.2:free",
+    "cmc/zai-org/GLM-5.2-Fast",
+    "ocg/glm-5.2",
+    "ocg/glm-5.3",
+    "ocg/kimi-k3",
+    "ocg/qwen3.8-max"
+  ],
+  "members": [
+    {
+      "id": "cmc/z-ai/glm-5.3-flash",
+      "owned_by": "cmc",
+      "intelligence": 57.4592004791323,
+      "costPerTask": 0.0868525314872083,
+      "aa_slug": "glm-5-3-flash",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/glm-5.3-flash",
+      "owned_by": "ocg",
+      "intelligence": 57.4592004791323,
+      "costPerTask": 0.0868525314872083,
+      "aa_slug": "glm-5-3-flash",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/qwen3.8-flash",
+      "owned_by": "ocg",
+      "intelligence": 55.8139871116362,
+      "costPerTask": 0.09701942971977867,
+      "aa_slug": "qwen3-8-flash-next",
+      "vision": false,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cmc/meta/muse-spark-1.2-contributor",
+      "owned_by": "cmc",
+      "intelligence": 56.7615911905642,
+      "costPerTask": 0.02,
+      "aa_slug": "muse-spark-1-2",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/muse-spark-1.2-contributor",
+      "owned_by": "ocg",
+      "intelligence": 56.7615911905642,
+      "costPerTask": 0.02,
+      "aa_slug": "muse-spark-1-2",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "cmc/deepseek/deepseek-v4-flash",
+      "owned_by": "cmc",
+      "intelligence": 51.7665776089032,
+      "costPerTask": 0.11215889736791404,
+      "aa_slug": "deepseek-v4-flash",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ocg/deepseek-v4-flash",
+      "owned_by": "ocg",
+      "intelligence": 51.7665776089032,
+      "costPerTask": 0.11215889736791404,
+      "aa_slug": "deepseek-v4-flash",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "cmc/deepseek/deepseek-v4-pro",
+      "owned_by": "cmc",
+      "intelligence": 53.1976849297815,
+      "costPerTask": 0.26526849335458225,
+      "aa_slug": "deepseek-v4-pro",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "ocg/deepseek-v4-pro",
+      "owned_by": "ocg",
+      "intelligence": 53.1976849297815,
+      "costPerTask": 0.26526849335458225,
+      "aa_slug": "deepseek-v4-pro",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "openrouter/z-ai/glm-5.2:free",
+      "owned_by": "openrouter",
+      "intelligence": 52.6409563457385,
+      "costPerTask": 0.4445310520749471,
+      "aa_slug": "glm-5-2",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "cmc/zai-org/GLM-5.2-Fast",
+      "owned_by": "cmc",
+      "intelligence": 52.6409563457385,
+      "costPerTask": 0.4445310520749471,
+      "aa_slug": "glm-5-2",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/glm-5.2",
+      "owned_by": "ocg",
+      "intelligence": 52.6409563457385,
+      "costPerTask": 0.4445310520749471,
+      "aa_slug": "glm-5-2",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/glm-5.3",
+      "owned_by": "ocg",
+      "intelligence": 59.5134408119521,
+      "costPerTask": 0.6829307999945118,
+      "aa_slug": "glm-5-3",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ocg/kimi-k3",
+      "owned_by": "ocg",
+      "intelligence": 59.6994671342592,
+      "costPerTask": 0.8374574917584584,
+      "aa_slug": "kimi-k3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ocg/qwen3.8-max",
+      "owned_by": "ocg",
+      "intelligence": 58.0774404479668,
+      "costPerTask": 0.9133365716363483,
+      "aa_slug": "qwen3-8-max",
+      "vision": false,
+      "contextWindow": 1000000
+    }
+  ]
+}

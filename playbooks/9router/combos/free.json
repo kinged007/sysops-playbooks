@@ -1,0 +1,421 @@
+{
+  "name": "free",
+  "description": "All free cost asc intelligence desc, blanks last",
+  "generated": "2026-08-30T17:18:17.938325",
+  "source": "models.json + AA Intel+Cost (muse overridden 0.02)",
+  "ordering": "intelligence desc (highest first), cost irrelevant, blanks last",
+  "models": [
+    "openrouter/z-ai/glm-5.2:free",
+    "gemini/gemini-3.1-pro-preview",
+    "openrouter/minimax/minimax-m3:free",
+    "cf/@cf/moonshotai/kimi-k2.6",
+    "openrouter/thinkingmachines/inkling:free",
+    "openrouter/thinkingmachines/inkling-small:free",
+    "ollama/nemotron-3-ultra",
+    "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+    "openrouter/inclusionai/ling-3.0-flash-fin:free",
+    "cf/@cf/moonshotai/kimi-k2.5",
+    "gemini/gemma-4-31b-it",
+    "ollama/gemma4:31b",
+    "openrouter/google/gemma-4-31b-it:free",
+    "gemini/gemini-3-flash-preview",
+    "openrouter/google/gemma-4-26b-a4b-it:free",
+    "ollama/nemotron-3-super",
+    "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+    "gemini/gemini-3.1-flash-lite-preview",
+    "ollama/gpt-oss:120b",
+    "openrouter/nvidia/nemotron-3.5-lightning:free",
+    "cf/@cf/zai-org/glm-4.7-flash",
+    "openrouter/cohere/north-mini-code:free",
+    "ollama/gpt-oss:20b",
+    "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+    "cf/@cf/mistralai/mistral-small-3.1-24b-instruct",
+    "ollama/nemotron-3-nano:30b",
+    "cf/@cf/qwen/qwq-32b",
+    "cf/@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+    "cf/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "openrouter/openrouter/free",
+    "cf/@cf/meta/llama-3.1-8b-instruct-awq",
+    "cf/@cf/meta/llama-3.1-8b-instruct-fp8-fast",
+    "cf/@cf/qwen/qwen2.5-coder-32b-instruct",
+    "cf/@cf/meta/llama-3.1-70b-instruct-fp8-fast",
+    "cf/@cf/meta/llama-3.2-3b-instruct",
+    "cf/@cf/meta/llama-3.2-1b-instruct",
+    "openrouter/dots-studio/dots-3-note-preview:free",
+    "openrouter/google/lyria-3-clip-preview",
+    "openrouter/google/lyria-3-pro-preview",
+    "openrouter/poolside/laguna-s-2.1:free",
+    "openrouter/poolside/laguna-xs-2.1:free"
+  ],
+  "members": [
+    {
+      "id": "openrouter/z-ai/glm-5.2:free",
+      "owned_by": "openrouter",
+      "intelligence": 52.6409563457385,
+      "costPerTask": 0.4445310520749471,
+      "aa_slug": "glm-5-2",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "gemini/gemini-3.1-pro-preview",
+      "owned_by": "gemini",
+      "intelligence": 47.7383260259131,
+      "costPerTask": 0.3345647504982565,
+      "aa_slug": "gemini-3-1-pro-preview",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "openrouter/minimax/minimax-m3:free",
+      "owned_by": "openrouter",
+      "intelligence": 45.3968506399702,
+      "costPerTask": 0.13870974901890812,
+      "aa_slug": "minimax-m3",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "cf/@cf/moonshotai/kimi-k2.6",
+      "owned_by": "cf",
+      "intelligence": 45.1382483763163,
+      "costPerTask": 0.38861223350545604,
+      "aa_slug": "kimi-k2-6",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "openrouter/thinkingmachines/inkling:free",
+      "owned_by": "openrouter",
+      "intelligence": 42.2947721285326,
+      "costPerTask": 0.3388848141344296,
+      "aa_slug": "inkling",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "openrouter/thinkingmachines/inkling-small:free",
+      "owned_by": "openrouter",
+      "intelligence": 41.1806598798293,
+      "costPerTask": 0.07353375676315574,
+      "aa_slug": "inkling-small",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "ollama/nemotron-3-ultra",
+      "owned_by": "ollama",
+      "intelligence": 38.3185469149774,
+      "costPerTask": 0.38266237297499145,
+      "aa_slug": "nvidia-nemotron-3-ultra-550b-a55b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
+      "owned_by": "openrouter",
+      "intelligence": 38.3185469149774,
+      "costPerTask": 0.38266237297499145,
+      "aa_slug": "nvidia-nemotron-3-ultra-550b-a55b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/inclusionai/ling-3.0-flash-fin:free",
+      "owned_by": "openrouter",
+      "intelligence": 37.820825176113,
+      "costPerTask": 0.03766412774562829,
+      "aa_slug": "ling-3-0-flash",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cf/@cf/moonshotai/kimi-k2.5",
+      "owned_by": "cf",
+      "intelligence": 36.0227407548798,
+      "costPerTask": 0.09638405919581741,
+      "aa_slug": "kimi-k2-5",
+      "vision": true,
+      "contextWindow": 262144
+    },
+    {
+      "id": "gemini/gemma-4-31b-it",
+      "owned_by": "gemini",
+      "intelligence": 29.6949678165957,
+      "costPerTask": 0,
+      "aa_slug": "gemma-4-31b",
+      "vision": true,
+      "contextWindow": 128000
+    },
+    {
+      "id": "ollama/gemma4:31b",
+      "owned_by": "ollama",
+      "intelligence": 29.6949678165957,
+      "costPerTask": 0,
+      "aa_slug": "gemma-4-31b",
+      "vision": true,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/google/gemma-4-31b-it:free",
+      "owned_by": "openrouter",
+      "intelligence": 29.6949678165957,
+      "costPerTask": 0,
+      "aa_slug": "gemma-4-31b",
+      "vision": true,
+      "contextWindow": 128000
+    },
+    {
+      "id": "gemini/gemini-3-flash-preview",
+      "owned_by": "gemini",
+      "intelligence": 27.938225136834387,
+      "costPerTask": null,
+      "aa_slug": "gemini-3-flash",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "openrouter/google/gemma-4-26b-a4b-it:free",
+      "owned_by": "openrouter",
+      "intelligence": 26.0656023232983,
+      "costPerTask": 0.03912654124783082,
+      "aa_slug": "gemma-4-26b-a4b",
+      "vision": true,
+      "contextWindow": 128000
+    },
+    {
+      "id": "ollama/nemotron-3-super",
+      "owned_by": "ollama",
+      "intelligence": 25.6684845978586,
+      "costPerTask": 0.22856096347482535,
+      "aa_slug": "nvidia-nemotron-3-super-120b-a12b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+      "owned_by": "openrouter",
+      "intelligence": 25.6684845978586,
+      "costPerTask": 0.22856096347482535,
+      "aa_slug": "nvidia-nemotron-3-super-120b-a12b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "gemini/gemini-3.1-flash-lite-preview",
+      "owned_by": "gemini",
+      "intelligence": 25.6076097099382,
+      "costPerTask": 0.04324611147116286,
+      "aa_slug": "gemini-3-1-flash-lite-preview",
+      "vision": true,
+      "contextWindow": 1048576
+    },
+    {
+      "id": "ollama/gpt-oss:120b",
+      "owned_by": "ollama",
+      "intelligence": 24.126439151808,
+      "costPerTask": 0.07272539301473413,
+      "aa_slug": "gpt-oss-120b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/nvidia/nemotron-3.5-lightning:free",
+      "owned_by": "openrouter",
+      "intelligence": 23.606237599256,
+      "costPerTask": 0.07732079323498033,
+      "aa_slug": "nemotron-3-5-lightning",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cf/@cf/zai-org/glm-4.7-flash",
+      "owned_by": "cf",
+      "intelligence": 23.284298431289574,
+      "costPerTask": null,
+      "aa_slug": "glm-4-7-flash",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "openrouter/cohere/north-mini-code:free",
+      "owned_by": "openrouter",
+      "intelligence": 20.1690287982621,
+      "costPerTask": 0,
+      "aa_slug": "north-mini-code",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "ollama/gpt-oss:20b",
+      "owned_by": "ollama",
+      "intelligence": 15.2251599944346,
+      "costPerTask": 0.02498068399823657,
+      "aa_slug": "gpt-oss-20b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "owned_by": "openrouter",
+      "intelligence": 15.006841515636083,
+      "costPerTask": null,
+      "aa_slug": "nemotron-3-nano-omni-30b-a3b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cf/@cf/mistralai/mistral-small-3.1-24b-instruct",
+      "owned_by": "cf",
+      "intelligence": 14.8667863104857,
+      "costPerTask": 0.04431742828316981,
+      "aa_slug": "mistral-small-3-1",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "ollama/nemotron-3-nano:30b",
+      "owned_by": "ollama",
+      "intelligence": 14.537976286548,
+      "costPerTask": 0.024889427328985605,
+      "aa_slug": "nvidia-nemotron-3-nano-30b-a3b-reasoning",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cf/@cf/qwen/qwq-32b",
+      "owned_by": "cf",
+      "intelligence": 13.391963339078304,
+      "costPerTask": null,
+      "aa_slug": "qwq-32b",
+      "vision": false,
+      "contextWindow": 131072
+    },
+    {
+      "id": "cf/@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+      "owned_by": "cf",
+      "intelligence": 10.964205576829057,
+      "costPerTask": null,
+      "aa_slug": "deepseek-r1-distill-qwen-32b",
+      "vision": false,
+      "contextWindow": 262144
+    },
+    {
+      "id": "cf/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "owned_by": "cf",
+      "intelligence": 9.26237834279053,
+      "costPerTask": null,
+      "aa_slug": "llama-3-3-instruct-70b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/openrouter/free",
+      "owned_by": "openrouter",
+      "intelligence": 8.167627314682118,
+      "costPerTask": null,
+      "aa_slug": "qwen3-4b-instruct-reasoning",
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "cf/@cf/meta/llama-3.1-8b-instruct-awq",
+      "owned_by": "cf",
+      "intelligence": 7.398093964814081,
+      "costPerTask": null,
+      "aa_slug": "llama-3-1-instruct-8b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cf/@cf/meta/llama-3.1-8b-instruct-fp8-fast",
+      "owned_by": "cf",
+      "intelligence": 7.398093964814081,
+      "costPerTask": null,
+      "aa_slug": "llama-3-1-instruct-8b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cf/@cf/qwen/qwen2.5-coder-32b-instruct",
+      "owned_by": "cf",
+      "intelligence": 6.881261147068546,
+      "costPerTask": null,
+      "aa_slug": "qwen2-5-coder-32b-instruct",
+      "vision": false,
+      "contextWindow": 1000000
+    },
+    {
+      "id": "cf/@cf/meta/llama-3.1-70b-instruct-fp8-fast",
+      "owned_by": "cf",
+      "intelligence": 6.508940242603085,
+      "costPerTask": null,
+      "aa_slug": "llama-3-1-instruct-70b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cf/@cf/meta/llama-3.2-3b-instruct",
+      "owned_by": "cf",
+      "intelligence": 3.87835237141565,
+      "costPerTask": null,
+      "aa_slug": "llama-3-2-instruct-3b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "cf/@cf/meta/llama-3.2-1b-instruct",
+      "owned_by": "cf",
+      "intelligence": 1,
+      "costPerTask": null,
+      "aa_slug": "llama-3-2-instruct-1b",
+      "vision": false,
+      "contextWindow": 128000
+    },
+    {
+      "id": "openrouter/dots-studio/dots-3-note-preview:free",
+      "owned_by": "openrouter",
+      "intelligence": null,
+      "costPerTask": null,
+      "aa_slug": null,
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "openrouter/google/lyria-3-clip-preview",
+      "owned_by": "openrouter",
+      "intelligence": null,
+      "costPerTask": null,
+      "aa_slug": null,
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "openrouter/google/lyria-3-pro-preview",
+      "owned_by": "openrouter",
+      "intelligence": null,
+      "costPerTask": null,
+      "aa_slug": null,
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "openrouter/poolside/laguna-s-2.1:free",
+      "owned_by": "openrouter",
+      "intelligence": null,
+      "costPerTask": null,
+      "aa_slug": null,
+      "vision": false,
+      "contextWindow": 200000
+    },
+    {
+      "id": "openrouter/poolside/laguna-xs-2.1:free",
+      "owned_by": "openrouter",
+      "intelligence": null,
+      "costPerTask": null,
+      "aa_slug": null,
+      "vision": false,
+      "contextWindow": 200000
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+# 9Router — Docker Compose WITH Headroom sidecar
+# Usage: copy to <COMPOSE_DIR>/docker-compose.yml when the operator wants
+# Headroom token saver (playbook §5.3). Headroom runs as a local /v1/compress
+# proxy before provider routing; if it is down, 9Router fails open.
+# Fill <PORT> and volumes per plan.md; keep .env next to this file.
+# Ref: DOCKER.md "Optional Headroom sidecar" + README env table.
+services:
+  9router:
+    image: decolua/9router:latest
+    container_name: 9router
+    restart: always
+    ports:
+      - "<PORT>:20128"
+    volumes:
+      - 9router-data:/app/data
+      # Or bind: - "${HOME}/.9router:/app/data"
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /app/data
+      PORT: "20128"
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+      HEADROOM_URL: http://headroom:8787
+      # Inside this compose network the headroom service is reachable as http://headroom:8787
+      # If Headroom runs on the Docker host (not as a sidecar), change to:
+      #   HEADROOM_URL: http://host.docker.internal:8787
+      # and add under 9router:
+      #   extra_hosts:
+      #     - "host.docker.internal:host-gateway"
+    depends_on:
+      - headroom
+
+  headroom:
+    image: ghcr.io/chopratejas/headroom:latest
+    container_name: headroom
+    restart: always
+    ports:
+      - "8787:8787"
+      # Exposed for debugging; can be removed or bound to 127.0.0.1 only:
+      # - "127.0.0.1:8787:8787"
+    # No volumes/env needed for headroom in the default setup.
+
+volumes:
+  9router-data:
+    name: 9router-data
+
+# Dashboard step after deploy:
+#   Endpoint → Token Saver → Headroom → confirm URL is http://headroom:8787 → recheck status → Enable.
+# Host-level Headroom alternative (Linux):
+#   On the host: pip install "headroom-ai[proxy]" && headroom proxy --port 8787
+#   Compose 9router HEADROOM_URL=http://host.docker.internal:8787 + extra_hosts as above.

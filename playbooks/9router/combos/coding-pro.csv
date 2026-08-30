@@ -1,0 +1,16 @@
+rank,id,owned_by,intelligence,costPerTask,aa_slug,vision,contextWindow
+1,cmc/z-ai/glm-5.3-flash,cmc,57.4592004791323,0.0868525314872083,glm-5-3-flash,False,200000
+2,ocg/glm-5.3-flash,ocg,57.4592004791323,0.0868525314872083,glm-5-3-flash,False,200000
+3,ocg/qwen3.8-flash,ocg,55.8139871116362,0.09701942971977867,qwen3-8-flash-next,False,262144
+4,cmc/meta/muse-spark-1.2-contributor,cmc,56.7615911905642,0.02,muse-spark-1-2,False,200000
+5,ocg/muse-spark-1.2-contributor,ocg,56.7615911905642,0.02,muse-spark-1-2,False,200000
+6,cmc/deepseek/deepseek-v4-flash,cmc,51.7665776089032,0.11215889736791404,deepseek-v4-flash,False,1000000
+7,ocg/deepseek-v4-flash,ocg,51.7665776089032,0.11215889736791404,deepseek-v4-flash,False,1000000
+8,cmc/deepseek/deepseek-v4-pro,cmc,53.1976849297815,0.26526849335458225,deepseek-v4-pro,False,1000000
+9,ocg/deepseek-v4-pro,ocg,53.1976849297815,0.26526849335458225,deepseek-v4-pro,False,1000000
+10,openrouter/z-ai/glm-5.2:free,openrouter,52.6409563457385,0.4445310520749471,glm-5-2,False,200000
+11,cmc/zai-org/GLM-5.2-Fast,cmc,52.6409563457385,0.4445310520749471,glm-5-2,False,200000
+12,ocg/glm-5.2,ocg,52.6409563457385,0.4445310520749471,glm-5-2,False,200000
+13,ocg/glm-5.3,ocg,59.5134408119521,0.6829307999945118,glm-5-3,False,200000
+14,ocg/kimi-k3,ocg,59.6994671342592,0.8374574917584584,kimi-k3,True,1048576
+15,ocg/qwen3.8-max,ocg,58.0774404479668,0.9133365716363483,qwen3-8-max,False,1000000

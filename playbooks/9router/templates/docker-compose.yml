@@ -1,0 +1,35 @@
+# 9Router — Docker Compose (single service, no Headroom)
+# Usage: copy to <COMPOSE_DIR>/docker-compose.yml on <ALIAS> and run:
+#   docker compose pull && docker compose up -d
+# Fill <PORT> and env_file / volume host paths per plan.md.
+# Upstream ref: https://raw.githubusercontent.com/decolua/9router/master/docker-compose.yml
+# and DOCKER.md. Published image: decolua/9router:latest (linux/amd64+arm64).
+services:
+  9router:
+    image: decolua/9router:latest
+    container_name: 9router
+    restart: always
+    ports:
+      - "<PORT>:20128"
+      # Keep as "<HOST_DATA_PORT>:20128" on the host. Default <PORT>=20128.
+      # If behind a reverse proxy with firewall, do NOT expose <PORT> publicly;
+      # proxy should hit 127.0.0.1:<PORT> instead (set firewall deny on <PORT>).
+    volumes:
+      - 9router-data:/app/data
+      # Or bind-mount a host dir (pick one style and keep it):
+      # - "${HOME}/.9router:/app/data"
+      # - "/var/lib/9router:/app/data"
+    env_file:
+      - .env
+      # .env is this folder's env file (see templates/env.example).
+      # Must define: JWT_SECRET, INITIAL_PASSWORD, DATA_DIR, API_KEY_SECRET, etc.
+    environment:
+      DATA_DIR: /app/data
+      PORT: "20128"
+      HOSTNAME: "0.0.0.0"
+      NODE_ENV: production
+
+volumes:
+  9router-data:
+    name: 9router-data
+    # Remove the named volume if you use a bind mount instead.
