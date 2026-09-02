@@ -122,3 +122,13 @@ def test_ninerouter_auth_helpers_exist():
     assert callable(get_ninerouter_creds)
     assert callable(http_request)
     assert callable(login_and_get_session)
+
+
+def test_provider_diff():
+    from playbooks_9router_scripts_9router_sync import diff_providers
+    current={"oc":["a","b"], "ocg":["x"]}
+    desired={"oc":["a","c"], "ocg":["x"]}
+    diff=diff_providers(current, desired)
+    assert diff=={"oc": ({"c"}, {"b"})}  # to_add, to_remove
+    # no diff case
+    assert diff_providers(desired, desired)=={}
