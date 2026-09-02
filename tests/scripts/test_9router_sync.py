@@ -140,3 +140,13 @@ def test_combo_diff():
     desired={"free":["a","c"], "coding-low":["x"]}
     d=diff_combos(current, desired)
     assert "free" in d and "coding-low" not in d
+
+
+def test_cli_generation(tmp_path):
+    from playbooks_9router_scripts_9router_sync import write_cli_configs
+    # mock models list
+    models=[{"id":"oc/grok-4.6","owned_by":"oc"}, {"id":"free","owned_by":"combo"}]
+    out=tmp_path / "generated"
+    write_cli_configs(models, "https://router.example.com", out, "free")
+    assert (out / "opencode.json").exists()
+    assert (out / "claude-settings.json").exists()

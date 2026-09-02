@@ -636,6 +636,152 @@ def sync_combos(session, url: str, desired_combos: Dict[str, List[str]], dry_run
             if verbose: print(f"    POST combo {name} {len(desired_models)} models -> {code} {str(body)[:300]}")
     return True
 
+def write_opencode(models, base_url, api_key, out_dir, active_model):
+    # api_key is ignored — never hardcode, reference env var only (per user request)
+    provider_models = {}
+    for m in models:
+        mid = m.get("id")
+        if not mid:
+            continue
+        provider_models[mid] = {"name": mid, "modalities": {"input": ["text", "image"], "output": ["text"]}}
+    config = {
+        "$schema": "https://opencode.ai/config.json",
+        "provider": {
+            "9router": {
+                "npm": "@ai-sdk/openai-compatible",
+                "name": "9Router",
+                "options": {"baseURL": base_url.rstrip("/") + "/v1", "apiKey": "${NINEROUTER_KEY}"},
+                "models": provider_models,
+            }
+        },
+        "model": f"9router/{active_model}" if active_model else "9router/free",
+    }
+    p = out_dir / "opencode.json"
+    p.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
+    snippet = {"provider": {"9router": config["provider"]["9router"]}, "model": config["model"]}
+    (out_dir / "opencode-snippet.json").write_text(json.dumps(snippet, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"opencode: {p} ({len(provider_models)} models, active {active_model}) — apiKey references ${{NINEROUTER_KEY}}, set env manually")
+
+def write_hermes(models, base_url, api_key, out_dir, active_model):
+    # include all combos/models like opencode, referencing env var only
+    base_url_v1 = base_url.rstrip("/") + "/v1"
+    # Build providers block with all models for Desktop picker
+    models_yaml = ""
+    for m in models:
+        mid = m.get("id")
+        if not mid:
+            continue
+        # per-model context_length if available, else omitted
+        models_yaml += f"      {mid}:\n        display_name: {mid}\n"
+    yaml_block = f"""model:
+  default: "{active_model}"
+  provider: "custom"
+  base_url: "{base_url_v1}"
+  api_key: ${{OPENAI_API_KEY}}
+
+# Provider inventory for Desktop picker — all {len(models)} models/combos from live /v1/models
+providers:
+  9router:
+    name: 9Router
+    base_url: "{base_url_v1}"
+    api_key: ${{OPENAI_API_KEY}}
+    transport: openai_chat
+    models:
+{models_yaml}"""
+    (out_dir / "hermes-config.yaml").write_text(yaml_block, encoding="utf-8")
+    # Do not write actual key — user adds manually. Reference is already in yaml via ${OPENAI_API_KEY}
+    (out_dir / "hermes.env").write_text("# Add manually: OPENAI_API_KEY=sk-... (or NINEROUTER_KEY)\n# The yaml above references ${OPENAI_API_KEY}, set it in ~/.hermes/.env\n", encoding="utf-8")
+    (out_dir / "hermes-README.txt").write_text(f"# Hermes - copy to ~/.hermes/config.yaml\n{yaml_block}\n# Hermes env - add to ~/.hermes/.env manually:\n# OPENAI_API_KEY=sk-...\n", encoding="utf-8")
+    print(f"hermes: {out_dir/'hermes-config.yaml'} ({len(models)} models, default {active_model}) — api_key references ${{OPENAI_API_KEY}}")
+
+def write_codex(base_url, api_key, out_dir, active_model):
+    base_url_v1 = base_url.rstrip("/") + "/v1"
+    # api_key is ignored — reference env var only
+    toml = f"""# Codex - copy to ~/.codex/config.toml
+# Set OPENAI_API_KEY or NINEROUTER_KEY in env / ~/.codex/auth.json manually
+model = "{active_model}"
+model_provider = "9router"
+
+[model_providers.9router]
+name = "9Router"
+base_url = "{base_url_v1}"
+wire_api = "responses"
+http_headers = {{ Authorization = "Bearer ${{OPENAI_API_KEY}}" }}
+
+[agents]
+default_subagent_model = "{active_model}"
+"""
+    (out_dir / "codex-config.toml").write_text(toml, encoding="utf-8")
+    print(f"codex: {out_dir/'codex-config.toml'} — api key references ${{OPENAI_API_KEY}}")
+
+def write_claude(base_url, api_key, out_dir, active_model):
+    base_url_v1 = base_url.rstrip("/") + "/v1"
+    # reference env var, do not hardcode key
+    settings = {"env": {"ANTHROPIC_BASE_URL": base_url_v1, "ANTHROPIC_AUTH_TOKEN": "${NINEROUTER_KEY}", "ANTHROPIC_MODEL": active_model}, "hasCompletedOnboarding": True}
+    (out_dir / "claude-settings.json").write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
+    (out_dir / "claude-env.sh").write_text(f"export ANTHROPIC_BASE_URL=\"{base_url_v1}\"\nexport ANTHROPIC_AUTH_TOKEN=\"${{NINEROUTER_KEY}}\"  # set NINEROUTER_KEY manually\n", encoding="utf-8")
+    print(f"claude: {out_dir/'claude-settings.json'} — token references ${{NINEROUTER_KEY}}")
+
+def write_generic(base_url, api_key, out_dir, active_model):
+    base_url_v1 = base_url.rstrip("/") + "/v1"
+    # only base_url, reference env var placeholder — do not hardcode key
+    (out_dir / "generic-env.sh").write_text(f"# Generic OpenAI-compatible - source or copy (set keys manually)\nexport OPENAI_BASE_URL=\"{base_url_v1}\"\nexport OPENAI_API_KEY=\"${{OPENAI_API_KEY}}\"  # set manually: export OPENAI_API_KEY=sk-...\nexport NINEROUTER_URL=\"{base_url}\"\nexport NINEROUTER_KEY=\"${{NINEROUTER_KEY}}\"  # set manually\n# active model: {active_model}\n", encoding="utf-8")
+    (out_dir / ".env.example").write_text(f"NINEROUTER_URL={base_url}\nNINEROUTER_KEY=${{NINEROUTER_KEY}}\nOPENAI_BASE_URL={base_url_v1}\nOPENAI_API_KEY=${{OPENAI_API_KEY}}\n# Set the above vars manually — do not commit real keys\n", encoding="utf-8")
+    print(f"generic: {out_dir/'generic-env.sh'} — keys referenced as ${{OPENAI_API_KEY}}/${{NINEROUTER_KEY}}")
+
+def write_readme(out_dir, base_url, models_count, active_model):
+    readme = f"""# 9Router Generated Configs
+
+Generated: from live {base_url}/v1/models ({models_count} models/combos) via generate-configs.py
+Active model: {active_model}
+Base URL: {base_url.rstrip("/")}/v1
+
+## Files
+- opencode.json - Full opencode config (~/.config/opencode/opencode.json). Contains all {models_count} models as 9router provider. Use model 9router/{active_model} or any id.
+- opencode-snippet.json - Minimal snippet to merge into existing opencode.json
+- hermes-config.yaml + hermes.env - Hermes (~/.hermes/config.yaml + .env)
+- codex-config.toml - Codex (~/.codex/config.toml)
+- claude-settings.json - Claude Code (~/.claude/settings.json env block)
+- generic-env.sh / .env.example - Exports for any OpenAI-compatible CLI (cursor, cline, roo, continue, droid, copilot custom endpoint)
+
+## Usage on remote servers
+1. Copy NINEROUTER_URL and NINEROUTER_KEY to remote host env or secrets file.
+2. Run on remote: `python generate-configs.py --url $NINEROUTER_URL --key $NINEROUTER_KEY` to refresh with live models.
+3. Copy desired config to tool's config path (see file headers).
+
+## Models included
+All ids from GET /v1/models (including combos owned_by=combo: free, coding-pro, coding-med, coding-low, vision).
+Check opencode.json -> provider.9router.models keys for full list, or GET {base_url.rstrip("/")}/v1/models
+
+## Verification
+curl -H "Authorization: Bearer $NINEROUTER_KEY" {base_url.rstrip("/")}/v1/models | jq '.data[].id'
+curl {base_url.rstrip("/")}/api/health
+"""
+    (out_dir / "README.md").write_text(readme, encoding="utf-8")
+
+def fetch_live_v1_models(url: str, api_key: str) -> List[Dict[str, Any]]:
+    if not url:
+        return []
+    endpoint = url.rstrip("/") + "/v1/models"
+    headers: Dict[str, str] = {}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    code, body = http_request("GET", endpoint, headers=headers)
+    if code == 200 and isinstance(body, dict):
+        return body.get("data", [])
+    return []
+
+def write_cli_configs(live_models: List[Dict[str, Any]], base_url: str, out_dir: pathlib.Path, active_model: str = "free") -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    # adapt writers to accept live_models list as [{"id":..., "owned_by":...}]
+    # copy implementations from generate-configs.py verbatim
+    write_opencode(live_models, base_url, "sk-placeholder", out_dir, active_model)
+    write_hermes(live_models, base_url, "sk-placeholder", out_dir, active_model)
+    write_codex(base_url, "sk-placeholder", out_dir, active_model)
+    write_claude(base_url, "sk-placeholder", out_dir, active_model)
+    write_generic(base_url, "sk-placeholder", out_dir, active_model)
+    write_readme(out_dir, base_url, len(live_models), active_model)
+
 if __name__ == "__main__":
     parser=argparse.ArgumentParser(description="9Router sync: inventory -> providers+combos+CLI")
     parser.add_argument("--config", help="path to 9router-sync config yaml")
