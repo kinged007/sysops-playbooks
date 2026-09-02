@@ -154,6 +154,88 @@ def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
                     if val and not os.environ.get(key): os.environ[key]=val
                 except: pass
 
+def load_inventory(inv_dir: pathlib.Path) -> List[Dict[str, Any]]:
+    """Try models.json then models.csv in inv_dir. Returns list of dicts with normalized keys."""
+    jpath = inv_dir / "models.json"
+    if jpath.exists():
+        try:
+            data = json.loads(jpath.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and "models" in data:
+                return data["models"]
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict) and "data" in data:  # 9router shape fallback
+                return data["data"]
+        except Exception as e:
+            print(f"WARN load_inventory json {jpath}: {e}", file=sys.stderr)
+    cpath = inv_dir / "models.csv"
+    if cpath.exists():
+        out=[]
+        try:
+            with cpath.open("r", encoding="utf-8", newline="") as f:
+                reader=csv.DictReader(f)
+                for row in reader:
+                    # normalize numeric fields
+                    for k in ("intelligence","cost_per_task","cost_input_per_1M","cost_output_per_1M"):
+                        if row.get(k) in ("", None):
+                            row[k]=None
+                        else:
+                            try: row[k]=float(row[k]) if row[k]!="" else None
+                            except: pass
+                    if "free" in row:
+                        v=row["free"]
+                        if isinstance(v, str): row["free"]=v.lower() in ("true","1","yes")
+                    out.append(row)
+            return out
+        except Exception as e:
+            print(f"WARN load_inventory csv {cpath}: {e}", file=sys.stderr)
+    return []
+
+def matches_any(patterns: List[str], text: str) -> bool:
+    if not patterns or not text: return False
+    low=text.lower()
+    for pat in patterns:
+        pat_low=pat.lower()
+        if fnmatch.fnmatch(low, pat_low): return True
+        if pat_low in low: return True
+        try:
+            if re.search(pat, text, re.IGNORECASE): return True
+        except re.error: pass
+    return False
+
+def map_provider(inventory_provider: str, model_id: str, mapping: Dict[str,str]) -> str:
+    alias = mapping.get(inventory_provider, inventory_provider)
+    # allow mapping values like "" for cloudflare
+    if alias == "" or alias is None:
+        return model_id
+    # avoid double prefix: if model_id already starts with alias + "/"
+    if model_id.lower().startswith(alias.lower() + "/"):
+        return model_id
+    # also handle case where model_id is like "cmc/..." already contains slash but alias is cmc
+    # above check covers it
+    return f"{alias}/{model_id}"
+
+def find_inventory_dir(config_dir: pathlib.Path) -> Optional[pathlib.Path]:
+    candidates = [
+        config_dir / "model-inventory",
+        config_dir / "model-inventory-output",
+        pathlib.Path("executions/9router/model-inventory"),
+        pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/model-inventory"),
+    ]
+    for c in candidates:
+        if (c / "models.json").exists() or (c / "models.csv").exists():
+            return c
+    # glob fallback: any model-inventory under executions/*9router*
+    try:
+        for root in [pathlib.Path("executions"), pathlib.Path("D:/Data/git/sysops-playbooks/executions")]:
+            if not root.exists(): continue
+            for nine_dir in root.glob("*9router*"):
+                for pat in ("model-inventory/models.json","model-inventory/models.csv"):
+                    p = nine_dir / pat
+                    if p.exists(): return p.parent
+    except: pass
+    return None
+
 if __name__ == "__main__":
     parser=argparse.ArgumentParser(description="9Router sync: inventory -> providers+combos+CLI")
     parser.add_argument("--config", help="path to 9router-sync config yaml")
