@@ -236,6 +236,70 @@ def find_inventory_dir(config_dir: pathlib.Path) -> Optional[pathlib.Path]:
     except: pass
     return None
 
+def apply_global_filter(models: List[Dict[str, Any]], cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+    min_intel = cfg.get("min_intelligence")
+    include_null = cfg.get("include_null_intelligence", True)
+    max_cpt = cfg.get("max_cost_per_task")
+    min_cpt = cfg.get("min_cost_per_task")
+    prov_wl = [str(x) for x in (cfg.get("provider_whitelist") or []) if x]
+    prov_bl = [str(x) for x in (cfg.get("provider_blacklist") or []) if x]
+    mod_wl = [str(x) for x in (cfg.get("model_whitelist") or []) if x]
+    mod_bl = [str(x) for x in (cfg.get("model_blacklist") or []) if x]
+    free_filter = cfg.get("free", "both")
+    if isinstance(free_filter, str): free_filter = free_filter.lower()
+    # normalize bool
+    if free_filter is True: free_str="true"
+    elif free_filter is False: free_str="false"
+    else: free_str=str(free_filter).lower() if free_filter else "both"
+
+    out=[]
+    for m in models:
+        prov=m.get("provider","")
+        mid=m.get("model_id","")
+        composite=f"{prov}/{mid}"
+        # whitelist wins: if matches any whitelist, include immediately (skip blacklist/min checks)
+        is_wl = matches_any(mod_wl, mid) or matches_any(mod_wl, composite) or matches_any(prov_wl, prov)
+        # Actually provider whitelist is separate; handle below
+        # First check provider whitelist/blacklist
+        if prov_wl and not matches_any(prov_wl, prov):
+            if not is_wl: continue
+        if prov_bl and matches_any(prov_bl, prov):
+            if not is_wl: continue
+        # model whitelist immediate pass
+        if mod_wl and (matches_any(mod_wl, mid) or matches_any(mod_wl, composite)):
+            out.append(m); continue
+        # model blacklist
+        if matches_any(mod_bl, mid) or matches_any(mod_bl, composite):
+            continue
+        # free filter
+        if free_str != "both":
+            is_free = bool(m.get("free"))
+            if free_str == "true" and not is_free: continue
+            if free_str == "false" and is_free: continue
+        # intelligence
+        intel=m.get("intelligence")
+        if intel is None:
+            if not include_null: continue
+        else:
+            try:
+                if min_intel is not None and float(intel) < float(min_intel):
+                    continue
+            except: pass
+        # cost per task
+        cpt=m.get("cost_per_task")
+        # if cost is None, treat as pass unless max is set and we want to exclude null? Spec says max cost per task — null should be excluded if max set?
+        # Keep null as pass only if include_null true and no max? Simpler: if cpt is None, skip cost checks.
+        if cpt is not None:
+            try:
+                if max_cpt is not None and float(cpt) > float(max_cpt): continue
+                if min_cpt is not None and float(cpt) < float(min_cpt): continue
+            except: pass
+        else:
+            # if max_cpt is set and cpt is None, we consider it as not exceeding max (keep) — unless global include_null false?
+            pass
+        out.append(m)
+    return out
+
 if __name__ == "__main__":
     parser=argparse.ArgumentParser(description="9Router sync: inventory -> providers+combos+CLI")
     parser.add_argument("--config", help="path to 9router-sync config yaml")

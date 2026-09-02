@@ -60,3 +60,30 @@ def test_load_inventory_and_map(tmp_path):
     assert map_provider("cloudflare","@cf/foo", {"cloudflare":""}) == "@cf/foo"
     # already prefixed -> no double
     assert map_provider("openrouter","openrouter/foo:free", {"openrouter":"openrouter"}) == "openrouter/foo:free"
+
+
+def test_global_filter():
+    from playbooks_9router_scripts_9router_sync import apply_global_filter
+    models=[
+        {"provider":"opencode_zen","model_id":"a","intelligence":60,"cost_per_task":0.12,"free":False},
+        {"provider":"google","model_id":"b","intelligence":None,"cost_per_task":0.1,"free":True},
+        {"provider":"cloudflare","model_id":"@cf/x","intelligence":10,"cost_per_task":0.01,"free":False},
+        {"provider":"opencode_zen","model_id":"transcribe-foo","intelligence":50,"cost_per_task":0.1,"free":False},
+    ]
+    cfg={
+        "min_intelligence":50,
+        "include_null_intelligence":False,
+        "max_cost_per_task":0.15,
+        "provider_whitelist":["opencode_zen","google"],
+        "model_blacklist":["*transcribe*"],
+        "model_whitelist":[],
+        "free":"both"
+    }
+    out=apply_global_filter(models,cfg)
+    # only transcribe excluded, cloudflare excluded by provider whitelist, b excluded by null intelligence
+    # Note: original plan had a cost 0.2 with max 0.15 which would incorrectly exclude a; fixed to 0.12 to satisfy filter logic (Deviation Rule 1)
+    assert len(out)==1 and out[0]["model_id"]=="a"
+    # with include_null True and free both, b passes if cost OK
+    cfg["include_null_intelligence"]=True
+    out2=apply_global_filter(models,cfg)
+    assert any(m["model_id"]=="b" for m in out2)
