@@ -428,6 +428,97 @@ def build_routed_list(global_filtered: List[Dict[str,Any]], mapping: Dict[str,st
         out.append({**m, "mapped_provider": alias, "routed": routed})
     return out
 
+def get_ninerouter_creds(config: Dict[str,Any], config_path: pathlib.Path) -> Tuple[str,str,str]:
+    """Return (url, api_key, dashboard_password). Reads from config ninerouter block + secrets."""
+    ncfg = config.get("ninerouter") or {}
+    url = sanitize_key(expand_env(ncfg.get("url") or os.environ.get("NINEROUTER_URL") or ""))
+    if not url:
+        # try secrets file
+        for cand in [config_path.parent / "secrets" / "ninerouter-url.txt", pathlib.Path("executions/9router/secrets/ninerouter-url.txt"), pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/secrets/ninerouter-url.txt")]:
+            if cand.exists():
+                try: url=sanitize_key(cand.read_text(encoding="utf-8").strip())
+                except: pass
+                if url: break
+    api_key = ""
+    key_file = ncfg.get("api_key_file") or "secrets/9router-api-key.txt"
+    # try explicit file relative to config
+    for cand in [config_path.parent / key_file, pathlib.Path(key_file), pathlib.Path("executions/9router/secrets/9router-api-key.txt")]:
+        if cand.exists():
+            try: api_key=sanitize_key(cand.read_text(encoding="utf-8").strip())
+            except: pass
+            if api_key: break
+    if not api_key:
+        api_key=sanitize_key(os.environ.get("NINEROUTER_KEY") or os.environ.get("9ROUTER_API_KEY") or "")
+    pwd=""
+    pwd_file = ncfg.get("dashboard_password_file") or "secrets/dashboard-password.txt"
+    for cand in [config_path.parent / pwd_file, pathlib.Path(pwd_file), pathlib.Path("executions/9router/secrets/dashboard-password.txt")]:
+        if cand.exists():
+            try: pwd=cand.read_text(encoding="utf-8").strip()
+            except: pass
+            if pwd: break
+    if not pwd:
+        pwd=os.environ.get("DASHBOARD_PASSWORD") or ""
+    return url.rstrip("/"), api_key, pwd
+
+def http_request(method: str, url: str, headers: Optional[Dict[str,str]]=None, json_body: Any=None, timeout: int=20, session=None) -> Tuple[int, Any]:
+    headers=headers or {}
+    if requests is not None and session is None:
+        try:
+            resp = requests.request(method, url, headers=headers, json=json_body, timeout=timeout)
+            ct=resp.headers.get("content-type","")
+            if "application/json" in ct or resp.text.strip().startswith("{") or resp.text.strip().startswith("["):
+                try: return resp.status_code, resp.json()
+                except: return resp.status_code, resp.text
+            return resp.status_code, resp.text
+        except Exception as e: return 0, str(e)
+    else:
+        import urllib.request, urllib.error
+        data=None
+        if json_body is not None:
+            data=json.dumps(json_body).encode("utf-8")
+            headers["Content-Type"]="application/json"
+        # session handling for cookie auth
+        if session is not None:
+            # use requests session if available
+            if requests and isinstance(session, requests.Session):
+                resp=session.request(method, url, headers=headers, json=json_body, timeout=timeout)
+                try: return resp.status_code, resp.json()
+                except: return resp.status_code, resp.text
+        req=urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                body=r.read().decode("utf-8", errors="replace")
+                try: return r.status, json.loads(body)
+                except: return r.status, body
+        except urllib.error.HTTPError as e:
+            try:
+                body=e.read().decode("utf-8", errors="replace")
+                try: return e.code, json.loads(body)
+                except: return e.code, body
+            except Exception as ex: return e.code, str(ex)
+        except Exception as e: return 0, str(e)
+
+def login_and_get_session(url: str, password: str):
+    if not url or not password:
+        return None
+    if requests:
+        s=requests.Session()
+        code, body = http_request("POST", f"{url}/api/auth/login", json_body={"password": password}, session=s)
+        # but http_request with session not correctly used; do direct
+        try:
+            resp=s.post(f"{url}/api/auth/login", json={"password": password}, timeout=15)
+            if resp.status_code==200:
+                return s
+            else:
+                print(f"WARN login {resp.status_code}: {resp.text[:400]}", file=sys.stderr)
+                return None
+        except Exception as e:
+            print(f"WARN login failed: {e}", file=sys.stderr); return None
+    else:
+        # urllib fallback with cookie handling manually is complex; require requests for auth
+        print("WARN: requests required for /api/auth/login", file=sys.stderr)
+        return None
+
 if __name__ == "__main__":
     parser=argparse.ArgumentParser(description="9Router sync: inventory -> providers+combos+CLI")
     parser.add_argument("--config", help="path to 9router-sync config yaml")

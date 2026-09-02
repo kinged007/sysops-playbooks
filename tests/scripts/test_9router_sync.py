@@ -115,3 +115,10 @@ def test_combo_pipeline():
     assert out[0]["routed"]=="oc/deepseek-v4-flash"
     assert out[1]["routed"]=="oc/deepseek-v4-pro"
     assert out[2]["routed"]=="openrouter/z-ai/glm-5.2:free"
+
+
+def test_ninerouter_auth_helpers_exist():
+    from playbooks_9router_scripts_9router_sync import get_ninerouter_creds, http_request, login_and_get_session
+    assert callable(get_ninerouter_creds)
+    assert callable(http_request)
+    assert callable(login_and_get_session)
