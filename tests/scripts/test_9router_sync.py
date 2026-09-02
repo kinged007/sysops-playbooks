@@ -150,3 +150,49 @@ def test_cli_generation(tmp_path):
     write_cli_configs(models, "https://router.example.com", out, "free")
     assert (out / "opencode.json").exists()
     assert (out / "claude-settings.json").exists()
+
+
+def test_no_unnecessary_writes(monkeypatch):
+    from playbooks_9router_scripts_9router_sync import sync_providers
+    import playbooks_9router_scripts_9router_sync as mod
+    monkeypatch.setattr(mod, "fetch_current_provider_models", lambda s, u: {"oc": ["a", "b"]})
+    calls = []
+    monkeypatch.setattr(mod, "http_request", lambda *a, **k: (calls.append(a), (200, {}))[1])
+    changed = sync_providers(None, "http://x", {"oc": ["a", "b"]}, dry_run=False)
+    assert changed is False
+    assert len(calls) == 0
+
+
+def test_dry_run_prevents_provider_writes(monkeypatch):
+    from playbooks_9router_scripts_9router_sync import sync_providers
+    import playbooks_9router_scripts_9router_sync as mod
+    monkeypatch.setattr(mod, "fetch_current_provider_models", lambda s, u: {"oc": ["a"]})
+    calls = []
+    monkeypatch.setattr(mod, "http_request", lambda *a, **k: (calls.append(a), (200, {}))[1])
+    changed = sync_providers(None, "http://x", {"oc": ["a", "b"]}, dry_run=True)
+    assert changed is False
+    assert len(calls) == 0
+
+
+def test_dry_run_prevents_combo_writes(monkeypatch):
+    from playbooks_9router_scripts_9router_sync import sync_combos
+    import playbooks_9router_scripts_9router_sync as mod
+    monkeypatch.setattr(mod, "fetch_current_combos", lambda s, u: {"free": ["a"]})
+    monkeypatch.setattr(mod, "fetch_combo_ids", lambda s, u: {"free": "id123"})
+    calls = []
+    monkeypatch.setattr(mod, "http_request", lambda *a, **k: (calls.append(a), (200, {}))[1])
+    changed = sync_combos(None, "http://x", {"free": ["a", "b"]}, dry_run=True)
+    assert changed is False
+    assert len(calls) == 0
+
+
+def test_no_unnecessary_combo_writes(monkeypatch):
+    from playbooks_9router_scripts_9router_sync import sync_combos
+    import playbooks_9router_scripts_9router_sync as mod
+    monkeypatch.setattr(mod, "fetch_current_combos", lambda s, u: {"free": ["a", "b"]})
+    monkeypatch.setattr(mod, "fetch_combo_ids", lambda s, u: {"free": "id123"})
+    calls = []
+    monkeypatch.setattr(mod, "http_request", lambda *a, **k: (calls.append(a), (200, {}))[1])
+    changed = sync_combos(None, "http://x", {"free": ["a", "b"]}, dry_run=False)
+    assert changed is False
+    assert len(calls) == 0
