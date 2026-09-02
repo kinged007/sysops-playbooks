@@ -587,6 +587,55 @@ def sync_providers(session, url: str, desired_by_alias: Dict[str, List[str]], dr
     # For brevity, if provider has static models not in desired, disable them
     return True
 
+def fetch_current_combos(session, url: str) -> Dict[str, List[str]]:
+    if not session or not url: return {}
+    code, body = http_request("GET", f"{url}/api/combos", session=session)
+    if code!=200 or not isinstance(body, dict): return {}
+    combos=body.get("combos") or []
+    out={}
+    for c in combos:
+        name=c.get("name")
+        models=c.get("models") or []
+        if name: out[name]=models
+    return out
+
+def fetch_combo_ids(session, url: str) -> Dict[str, str]:
+    if not session or not url: return {}
+    code, body = http_request("GET", f"{url}/api/combos", session=session)
+    if code!=200 or not isinstance(body, dict): return {}
+    return {c["name"]: c["id"] for c in body.get("combos",[]) if c.get("name") and c.get("id")}
+
+def diff_combos(current: Dict[str, List[str]], desired: Dict[str, List[str]]) -> Dict[str, Tuple[List[str], List[str]]]:
+    diff={}
+    for name, des_models in desired.items():
+        cur = current.get(name)
+        if cur is None or cur != des_models:
+            diff[name]=(des_models, cur)
+    # also detect combos to delete? Keep extra combos not in desired as-is (or delete if not in desired and not in keep list)
+    return diff
+
+def sync_combos(session, url: str, desired_combos: Dict[str, List[str]], dry_run=False, verbose=False) -> bool:
+    current = fetch_current_combos(session, url)
+    ids = fetch_combo_ids(session, url)
+    diff = diff_combos(current, desired_combos)
+    if not diff:
+        print("  combos: no diff")
+        return False
+    print(f"  combos diff for: {list(diff.keys())}")
+    if dry_run:
+        print("  dry-run: would apply combo changes")
+        return False
+    for name, (desired_models, cur) in diff.items():
+        if name in ids:
+            # PUT
+            cid=ids[name]
+            code, body = http_request("PUT", f"{url}/api/combos/{cid}", json_body={"name": name, "models": desired_models}, session=session)
+            if verbose: print(f"    PUT combo {name} ({cid}) {len(desired_models)} models -> {code}")
+        else:
+            code, body = http_request("POST", f"{url}/api/combos", json_body={"name": name, "models": desired_models}, session=session)
+            if verbose: print(f"    POST combo {name} {len(desired_models)} models -> {code} {str(body)[:300]}")
+    return True
+
 if __name__ == "__main__":
     parser=argparse.ArgumentParser(description="9Router sync: inventory -> providers+combos+CLI")
     parser.add_argument("--config", help="path to 9router-sync config yaml")

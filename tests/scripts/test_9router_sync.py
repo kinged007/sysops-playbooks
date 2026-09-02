@@ -132,3 +132,11 @@ def test_provider_diff():
     assert diff=={"oc": ({"c"}, {"b"})}  # to_add, to_remove
     # no diff case
     assert diff_providers(desired, desired)=={}
+
+
+def test_combo_diff():
+    from playbooks_9router_scripts_9router_sync import diff_combos
+    current={"free":["a","b"], "coding-low":["x"]}
+    desired={"free":["a","c"], "coding-low":["x"]}
+    d=diff_combos(current, desired)
+    assert "free" in d and "coding-low" not in d
