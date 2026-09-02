@@ -782,10 +782,158 @@ def write_cli_configs(live_models: List[Dict[str, Any]], base_url: str, out_dir:
     write_generic(base_url, "sk-placeholder", out_dir, active_model)
     write_readme(out_dir, base_url, len(live_models), active_model)
 
-if __name__ == "__main__":
+def process_one_config(config_path: pathlib.Path, args) -> bool:
+    print(f"\n=== Processing {config_path} ===")
+    load_execution_env(config_path)
+    cfg = expand_env(load_yaml(config_path))
+    # defaults
+    defaults = {
+        "global_filter": {"min_intelligence":0,"include_null_intelligence":True,"max_cost_per_task":None,"provider_whitelist":[],"model_blacklist":[],"model_whitelist":[],"free":"both"},
+        "provider_mapping": {"opencode_zen":"oc","opencode_go":"ocg","ollama_cloud":"ollama","openrouter":"openrouter","command_code":"cmc","cloudflare":"","google":"gemini"},
+        "combos": {},
+        "cli": {"enabled":True,"output_dir":"generated","active_model":"free","writers":["opencode","hermes","codex","claude","generic"]},
+        "ninerouter": {"url":"","api_key_file":"secrets/9router-api-key.txt","dashboard_password_file":"secrets/dashboard-password.txt"},
+        "options": {"dry_run":False,"check_diff_before_write":True,"remove_all_before_add":True}
+    }
+    # deep merge
+    def deep_merge(a,b):
+        out=dict(a)
+        for k,v in b.items():
+            if isinstance(v,dict) and isinstance(out.get(k),dict):
+                out[k]=deep_merge(out[k],v)
+            else: out[k]=v
+        return out
+    cfg = deep_merge(defaults, cfg)
+    if args.dry_run: cfg["options"]["dry_run"]=True
+    verbose=args.verbose
+
+    # 1. find inventory
+    inv_dir = find_inventory_dir(config_path.parent)
+    if not inv_dir:
+        print(f"ERR: no model-inventory found for {config_path}", file=sys.stderr)
+        return False
+    print(f"  inventory: {inv_dir}")
+    models = load_inventory(inv_dir)
+    print(f"  loaded {len(models)} models")
+
+    # 2. global filter
+    global_filtered = apply_global_filter(models, cfg["global_filter"])
+    print(f"  global filtered: {len(global_filtered)} / {len(models)}")
+
+    # 3. provider mapping -> routed + group by alias
+    mapping = cfg["provider_mapping"]
+    routed = build_routed_list(global_filtered, mapping)
+    print(f"  routed ids sample: {[x['routed'] for x in routed[:5]]}")
+    # group desired custom models per alias
+    desired_by_alias: Dict[str, List[str]] = {}
+    for r in routed:
+        alias=r["mapped_provider"]
+        # alias "" -> skip grouping? Use model_id as-is but still needs provider? For "" we treat as generic? skip.
+        if alias == "":
+            # For cloudflare empty alias case, the routed is just model_id like "@cf/..."
+            # We need to decide providerAlias for custom API: for cloudflare, providerAlias is "cf" not "".
+            # So if mapping is "", we should infer alias from routed? But per spec they said cloudflare maps to '' because model_id contains full.
+            # We'll handle: if alias == "", don't add to custom sync (assume model already handled via disabled or static)
+            continue
+        # For openrouter etc, alias is the providerAlias directly
+        # Extract model part after alias/
+        routed_id=r["routed"]
+        # For custom API, id should be the part after alias/ (the registry id)
+        # e.g. routed "oc/grok-4.6" -> custom id "grok-4.6" with alias "oc"
+        # routed "openrouter/z-ai/glm-5.2:free" -> custom id "z-ai/glm-5.2:free" with alias "openrouter"
+        # routed "cmc/deepseek/deepseek-v4-pro" -> "deepseek/deepseek-v4-pro" with alias "cmc"
+        if "/" in routed_id:
+            # split on first slash
+            _, mid = routed_id.split("/",1)
+        else:
+            mid=routed_id
+        desired_by_alias.setdefault(alias, []).append(mid)
+    # dedupe per alias preserve order
+    for alias in list(desired_by_alias.keys()):
+        seen=set(); uniq=[]
+        for x in desired_by_alias[alias]:
+            if x not in seen:
+                seen.add(x); uniq.append(x)
+        desired_by_alias[alias]=uniq
+    print(f"  desired_by_alias: {{ {', '.join(f'{k}:{len(v)}' for k,v in desired_by_alias.items())} }}")
+
+    # 4. 9router auth
+    url, api_key, pwd = get_ninerouter_creds(cfg, config_path)
+    if not url:
+        print(f"ERR: NINEROUTER_URL not found for {config_path}", file=sys.stderr)
+        return False
+    print(f"  9router url: {url}")
+    session = login_and_get_session(url, pwd)
+    if not session:
+        print(f"WARN: no session (dashboard password missing) — provider/combo sync skipped, only local processing", file=sys.stderr)
+    else:
+        # 4a. provider sync
+        if desired_by_alias:
+            changed = sync_providers(session, url, desired_by_alias, dry_run=cfg["options"]["dry_run"], verbose=verbose)
+            # optionally sync disabled for static providers
+            # 4b. combo sync
+            # Build combos desired: apply per-combo pipeline to routed list
+            desired_combos={}
+            for combo_name, combo_cfg in (cfg.get("combos") or {}).items():
+                combo_models = apply_combo_pipeline(routed, combo_cfg)
+                # Convert to list of routed ids
+                desired_combos[combo_name]=[m["routed"] for m in combo_models]
+                print(f"    combo {combo_name}: {len(desired_combos[combo_name])} models")
+            if desired_combos:
+                sync_combos(session, url, desired_combos, dry_run=cfg["options"]["dry_run"], verbose=verbose)
+        else:
+            print("  no desired providers to sync")
+
+    # 5. CLI generation (always, even if no session)
+    if cfg["cli"].get("enabled", True):
+        live_models = fetch_live_v1_models(url, api_key) if url and api_key else []
+        if not live_models:
+            # fallback to desired routed list as mock live
+            live_models=[{"id": r["routed"], "owned_by": r["mapped_provider"]} for r in routed]
+            # add combos as combo owned_by
+            for cname in (cfg.get("combos") or {}).keys():
+                live_models.append({"id": cname, "owned_by":"combo"})
+        cli_out = cfg["cli"].get("output_dir","generated")
+        out_dir = pathlib.Path(cli_out)
+        if not out_dir.is_absolute():
+            out_dir = (config_path.parent / out_dir).resolve()
+        else:
+            out_dir = out_dir.resolve()
+        active = cfg["cli"].get("active_model","free")
+        write_cli_configs(live_models, url or "https://router.example.com", out_dir, active)
+        print(f"  cli configs -> {out_dir}")
+
+    # 6. save state snapshot alongside config
+    snapshot={"generated": datetime.datetime.now(datetime.timezone.utc).isoformat(),"config":str(config_path),"global_filtered":len(global_filtered),"routed":len(routed),"desired_by_alias":{k:len(v) for k,v in desired_by_alias.items()}}
+    try:
+        (config_path.parent / "9router-sync.state.json").write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
+    except: pass
+    return True
+
+def main():
     parser=argparse.ArgumentParser(description="9Router sync: inventory -> providers+combos+CLI")
     parser.add_argument("--config", help="path to 9router-sync config yaml")
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--dry-run", action="store_true", help="do not write to 9Router")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--force", action="store_true", help="ignore diff check and force write")
     args=parser.parse_args()
-    print(find_sync_configs(args.config))
+    load_execution_env(pathlib.Path(args.config) if args.config else None)
+    configs=find_sync_configs(args.config)
+    if not configs:
+        print("ERR: no 9router-sync config found", file=sys.stderr)
+        print("Hint: copy playbooks/9router/templates/9router-sync.config.example.yaml to executions/9router/9router-sync.config.yaml", file=sys.stderr)
+        sys.exit(2)
+    print(f"Found {len(configs)} config(s): {[str(p) for p in configs]}")
+    ok=True
+    for cfg_path in configs:
+        try:
+            res=process_one_config(cfg_path, args)
+            ok = ok and res
+        except Exception as e:
+            print(f"ERR processing {cfg_path}: {e}", file=sys.stderr)
+            import traceback; traceback.print_exc()
+            ok=False
+    sys.exit(0 if ok else 1)
+
+if __name__ == "__main__":
+    main()
