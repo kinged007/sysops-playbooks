@@ -1,0 +1,100 @@
+# 9Router Sync Config — example (placeholders only, committed)
+# Copy to executions/9router/9router-sync.config.yaml (gitignored) or any
+# executions/*9router*/**/9router-sync*.yaml  — script auto-discovers via glob.
+# All ${VAR} expanded at runtime (see model-inventory.py expand_env).
+
+# Execution discovery: script processes EACH matching config file found.
+# Output for a given config lives alongside it (<config-dir>/generated/, <config-dir>/model-inventory/).
+
+# Global filter — applied to ALL models from model-inventory before provider mapping.
+global_filter:
+  min_intelligence: 0
+  include_null_intelligence: true
+  max_cost_per_task: null        # null = no cap; else e.g. 0.5
+  min_cost_per_task: null        # optional
+  provider_whitelist: []         # fnmatch, case-insensitive. [] = all. e.g. ["opencode_zen","google"]
+  provider_blacklist: []         # e.g. ["cloudflare"]
+  model_whitelist: []            # matches raw model_id OR provider/model_id composite
+  model_blacklist: []            # e.g. ["*transcribe*","*image*","lyria-3*"]
+  free: "both"                   # true | false | both  (filter on inventory 'free' flag)
+
+# Provider mapping: inventory provider -> 9Router alias/prefix.
+# Routed id = "<alias>/<model_id>" if alias != "" else "<model_id>".
+# If model_id already starts with "<alias>/", it is used as-is (no double prefix).
+provider_mapping:
+  opencode_zen: "oc"
+  opencode_go: "ocg"
+  ollama_cloud: "ollama"
+  openrouter: "openrouter"
+  command_code: "cmc"
+  cloudflare: ""        # model_id already like "@cf/..." -> use as-is
+  google: "gemini"
+
+# Combos: each block is applied to the *already globally filtered* set.
+# Allow any number of combos; the 5 defaults match the baseline in playbooks/9router/combos/.
+combos:
+  free:
+    description: "All free cost asc intelligence desc"
+    sort_by: "intelligence"      # intelligence | cost | provider | model | cost_per_task
+    sort_order: "desc"           # asc | desc
+    free: true                   # true | false | both
+    min_intelligence: null
+    max_intelligence: null
+    min_cost_per_task: null
+    max_cost_per_task: null
+    provider_whitelist: []
+    provider_blacklist: []
+    model_whitelist: []
+    model_blacklist: []
+    favorites: []                # ordered fnmatch patterns, moved to top after sort
+  coding-free:
+    description: "Coding free tier"
+    sort_by: "cost"
+    sort_order: "asc"
+    free: true
+    min_intelligence: 25
+    max_intelligence: null
+    favorites: ["deepseek-v4*","glm-5.3-flash"]
+  coding-low:
+    sort_by: "cost"
+    sort_order: "asc"
+    free: "both"
+    min_intelligence: 30
+    max_intelligence: null
+    max_cost_per_task: 0.5
+    favorites: ["mimo-v2.5*","hy3"]
+  coding-med:
+    sort_by: "cost"
+    sort_order: "asc"
+    free: "both"
+    min_intelligence: 40
+    max_intelligence: null
+    favorites: []
+  coding-pro:
+    sort_by: "cost"
+    sort_order: "asc"
+    free: "both"
+    min_intelligence: 50
+    max_intelligence: null
+    favorites: ["deepseek-v4*"]
+
+# CLI generation (post-sync, after providers+combos are live)
+cli:
+  enabled: true
+  output_dir: "generated"        # relative to config dir, or absolute
+  active_model: "free"           # default model for generated configs
+  # Which writers to run (subset of opencode/hermes/codex/claude/generic)
+  writers: ["opencode","hermes","codex","claude","generic"]
+
+# 9Router connection (per-variant; env expansion supported)
+ninerouter:
+  url: "${NINEROUTER_URL}"               # or literal https://router.munyard.biz
+  api_key_file: "secrets/9router-api-key.txt"  # for /v1/models
+  dashboard_password_file: "secrets/dashboard-password.txt"  # for /api/* JWT
+  # Alternatively set NINEROUTER_URL / NINEROUTER_KEY env directly
+
+# Safety
+options:
+  dry_run: false                 # if true, never POST/PUT/DELETE, only log diff
+  check_diff_before_write: true  # required true per spec (no unnecessary writes)
+  remove_all_before_add: true    # if diff detected, clear then re-add filtered set
