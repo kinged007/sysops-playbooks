@@ -87,3 +87,31 @@ def test_global_filter():
     cfg["include_null_intelligence"]=True
     out2=apply_global_filter(models,cfg)
     assert any(m["model_id"]=="b" for m in out2)
+
+
+def test_combo_pipeline():
+    from playbooks_9router_scripts_9router_sync import apply_combo_pipeline
+    models=[
+        {"provider":"oc","model_id":"deepseek-v4-pro","routed":"oc/deepseek-v4-pro","intelligence":53,"cost_per_task":0.26,"free":False},
+        {"provider":"oc","model_id":"deepseek-v4-flash","routed":"oc/deepseek-v4-flash","intelligence":51,"cost_per_task":0.11,"free":False},
+        {"provider":"openrouter","model_id":"z-ai/glm-5.2:free","routed":"openrouter/z-ai/glm-5.2:free","intelligence":52,"cost_per_task":0.44,"free":True},
+        {"provider":"gemini","model_id":"gemini-3.1-pro","routed":"gemini/gemini-3.1-pro","intelligence":47,"cost_per_task":0.33,"free":False},
+    ]
+    combo_cfg={
+        "sort_by":"cost",
+        "sort_order":"asc",
+        "free":"both",
+        "min_intelligence":50,
+        "max_cost_per_task":0.5,
+        "provider_whitelist":[],
+        "provider_blacklist":[],
+        "model_whitelist":[],
+        "model_blacklist":[],
+        "favorites":["deepseek-v4*"]
+    }
+    out=apply_combo_pipeline(models, combo_cfg)
+    # filter min 50 removes gemini 47, cost max 0.5 keeps all others, sort cost asc => flash 0.11, pro 0.26, glm 0.44
+    # favorites deepseek* moves both deepseek to top in pattern order, preserving sorted order within pattern
+    assert out[0]["routed"]=="oc/deepseek-v4-flash"
+    assert out[1]["routed"]=="oc/deepseek-v4-pro"
+    assert out[2]["routed"]=="openrouter/z-ai/glm-5.2:free"

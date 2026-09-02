@@ -300,6 +300,134 @@ def apply_global_filter(models: List[Dict[str, Any]], cfg: Dict[str, Any]) -> Li
         out.append(m)
     return out
 
+def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+    # routed_models already have keys: provider (mapped alias), model_id, routed, intelligence, cost_per_task, free
+    # Work on copy
+    models = list(routed_models)
+    # Extract cfg
+    free_filter = combo_cfg.get("free", "both")
+    if isinstance(free_filter, bool): free_str = "true" if free_filter else "false"
+    else: free_str = str(free_filter).lower() if free_filter is not None else "both"
+    min_intel = combo_cfg.get("min_intelligence")
+    max_intel = combo_cfg.get("max_intelligence")
+    include_null = combo_cfg.get("include_null_intelligence", True)
+    min_cpt = combo_cfg.get("min_cost_per_task")
+    max_cpt = combo_cfg.get("max_cost_per_task")
+    sort_by = combo_cfg.get("sort_by", "intelligence")
+    sort_order = combo_cfg.get("sort_order", "desc")
+    prov_wl = combo_cfg.get("provider_whitelist") or combo_cfg.get("whitelist_providers") or []
+    prov_bl = combo_cfg.get("provider_blacklist") or combo_cfg.get("blacklist_providers") or []
+    mod_wl = combo_cfg.get("model_whitelist") or combo_cfg.get("whitelist") or []
+    mod_bl = combo_cfg.get("model_blacklist") or combo_cfg.get("blacklist") or []
+    favorites = combo_cfg.get("favorites") or combo_cfg.get("favorite") or []
+    if isinstance(favorites, str): favorites=[favorites]
+    # Also support legacy keys "whitelist"/"blacklist" that apply to model_id
+    # If generic whitelist/blacklist provided, treat as model patterns
+    if not mod_wl and combo_cfg.get("whitelist"): mod_wl = combo_cfg.get("whitelist")
+    if not mod_bl and combo_cfg.get("blacklist"): mod_bl = combo_cfg.get("blacklist")
+
+    filtered=[]
+    for m in models:
+        prov = m.get("provider","") or m.get("mapped_provider","")
+        mid = m.get("model_id","")
+        routed = m.get("routed","") or f"{prov}/{mid}"
+        composite = f"{prov}/{mid}"
+        # provider whitelist/blacklist
+        if prov_wl and not matches_any(prov_wl, prov):
+            # unless whitelisted via model
+            if not (matches_any(mod_wl, mid) or matches_any(mod_wl, routed) or matches_any(mod_wl, composite)):
+                continue
+        if prov_bl and matches_any(prov_bl, prov):
+            if not (matches_any(mod_wl, mid) or matches_any(mod_wl, routed)):
+                continue
+        # model whitelist immediate pass
+        is_mod_wl = matches_any(mod_wl, mid) or matches_any(mod_wl, routed) or matches_any(mod_wl, composite)
+        if is_mod_wl:
+            filtered.append(m); continue
+        if matches_any(mod_bl, mid) or matches_any(mod_bl, routed) or matches_any(mod_bl, composite):
+            continue
+        # free
+        if free_str != "both":
+            is_free = bool(m.get("free"))
+            if free_str == "true" and not is_free: continue
+            if free_str == "false" and is_free: continue
+        # intelligence
+        intel=m.get("intelligence")
+        if intel is None:
+            if not include_null and min_intel is not None:
+                continue
+            if min_intel is not None and not include_null:
+                continue
+        else:
+            try:
+                if min_intel is not None and float(intel) < float(min_intel):
+                    continue
+                if max_intel is not None and float(intel) > float(max_intel):
+                    continue
+            except: pass
+        # cost
+        cpt=m.get("cost_per_task")
+        if cpt is not None:
+            try:
+                if max_cpt is not None and float(cpt) > float(max_cpt): continue
+                if min_cpt is not None and float(cpt) < float(min_cpt): continue
+            except: pass
+        filtered.append(m)
+    # sorting
+    reverse = str(sort_order).lower() == "desc"
+    key = str(sort_by).lower()
+    if key in ("intelligence","intel"):
+        # For desc we want highest first, blanks last
+        # Use manual: sorted with key that pushes blanks last regardless
+        filtered = sorted(filtered, key=lambda m: (m.get("intelligence") is None, -(m.get("intelligence") or 0) if reverse else (m.get("intelligence") or 0), m.get("cost_per_task") if m.get("cost_per_task") is not None else 999999))
+        if not reverse:
+            # asc: blanks last, intel asc
+            filtered = sorted(filtered, key=lambda m: (m.get("intelligence") is None, m.get("intelligence") if m.get("intelligence") is not None else 999999, m.get("cost_per_task") or 999999))
+    elif key in ("cost","cost_per_task","costpertask"):
+        def cost_key(m):
+            c=m.get("cost_per_task")
+            if c is None: c=m.get("cost_input_per_1M")
+            is_blank=c is None
+            if is_blank: c=999999
+            intel=m.get("intelligence") or 0
+            return (is_blank, c, -intel)
+        filtered = sorted(filtered, key=cost_key)
+        if reverse:
+            filtered = list(reversed(filtered))
+    elif key == "provider":
+        filtered = sorted(filtered, key=lambda m: (m.get("provider") or "", m.get("model_id") or ""), reverse=reverse)
+    else: # model
+        filtered = sorted(filtered, key=lambda m: (m.get("model_id") or "").lower(), reverse=reverse)
+
+    # favorites promotion: stable move to top in config order
+    if favorites:
+        pool = list(filtered)
+        fav_ordered=[]
+        for pat in favorites:
+            matched = [x for x in pool if matches_any([pat], x.get("routed","") or x.get("model_id","")) or matches_any([pat], x.get("model_id","")) or matches_any([pat], x.get("provider","")+ "/" + x.get("model_id",""))]
+            # keep matched in current sorted order
+            for m in matched:
+                if m in pool:
+                    fav_ordered.append(m)
+                    pool.remove(m)
+        remaining = pool
+        filtered = fav_ordered + remaining
+    return filtered
+
+def build_routed_list(global_filtered: List[Dict[str,Any]], mapping: Dict[str,str]) -> List[Dict[str,Any]]:
+    out=[]
+    for m in global_filtered:
+        prov=m.get("provider")
+        mid=m.get("model_id")
+        routed=map_provider(prov, mid, mapping)
+        # mapped_provider is alias
+        alias=mapping.get(prov, prov) if mapping.get(prov,"") != "" else ""
+        # fix edge: if prov not in mapping, mapping.get(prov,"") returns "" -> alias becomes "" incorrectly; restore to prov
+        if prov not in mapping:
+            alias = prov
+        out.append({**m, "mapped_provider": alias, "routed": routed})
+    return out
+
 if __name__ == "__main__":
     parser=argparse.ArgumentParser(description="9Router sync: inventory -> providers+combos+CLI")
     parser.add_argument("--config", help="path to 9router-sync config yaml")
