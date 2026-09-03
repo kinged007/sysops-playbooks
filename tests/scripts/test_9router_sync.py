@@ -80,13 +80,17 @@ def test_global_filter():
         "free":"both"
     }
     out=apply_global_filter(models,cfg)
-    # only transcribe excluded, cloudflare excluded by provider whitelist, b excluded by null intelligence
+    # only transcribe excluded, cloudflare excluded by provider whitelist, b excluded by null intelligence (min 50 >0)
     # Note: original plan had a cost 0.2 with max 0.15 which would incorrectly exclude a; fixed to 0.12 to satisfy filter logic (Deviation Rule 1)
     assert len(out)==1 and out[0]["model_id"]=="a"
-    # with include_null True and free both, b passes if cost OK
+    # New rule: min_intelligence >0 always excludes null, even with include_null True
     cfg["include_null_intelligence"]=True
     out2=apply_global_filter(models,cfg)
-    assert any(m["model_id"]=="b" for m in out2)
+    assert not any(m["model_id"]=="b" for m in out2), "null should be excluded when min 50 >0"
+    # Only when min is null should null be included
+    cfg["min_intelligence"]=None
+    out3=apply_global_filter(models,cfg)
+    assert any(m["model_id"]=="b" for m in out3)
 
 
 def test_combo_pipeline():

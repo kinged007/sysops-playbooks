@@ -294,10 +294,20 @@ def apply_global_filter(models: List[Dict[str, Any]], cfg: Dict[str, Any]) -> Li
             is_free = bool(m.get("free"))
             if free_str == "true" and not is_free: continue
             if free_str == "false" and is_free: continue
-        # intelligence
+        # intelligence — per new rule: if min_intelligence is set (>0), null is always excluded
         intel=m.get("intelligence")
         if intel is None:
-            if not include_null: continue
+            # If a threshold is set, exclude null regardless of include_null flag
+            if min_intel is not None:
+                try:
+                    if float(min_intel) != 0:
+                        continue
+                except:
+                    # non-numeric threshold -> treat as set
+                    continue
+            # No threshold -> respect include_null flag
+            if not include_null:
+                continue
         else:
             try:
                 if min_intel is not None and float(intel) < float(min_intel):
@@ -391,12 +401,22 @@ def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[st
             is_free = bool(m.get("free"))
             if free_str == "true" and not is_free: continue
             if free_str == "false" and is_free: continue
-        # intelligence
+        # intelligence — new rule: if any intelligence threshold is set (>0 or not null), null is excluded
         intel=m.get("intelligence")
         if intel is None:
-            if not include_null and min_intel is not None:
+            has_threshold = False
+            for thr in (min_intel, max_intel):
+                if thr is not None:
+                    try:
+                        if float(thr) != 0:
+                            has_threshold = True
+                            break
+                    except:
+                        has_threshold = True
+                        break
+            if has_threshold:
                 continue
-            if min_intel is not None and not include_null:
+            if not include_null:
                 continue
         else:
             try:
