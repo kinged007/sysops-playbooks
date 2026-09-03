@@ -1,0 +1,35 @@
+# cron-9router-sync — crontab fragment for 9Router weekly sync
+# Every Monday at 16:00 (4pm) — syncs model-inventory -> 9Router providers/combos + CLI configs
+#
+# Two complementary cron jobs (install both, or systemd timer alternative):
+#   15:00 inventory fetch (model-inventory-cron.sh) — hits upstream APIs, updates executions/<variant>/model-inventory/
+#   16:00 sync to 9Router (9router-sync-cron.sh) — reads the fresh inventory, updates /api/models/custom + /api/combos, regenerates generated/
+#
+# Install (host):
+#   # Option A: system crontab (needs /opt/sysops-playbooks checkout)
+#   sudo crontab -e
+#   # add:
+#   0 15 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
+#   0 16 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
+#
+#   # Option B: user crontab (no sudo, repo under $HOME)
+#   crontab -e
+#   # add:
+#   0 15 * * 1 /home/<user>/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> /home/<user>/sysops-playbooks/executions/9router/logs/cron.log 2>&1
+#   0 16 * * 1 /home/<user>/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> /home/<user>/sysops-playbooks/executions/9router/logs/cron.log 2>&1
+#
+# Verify:
+#   ./playbooks/9router/scripts/9router-sync-cron.sh --dry-run --verbose
+#   ls -lh executions/9router/logs/*9router-sync-cron.log
+#   cat executions/9router/combos/free.csv | head -n 10
+#
+# Systemd timer alternative (preferred on modern hosts):
+#   sudo cp playbooks/9router/templates/systemd-9router-sync.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now 9router-sync.timer
+#
+# --- Cron lines (copy-paste) ---
+# Inventory fetch — Monday 15:00
+0 15 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
+# 9Router sync — Monday 16:00 (1h after inventory)
+0 16 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
+

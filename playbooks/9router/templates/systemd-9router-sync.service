@@ -1,0 +1,45 @@
+# systemd unit for 9Router weekly sync (9router-sync.py)
+# Runs model-inventory -> 9Router provider/combo sync + CLI config regeneration.
+# Every Monday 16:00 via systemd-9router-sync.timer (see companion timer).
+#
+# Install on <ALIAS> (Linux host with systemd):
+#   sudo cp playbooks/9router/templates/systemd-9router-sync.service /etc/systemd/system/9router-sync.service
+#   sudo cp playbooks/9router/templates/systemd-9router-sync.timer /etc/systemd/system/9router-sync.timer
+#   # Fill <REPO_ROOT> and <PYTHON> below, or use EnvironmentFile
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now 9router-sync.timer
+#   systemctl list-timers 9router-sync.timer
+#   journalctl -u 9router-sync -f
+#
+# Logs also go to executions/<variant>/logs/<ISO>-9router-sync-cron.log via the wrapper.
+#
+[Unit]
+Description=9Router weekly sync — model-inventory -> 9Router providers/combos + CLI configs
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Run as the repo owner (replace <USER> and <REPO_ROOT>)
+User=<USER>
+Group=<USER>
+WorkingDirectory=<REPO_ROOT>
+# <REPO_ROOT> e.g. /opt/sysops-playbooks or /home/<USER>/sysops-playbooks
+# Pick python via $PYTHON_BIN or .venv — wrapper resolves it
+ExecStart=<REPO_ROOT>/playbooks/9router/scripts/9router-sync-cron.sh --verbose
+# Alternatively call python directly:
+# ExecStart=<REPO_ROOT>/.venv/bin/python <REPO_ROOT>/playbooks/9router/scripts/9router-sync.py --verbose
+# Log via journal + variant logs/
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=9router-sync
+
+# Hardening (relax if REPO_ROOT is under /home)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=<REPO_ROOT>/executions <REPO_ROOT>/playbooks /tmp
+
+[Install]
+WantedBy=multi-user.target

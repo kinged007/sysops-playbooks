@@ -1,0 +1,37 @@
+# systemd timer for 9Router weekly sync — every Monday 16:00
+#
+# Install:
+#   sudo cp playbooks/9router/templates/systemd-9router-sync.service /etc/systemd/system/9router-sync.service
+#   sudo cp playbooks/9router/templates/systemd-9router-sync.timer /etc/systemd/system/9router-sync.timer
+#   # Edit <USER> and <REPO_ROOT> in the .service above
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now 9router-sync.timer
+#
+# Verify:
+#   systemctl list-timers 9router-sync.timer
+#   systemctl status 9router-sync.timer
+#   journalctl -u 9router-sync -f
+#   ls -lh executions/9router/logs/*9router-sync-cron.log
+#   cat executions/9router/combos/free.csv | head -n 10
+#
+# The timer complements model-inventory-cron at 15:00 — inventory fetches first,
+# this 16:00 job syncs to 9Router. Either can run standalone.
+#
+[Unit]
+Description=9Router weekly sync timer — every Monday 16:00
+
+[Timer]
+# Every Monday at 16:00 local time on the host
+OnCalendar=Mon *-*-* 16:00:00
+# Also run shortly after boot if missed (e.g. host was down Monday 16:00)
+Persistent=true
+# Randomize by up to 5 min to avoid thundering herd if many hosts share the timer
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
+
+# Manual trigger (without waiting for Monday):
+#   sudo systemctl start 9router-sync.service
+# Dry-run:
+#   /opt/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh --dry-run --verbose
