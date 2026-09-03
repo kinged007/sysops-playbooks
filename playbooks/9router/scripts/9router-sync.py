@@ -185,6 +185,15 @@ def load_inventory(inv_dir: pathlib.Path) -> List[Dict[str, Any]]:
                     if "free" in row:
                         v=row["free"]
                         if isinstance(v, str): row["free"]=v.lower() in ("true","1","yes")
+                    for bv in ("supports_vision","supports_image_generation","supports_image"):
+                        if bv in row:
+                            v=row[bv]
+                            if isinstance(v, str):
+                                if v.lower() in ("true","1","yes"): row[bv]=True
+                                elif v.lower() in ("false","0","no"): row[bv]=False
+                                elif v.strip()=="" : row[bv]=None
+                            if bv=="supports_image" and "supports_image_generation" not in row:
+                                row["supports_image_generation"]=row[bv]
                     out.append(row)
             return out
         except Exception as e:
@@ -251,6 +260,15 @@ def apply_global_filter(models: List[Dict[str, Any]], cfg: Dict[str, Any]) -> Li
     if free_filter is True: free_str="true"
     elif free_filter is False: free_str="false"
     else: free_str=str(free_filter).lower() if free_filter else "both"
+    # vision / image generation filters
+    def _norm_tri(v):
+        if v is True or (isinstance(v, str) and v.lower()=="true"): return "true"
+        if v is False or (isinstance(v, str) and v.lower()=="false"): return "false"
+        s=str(v).lower() if v is not None else "both"
+        if s in ("true","false","both"): return s
+        return "both"
+    supports_vision = _norm_tri(cfg.get("supports_vision", "both"))
+    supports_image = _norm_tri(cfg.get("supports_image_generation", cfg.get("supports_image", "both")))
 
     out=[]
     for m in models:
@@ -297,6 +315,19 @@ def apply_global_filter(models: List[Dict[str, Any]], cfg: Dict[str, Any]) -> Li
         else:
             # if max_cpt is set and cpt is None, we consider it as not exceeding max (keep) — unless global include_null false?
             pass
+        # supports_vision / supports_image_generation
+        if supports_vision != "both":
+            sv = m.get("supports_vision")
+            # treat None as false for filtering; but allow to pass if both?
+            is_true = bool(sv) if sv is not None else False
+            if supports_vision == "true" and not is_true: continue
+            if supports_vision == "false" and is_true: continue
+        if supports_image != "both":
+            si = m.get("supports_image_generation")
+            if si is None: si = m.get("supports_image")
+            is_true = bool(si) if si is not None else False
+            if supports_image == "true" and not is_true: continue
+            if supports_image == "false" and is_true: continue
         out.append(m)
     return out
 
@@ -320,6 +351,15 @@ def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[st
     mod_wl = combo_cfg.get("model_whitelist") or combo_cfg.get("whitelist") or []
     mod_bl = combo_cfg.get("model_blacklist") or combo_cfg.get("blacklist") or []
     favorites = combo_cfg.get("favorites") or combo_cfg.get("favorite") or []
+    # vision / image filters for combos
+    def _norm_tri(v):
+        if v is True or (isinstance(v, str) and v.lower()=="true"): return "true"
+        if v is False or (isinstance(v, str) and v.lower()=="false"): return "false"
+        s=str(v).lower() if v is not None else "both"
+        if s in ("true","false","both"): return s
+        return "both"
+    combo_supports_vision = _norm_tri(combo_cfg.get("supports_vision", "both"))
+    combo_supports_image = _norm_tri(combo_cfg.get("supports_image_generation", combo_cfg.get("supports_image", "both")))
     if isinstance(favorites, str): favorites=[favorites]
     # Also support legacy keys "whitelist"/"blacklist" that apply to model_id
     # If generic whitelist/blacklist provided, treat as model patterns
@@ -372,6 +412,18 @@ def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[st
                 if max_cpt is not None and float(cpt) > float(max_cpt): continue
                 if min_cpt is not None and float(cpt) < float(min_cpt): continue
             except: pass
+        # supports_vision / supports_image_generation for combos
+        if combo_supports_vision != "both":
+            sv = m.get("supports_vision")
+            is_true = bool(sv) if sv is not None else False
+            if combo_supports_vision == "true" and not is_true: continue
+            if combo_supports_vision == "false" and is_true: continue
+        if combo_supports_image != "both":
+            si = m.get("supports_image_generation")
+            if si is None: si = m.get("supports_image")
+            is_true = bool(si) if si is not None else False
+            if combo_supports_image == "true" and not is_true: continue
+            if combo_supports_image == "false" and is_true: continue
         filtered.append(m)
     # sorting
     reverse = str(sort_order).lower() == "desc"
@@ -788,7 +840,7 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
     cfg = expand_env(load_yaml(config_path))
     # defaults
     defaults = {
-        "global_filter": {"min_intelligence":0,"include_null_intelligence":True,"max_cost_per_task":None,"provider_whitelist":[],"model_blacklist":[],"model_whitelist":[],"free":"both"},
+        "global_filter": {"min_intelligence":0,"include_null_intelligence":True,"max_cost_per_task":None,"provider_whitelist":[],"model_blacklist":[],"model_whitelist":[],"free":"both","supports_vision":"both","supports_image_generation":"both"},
         "provider_mapping": {"opencode_zen":"oc","opencode_go":"ocg","ollama_cloud":"ollama","openrouter":"openrouter","command_code":"cmc","cloudflare":"","google":"gemini"},
         "combos": {},
         "cli": {"enabled":True,"output_dir":"generated","active_model":"free","writers":["opencode","hermes","codex","claude","generic"]},
@@ -857,7 +909,71 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
         desired_by_alias[alias]=uniq
     print(f"  desired_by_alias: {{ {', '.join(f'{k}:{len(v)}' for k,v in desired_by_alias.items())} }}")
 
-    # 4. 9router auth
+    # 4. Build combos locally (always, even without 9Router auth)
+    desired_combos: Dict[str, List[str]] = {}
+    desired_members: Dict[str, List[Dict[str, Any]]] = {}
+    for combo_name, combo_cfg in (cfg.get("combos") or {}).items():
+        combo_models = apply_combo_pipeline(routed, combo_cfg)
+        desired_combos[combo_name] = [m["routed"] for m in combo_models]
+        desired_members[combo_name] = combo_models
+        print(f"    combo {combo_name}: {len(desired_combos[combo_name])} models")
+
+    # 4b. Write combo files locally for inspection (always)
+    combos_out_dir = config_path.parent / "combos"
+    # Alternative: if user expects executions/9router/combos-preview, we use combos dir alongside config
+    try:
+        combos_out_dir.mkdir(parents=True, exist_ok=True)
+        for combo_name, routed_ids in desired_combos.items():
+            members = desired_members.get(combo_name, [])
+            # JSON file — mirrors playbooks/9router/combos/*.json structure
+            jpath = combos_out_dir / f"{combo_name}.json"
+            payload = {
+                "name": combo_name,
+                "description": (cfg.get("combos", {}).get(combo_name, {}) or {}).get("description", ""),
+                "generated": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+                "source": f"model-inventory {inv_dir} + 9router-sync {config_path.name}",
+                "ordering": (cfg.get("combos", {}).get(combo_name, {}) or {}).get("sort_by", "") + " " + (cfg.get("combos", {}).get(combo_name, {}) or {}).get("sort_order", ""),
+                "models": routed_ids,
+                "members": [
+                    {
+                        "id": m.get("routed"),
+                        "provider": m.get("mapped_provider"),
+                        "model_id": m.get("model_id"),
+                        "intelligence": m.get("intelligence"),
+                        "cost_per_task": m.get("cost_per_task"),
+                        "costPerTask": m.get("cost_per_task"),
+                        "free": bool(m.get("free")),
+                        "intelligence_source": m.get("intelligence_source"),
+                        "supports_vision": bool(m.get("supports_vision")) if m.get("supports_vision") is not None else None,
+                        "supports_image_generation": bool(m.get("supports_image_generation")) if m.get("supports_image_generation") is not None else None,
+                        "vision_source": m.get("vision_source"),
+                    }
+                    for m in members
+                ],
+            }
+            jpath.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+            # CSV preview
+            cpath = combos_out_dir / f"{combo_name}.csv"
+            with cpath.open("w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=["rank", "routed", "provider", "model_id", "intelligence", "cost_per_task", "free", "supports_vision", "supports_image_generation"])
+                w.writeheader()
+                for idx, m in enumerate(members, start=1):
+                    w.writerow({
+                        "rank": idx,
+                        "routed": m.get("routed", ""),
+                        "provider": m.get("mapped_provider", ""),
+                        "model_id": m.get("model_id", ""),
+                        "intelligence": m.get("intelligence", "") if m.get("intelligence") is not None else "",
+                        "cost_per_task": m.get("cost_per_task", "") if m.get("cost_per_task") is not None else "",
+                        "free": "true" if m.get("free") else "false",
+                        "supports_vision": "true" if m.get("supports_vision") else ("false" if m.get("supports_vision") is not None else ""),
+                        "supports_image_generation": "true" if m.get("supports_image_generation") else ("false" if m.get("supports_image_generation") is not None else ""),
+                    })
+        print(f"  combos written -> {combos_out_dir} ({len(desired_combos)} combos)")
+    except Exception as e:
+        print(f"WARN failed to write combos locally: {e}", file=sys.stderr)
+
+    # 5. 9Router auth + remote sync (only if not dry-run skip is respected)
     url, api_key, pwd = get_ninerouter_creds(cfg, config_path)
     if not url:
         print(f"ERR: NINEROUTER_URL not found for {config_path}", file=sys.stderr)
@@ -865,26 +981,18 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
     print(f"  9router url: {url}")
     session = login_and_get_session(url, pwd)
     if not session:
-        print(f"WARN: no session (dashboard password missing) — provider/combo sync skipped, only local processing", file=sys.stderr)
+        print(f"WARN: no session (dashboard password missing) — remote provider/combo sync skipped, local files already written", file=sys.stderr)
     else:
-        # 4a. provider sync
+        # 5a. provider sync
         if desired_by_alias:
-            changed = sync_providers(session, url, desired_by_alias, dry_run=cfg["options"]["dry_run"], verbose=verbose)
-            # optionally sync disabled for static providers
-            # 4b. combo sync
-            # Build combos desired: apply per-combo pipeline to routed list
-            desired_combos={}
-            for combo_name, combo_cfg in (cfg.get("combos") or {}).items():
-                combo_models = apply_combo_pipeline(routed, combo_cfg)
-                # Convert to list of routed ids
-                desired_combos[combo_name]=[m["routed"] for m in combo_models]
-                print(f"    combo {combo_name}: {len(desired_combos[combo_name])} models")
-            if desired_combos:
-                sync_combos(session, url, desired_combos, dry_run=cfg["options"]["dry_run"], verbose=verbose)
+            sync_providers(session, url, desired_by_alias, dry_run=cfg["options"]["dry_run"], verbose=verbose)
         else:
             print("  no desired providers to sync")
+        # 5b. combo remote sync
+        if desired_combos:
+            sync_combos(session, url, desired_combos, dry_run=cfg["options"]["dry_run"], verbose=verbose)
 
-    # 5. CLI generation (always, even if no session)
+    # 6. CLI generation (always, even if no session)
     if cfg["cli"].get("enabled", True):
         live_models = fetch_live_v1_models(url, api_key) if url and api_key else []
         if not live_models:
@@ -903,7 +1011,7 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
         write_cli_configs(live_models, url or "https://router.example.com", out_dir, active)
         print(f"  cli configs -> {out_dir}")
 
-    # 6. save state snapshot alongside config
+    # 7. save state snapshot alongside config
     snapshot={"generated": datetime.datetime.now(datetime.timezone.utc).isoformat(),"config":str(config_path),"global_filtered":len(global_filtered),"routed":len(routed),"desired_by_alias":{k:len(v) for k,v in desired_by_alias.items()}}
     try:
         (config_path.parent / "9router-sync.state.json").write_text(json.dumps(snapshot, indent=2), encoding="utf-8")

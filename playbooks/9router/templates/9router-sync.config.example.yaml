@@ -17,6 +17,8 @@ global_filter:
   model_whitelist: []            # matches raw model_id OR provider/model_id composite
   model_blacklist: []            # e.g. ["*transcribe*","*image*","lyria-3*"]
   free: "both"                   # true | false | both  (filter on inventory 'free' flag)
+  supports_vision: "both"        # true | false | both  (filter on supports_vision column)
+  supports_image_generation: "both"  # true | false | both
 
 # Provider mapping: inventory provider -> 9Router alias/prefix.
 # Routed id = "<alias>/<model_id>" if alias != "" else "<model_id>".
@@ -77,6 +79,22 @@ combos:
     min_intelligence: 50
     max_intelligence: null
     favorites: ["deepseek-v4*"]
+  vision:
+    description: "Vision-capable models, cheapest first"
+    sort_by: "cost"
+    sort_order: "asc"
+    free: "both"
+    supports_vision: true
+    supports_image_generation: "both"
+    favorites: []
+  gen-image:
+    description: "Image generation models, cheapest first"
+    sort_by: "cost"
+    sort_order: "asc"
+    free: "both"
+    supports_image_generation: true
+    supports_vision: "both"
+    favorites: []
 
 # CLI generation (post-sync, after providers+combos are live)
 cli:
