@@ -12,6 +12,8 @@
 ## Prerequisites
 <What must exist before a run: access, tools, accounts, credentials>
 
+> **Template default tooling:** if your template provisions a workspace (e.g. from `codercom/enterprise-node:ubuntu` or `codercom/universal`), ensure **GitHub CLI (`gh`), `uv`, `Go`, and `Rust`** are installed by default like `npm`/`python` — see `playbooks/coder-remote-servers/templates/scripts/install-*.sh` helpers (apt or binary to `~/.local/bin`/`~/.local/go`/`~/.cargo`, handles `runsc` with no sudo).
+
 ## Risk level
 <low | medium | high> — <one-line justification. Examples: "touches production
 Docker daemons", "moves live data between servers", "changes live email delivery">

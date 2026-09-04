@@ -11,6 +11,7 @@ Provision Docker containers as Coder workspaces with Docker-in-Docker support an
 - **Persistent Docker volume** — `/var/lib/docker` is persisted so devcontainer caches and pulled images are reused across restarts.
 - **Startup script** — the environment is initialised on start. There is deliberately NO shutdown cleanup: a workspace must never run daemon-wide docker commands (`docker system prune`) against a shared/host daemon — see `main.tf`.
 - **Git ready** — `GIT_AUTHOR_NAME` and `GIT_AUTHOR_EMAIL` are set automatically from the Coder user profile.
+- **GitHub CLI (gh), uv, Go, Rust — preinstalled by default** — like `npm` and `python` (baked into `codercom/enterprise-node:ubuntu`), `gh`/`uv`/`go`/`rust` are installed on every workspace start if missing. `gh` via apt or binary to `~/.local/bin`; `uv` via `pipx`/astral installer to `~/.local/bin`; `Go` tarball to `~/.local/go`; `Rust` via `rustup` to `~/.cargo`. All work without `sudo` for `runsc`/gVisor. Authenticate `gh` with `gh auth login` or via `coder external-auth`.
 - **Resource monitoring** — CPU, RAM, disk, and host-level metrics are displayed in the workspace dashboard.
 
 ## Configuration Parameters
@@ -129,6 +130,18 @@ If `repo_url` is left empty, no auth prompt and no clone — just a blank home.
 - **Start** — Docker daemon is started, any repo is cloned, and the devcontainer is launched.
 - **Stop** — the agent stops. No docker daemon commands are issued from the workspace (daemon-wide pruning is prohibited — it would hit shared/host containers).
 - **Delete** — the workspace container and both volumes (home + Docker) are destroyed.
+
+### Ports — why `localhost:PORT` just works here (vs `gvisor-docker`)
+
+This template is **DiD** (Docker-in-Docker): each workspace runs its own nested `dockerd` (`main.tf:365` `privileged=true`, `main.tf:15` `codercom/enterprise-node:ubuntu`). `docker run -p 3000:3000` publishes on **workspace `localhost`** → Coder agent `localhost:PORT` proxy and auto port-detect work immediately:
+
+```sh
+docker run -d -p 3000:3000 myapp:latest
+curl localhost:3000  # works
+# expose via Coder dashboard: coder_app with url = "http://localhost:3000" or coder port-forward
+```
+
+Contrast `gvisor-docker` (`playbooks/coder-remote-servers/templates/gvisor-docker/README.md:226`): it is **DooD** to a shared daemon, so `docker run -p` publishes on the **dind host**, not workspace `localhost` → needs `socat TCP-LISTEN:3000,fork TCP:host.docker.internal:3000` or a `coder_app` pointing at `http://host.docker.internal:3000`. Use this `docker-devcontainer` template when you want transparent `localhost:PORT` for many services.
 
 ## Prerequisites
 

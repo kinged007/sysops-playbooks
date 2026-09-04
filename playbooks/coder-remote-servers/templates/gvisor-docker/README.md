@@ -34,6 +34,8 @@ The gvisor-docker pattern gives you: a docker socket to run containers,
 isolation from the host, a sandbox boundary (when you choose `runsc`), and
 reduced resource consumption — one daemon for the host, not one per workspace.
 
+Workspaces have the same default tooling as `docker-devcontainer`: **Node.js / npm**, **Python**, **uv**, **GitHub CLI (`gh`)**, **Go**, and **Rust** — `gh`/`uv`/`go`/`rust` are installed on every start if missing (apt or binary to `~/.local/bin`/`~/.local/go`/`~/.cargo`; on `runsc` the binary fallback is the primary path since `sudo` is unsupported under gVisor).
+
 ## runc vs runsc
 
 Both runtimes run the **same container** (image, home volume, mounts,
@@ -223,6 +225,29 @@ ones.
 Note: `docker_enabled` is a **template variable**, so it is fixed per
 template push, not per workspace. If you need per-workspace choice, make it a
 `coder_parameter` like `workspace_runtime`.
+
+### Ports — shared daemon vs Coder proxy (`host.docker.internal` vs `localhost`)
+
+`gvisor-docker` is **DooD** (Docker outside of Docker): `docker run -p 3000:3000` creates a **sibling container on the shared isolated daemon** (`playbooks/coder-remote-servers/templates/workspace-docker.yml:15`), not a child inside the workspace netns. The port is published on the **dind host**, not on workspace `localhost`.
+
+The Coder agent proxies `localhost:PORT` inside the **workspace** (`main.tf:496` `host.docker.internal=host-gateway`, `main.tf:308` `DOCKER_HOST` over TLS). So `curl localhost:3000` inside the workspace fails → Coder auto port-detect (which watches workspace `localhost`) sees nothing, and a `coder_app` with `url = "http://localhost:3000"` will 502 — this is **expected for DooD**, not a gVisor/`runc` limitation.
+
+**Fix — make the daemon port visible on workspace `localhost`:**
+
+```sh
+# inside the workspace (runc or runsc, both use same DooD)
+docker run -d --name myapp -p 3000:3000 myapp:latest
+# publish on dind host; now expose it on workspace localhost via:
+socat TCP-LISTEN:3000,reuseaddr,fork TCP:host.docker.internal:3000 &
+# Coder now detects localhost:3000 and coder_app with localhost:3000 works
+curl localhost:3000  # via socat
+# or point a coder_app directly at the dind host:
+# url = "http://host.docker.internal:3000" (no socat needed)
+```
+
+To verify: `docker ps` (on shared daemon) shows `0.0.0.0:3000->3000/tcp`, `ss -tlnp | grep 3000` inside workspace is empty, `docker exec workspace-docker ss -tlnp | grep 3000` shows the listener, `curl host.docker.internal:3000` works from workspace.
+
+`docker-devcontainer` (`playbooks/coder-remote-servers/templates/docker-devcontainer/main.tf:17`) is **DiD** (per-workspace nested `dockerd`, `privileged=true`): `docker run -p 3000:3000` publishes directly on **workspace `localhost`** → Coder `localhost:3000` proxy works without `socat` or `host.docker.internal`. Use `docker-devcontainer` if you need transparent `localhost:PORT` for many services.
 
 ## Prerequisites (shared isolated daemon — standard)
 

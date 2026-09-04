@@ -10,6 +10,83 @@ if [ -z "$setup_cmd" ]; then
   exit 0
 fi
 
+# Ensure gh is available (like npm/python/uv/go/rust) before running setup_command which may use it
+if ! command -v gh >/dev/null 2>&1; then
+  if [ -x "$HOME/.local/bin/gh" ]; then
+    export PATH="$HOME/.local/bin:$PATH"
+  elif [ -f "$(dirname "$0")/install-gh.sh" ]; then
+    bash "$(dirname "$0")/install-gh.sh" 2>/dev/null || true
+    export PATH="$HOME/.local/bin:$PATH"
+  fi
+  if ! command -v gh >/dev/null 2>&1; then
+    mkdir -p "$HOME/.local/bin" 2>/dev/null || true
+    GH_VERSION=$(curl -fsSL https://api.github.com/repos/cli/cli/releases/latest 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/' 2>/dev/null || echo "2.78.0")
+    ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH="amd64" ;; aarch64|arm64) ARCH="arm64" ;; *) ARCH="amd64" ;; esac
+    curl -fsSL "https://github.com/cli/cli/releases/download/v"$GH_VERSION"/gh_"$GH_VERSION"_linux_"$ARCH".tar.gz" -o /tmp/gh.tar.gz 2>/dev/null && tar -xzf /tmp/gh.tar.gz -C /tmp 2>/dev/null && mv "/tmp/gh_"$GH_VERSION"_linux_"$ARCH"/bin/gh" "$HOME/.local/bin/gh" 2>/dev/null && chmod +x "$HOME/.local/bin/gh" 2>/dev/null && rm -rf /tmp/gh.tar.gz /tmp/gh_"$GH_VERSION"_linux_"$ARCH" 2>/dev/null || true
+    export PATH="$HOME/.local/bin:$PATH"
+  fi
+fi
+if command -v gh >/dev/null 2>&1; then
+  echo "gh available: $(gh --version 2>/dev/null | head -n1)"
+fi
+
+# Ensure uv is available (like npm/python/gh/go/rust) before setup_command
+if ! command -v uv >/dev/null 2>&1; then
+  if [ -x "$HOME/.local/bin/uv" ]; then
+    export PATH="$HOME/.local/bin:$PATH"
+  elif [ -f "$(dirname "$0")/install-uv.sh" ]; then
+    bash "$(dirname "$0")/install-uv.sh" 2>/dev/null || true
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+  fi
+  if ! command -v uv >/dev/null 2>&1; then
+    mkdir -p "$HOME/.local/bin" 2>/dev/null || true
+    curl -LsSf https://astral.sh/uv/install.sh 2>/dev/null | sh 2>/dev/null || true
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+  fi
+fi
+if command -v uv >/dev/null 2>&1; then
+  echo "uv available: $(uv --version 2>/dev/null | head -n1)"
+fi
+
+# Ensure Go is available before setup_command
+if ! command -v go >/dev/null 2>&1; then
+  if [ -x "$HOME/.local/go/bin/go" ]; then
+    export PATH="$HOME/.local/go/bin:$PATH"
+  elif [ -f "$(dirname "$0")/install-go.sh" ]; then
+    bash "$(dirname "$0")/install-go.sh" 2>/dev/null || true
+    export PATH="$HOME/.local/go/bin:$HOME/go/bin:$PATH"
+  fi
+  if ! command -v go >/dev/null 2>&1; then
+    mkdir -p "$HOME/.local/go" 2>/dev/null || true
+    GO_VERSION=$(curl -fsSL https://go.dev/VERSION?m=text 2>/dev/null | head -n1 | sed 's/go//' 2>/dev/null || echo "1.24.3")
+    ARCH=$(uname -m); case "$ARCH" in x86_64) ARCH="amd64" ;; aarch64|arm64) ARCH="arm64" ;; *) ARCH="amd64" ;; esac
+    curl -fsSL "https://go.dev/dl/go"$GO_VERSION".linux_"$ARCH".tar.gz" -o /tmp/go.tar.gz 2>/dev/null && tar -xzf /tmp/go.tar.gz -C /tmp 2>/dev/null && rm -rf "$HOME/.local/go" 2>/dev/null && mv /tmp/go "$HOME/.local/go" 2>/dev/null && rm -rf /tmp/go.tar.gz 2>/dev/null || true
+    export PATH="$HOME/.local/go/bin:$PATH"
+  fi
+fi
+if command -v go >/dev/null 2>&1; then
+  echo "go available: $(go version 2>/dev/null | head -n1)"
+fi
+
+# Ensure Rust is available before setup_command
+if ! command -v rustc >/dev/null 2>&1 && ! command -v cargo >/dev/null 2>&1; then
+  if [ -x "$HOME/.cargo/bin/rustc" ]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+  elif [ -f "$(dirname "$0")/install-rust.sh" ]; then
+    bash "$(dirname "$0")/install-rust.sh" 2>/dev/null || true
+    export PATH="$HOME/.cargo/bin:$PATH"
+  fi
+  if ! command -v rustc >/dev/null 2>&1; then
+    mkdir -p "$HOME/.cargo/bin" 2>/dev/null || true
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs 2>/dev/null | sh -s -- -y --no-modify-path --default-toolchain stable --profile minimal 2>/dev/null || true
+    export PATH="$HOME/.cargo/bin:$PATH"
+  fi
+fi
+if command -v rustc >/dev/null 2>&1; then
+  echo "rust available: $(rustc --version 2>/dev/null | head -n1) $(cargo --version 2>/dev/null | head -n1)"
+fi
+export PATH="$HOME/.local/bin:$HOME/.local/go/bin:$HOME/go/bin:$HOME/.cargo/bin:$PATH"
+
 marker="$HOME/.coder_setup_done"
 if [ -f "$marker" ] && [ "$(cat "$marker")" = "$setup_cmd" ]; then
   echo "Project setup already completed for this command."
