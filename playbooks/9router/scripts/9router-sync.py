@@ -487,16 +487,58 @@ def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[st
     return filtered
 
 def build_routed_list(global_filtered: List[Dict[str,Any]], mapping: Dict[str,str]) -> List[Dict[str,Any]]:
+    # Known 9Router provider aliases for already-routed detection
+    # Only provider aliases, not model prefixes — prevents "z-ai/glm-5.3" being mis-identified as already routed
+    known_aliases = set(v for v in mapping.values() if v) | {"oc","ocg","ollama","openrouter","cmc","gemini","cf"}
+    known_aliases = {a.lower() for a in known_aliases if a}
     out=[]
     for m in global_filtered:
         prov=m.get("provider")
-        mid=m.get("model_id")
-        routed=map_provider(prov, mid, mapping)
-        # mapped_provider is alias
-        alias=mapping.get(prov, prov) if mapping.get(prov,"") != "" else ""
-        # fix edge: if prov not in mapping, mapping.get(prov,"") returns "" -> alias becomes "" incorrectly; restore to prov
-        if prov not in mapping:
-            alias = prov
+        mid=m.get("model_id") or ""
+        # Skip combos that leaked into inventory (owned_by combo)
+        if m.get("owned_by") == "combo":
+            continue
+        # Detect already-routed model_ids (e.g. command_code returns "ocg/kimi-k3" or "cmc/ocg/kimi-k3")
+        # If mid already starts with a known alias, treat it as already routed.
+        routed_mid = mid
+        detected_alias = None
+        # Handle double prefix like "cmc/ocg/kimi-k3": peel repeatedly
+        temp_mid = mid
+        while "/" in temp_mid:
+            first = temp_mid.split("/",1)[0].lower()
+            if first in known_aliases:
+                detected_alias = temp_mid.split("/",1)[0]  # preserve case
+                # For cases like "cmc/ocg/kimi-k3", we want final alias to be the last known before non-known
+                # Check if remainder still starts with known alias — if so, peel one layer and re-evaluate
+                remainder = temp_mid.split("/",1)[1]
+                if "/" in remainder and remainder.split("/",1)[0].lower() in known_aliases:
+                    # peel outer alias and continue (cmc/ocg/... -> ocg/...)
+                    temp_mid = remainder
+                    continue
+                else:
+                    # already correctly routed as temp_mid
+                    routed_mid = temp_mid
+                    break
+            else:
+                break
+        if detected_alias is not None:
+            # Already routed — use as-is
+            routed = routed_mid
+            alias = routed.split("/",1)[0] if "/" in routed else detected_alias
+            # Normalize alias to mapping value if possible (e.g. opencode-go -> ocg)
+            # Keep detected alias as is for now
+        else:
+            routed = map_provider(prov, mid, mapping)
+            alias = mapping.get(prov, prov) if mapping.get(prov,"") != "" else ""
+            if prov not in mapping:
+                alias = prov
+            # For cloudflare with "" mapping, alias stays "" but we keep routed as mid
+            # For consistency, if routed still contains "/", alias should be first segment
+            if alias == "" and "/" in routed:
+                # try to infer alias from routed prefix if it matches known
+                first = routed.split("/",1)[0].lower()
+                if first in known_aliases:
+                    alias = routed.split("/",1)[0]
         out.append({**m, "mapped_provider": alias, "routed": routed})
     return out
 
