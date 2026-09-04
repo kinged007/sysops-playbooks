@@ -484,6 +484,85 @@ def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[st
         filtered = fav_ordered + remaining
     return filtered
 
+def reasoning_suffix(level: Any) -> str:
+    """Map 0-4 to 9Router thinking suffix. 0=auto (no suffix), 1=low, 2=medium, 3=high, 4=max (clamped to xhigh for openai)."""
+    try:
+        lvl = int(level) if level is not None else 0
+    except:
+        lvl = 0
+    mapping = {0: "", 1: " (low)", 2: " (medium)", 3: " (high)", 4: " (max)"}
+    return mapping.get(lvl, "")
+
+def thinking_levels_for_model(model_id: str) -> List[str]:
+    """Return available thinking levels for a model, mirroring open-sse/providers/thinkingLevels.js heuristic."""
+    low = model_id.lower()
+    # deepseek: hiMax ["none","high","max"]
+    if "deepseek" in low:
+        return ["none", "high", "max"]
+    # grok / gpt / openai
+    if "grok" in low or "gpt" in low or "openai" in low:
+        return ["none", "minimal", "low", "medium", "high", "xhigh"]
+    # kimi
+    if "kimi" in low:
+        return ["none", "low", "medium", "high", "max"]
+    # qwen
+    if "qwen" in low:
+        return ["none", "low", "medium", "high"]
+    # glm special: glm-5.3-flash is zai onOff, others qwen/base
+    if "glm-5.3-flash" in low:
+        return ["none", "thinking"]
+    if "glm" in low:
+        # zai for most glm, but fallback to base
+        if "glm-5" in low or "glm-4" in low:
+            return ["none", "thinking"]
+        return ["none", "low", "medium", "high"]
+    # minimax
+    if "minimax" in low:
+        return ["none", "thinking"]
+    # gemini
+    if "gemini" in low:
+        return ["minimal", "low", "medium", "high"]
+    # mimo, hunyuan, step -> base
+    if "mimo" in low or "hunyuan" in low or "hy3" in low or "step" in low:
+        return ["none", "low", "medium", "high"]
+    # default base
+    return ["none", "low", "medium", "high", "max", "xhigh", "thinking"]
+
+def apply_reasoning_suffix(routed_id: str, level: Any, model_id: str = "") -> str:
+    # Determine actual suffix based on model's available levels
+    try:
+        lvl = int(level) if level is not None else 0
+    except:
+        lvl = 0
+    if lvl == 0:
+        return routed_id
+    # Use model_id to determine available levels (fallback to routed_id)
+    mid = model_id or routed_id.split("/")[-1]
+    available = thinking_levels_for_model(mid)
+    # Map desired level to candidates in priority order
+    candidates_map = {
+        1: ["low"],
+        2: ["medium"],
+        3: ["high"],
+        4: ["max", "xhigh", "high", "medium", "low", "thinking"],
+    }
+    candidates = candidates_map.get(lvl, ["max"])
+    chosen = None
+    for c in candidates:
+        if c in available:
+            chosen = c
+            break
+    if not chosen:
+        # fallback to highest available (last non-none)
+        for a in reversed(available):
+            if a != "none":
+                chosen = a
+                break
+    if not chosen or chosen == "none":
+        return routed_id
+    base = re.sub(r"\s*\([^)]+\)\s*$", "", routed_id)
+    return f"{base} ({chosen})"
+
 def build_routed_list(global_filtered: List[Dict[str,Any]], mapping: Dict[str,str]) -> List[Dict[str,Any]]:
     # Known 9Router provider aliases for already-routed detection
     # Only provider aliases, not model prefixes — prevents "z-ai/glm-5.3" being mis-identified as already routed
@@ -974,9 +1053,29 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
     desired_members: Dict[str, List[Dict[str, Any]]] = {}
     for combo_name, combo_cfg in (cfg.get("combos") or {}).items():
         combo_models = apply_combo_pipeline(routed, combo_cfg)
+        # Apply reasoning level suffix per combo (0=auto, 1=low, 2=medium, 3=high, 4=max)
+        lvl = combo_cfg.get("reasoning_level", combo_cfg.get("reasoning", combo_cfg.get("thinking_level", 0)))
+        if lvl not in (None, 0, "0", ""):
+            # suffix each model's routed id with model-aware level selection
+            for m in combo_models:
+                mid = m.get("model_id") or m.get("routed","").split("/")[-1]
+                m["routed"] = apply_reasoning_suffix(m["routed"], lvl, mid)
+                # keep original for reference
+                m["_reasoning_level"] = lvl
+                m["_reasoning_suffix"] = reasoning_suffix(lvl)
+                # store actual chosen (may be xhigh for openai)
+                # re-derive actual from routed suffix
+                actual = re.search(r"\(([^)]+)\)\s*$", m["routed"])
+                m["_reasoning_actual"] = actual.group(1) if actual else ""
+        else:
+            for m in combo_models:
+                m["_reasoning_level"] = 0
+                m["_reasoning_suffix"] = ""
+                m["_reasoning_actual"] = ""
         desired_combos[combo_name] = [m["routed"] for m in combo_models]
         desired_members[combo_name] = combo_models
-        print(f"    combo {combo_name}: {len(desired_combos[combo_name])} models")
+        suffix_str = reasoning_suffix(lvl) or "auto"
+        print(f"    combo {combo_name}: {len(desired_combos[combo_name])} models reasoning={lvl} suffix='{suffix_str}'")
 
     # 4b. Write combo files locally for inspection (always)
     combos_out_dir = config_path.parent / "combos"
