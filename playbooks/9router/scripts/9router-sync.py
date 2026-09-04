@@ -382,18 +382,16 @@ def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[st
         mid = m.get("model_id","")
         routed = m.get("routed","") or f"{prov}/{mid}"
         composite = f"{prov}/{mid}"
-        # provider whitelist/blacklist
-        if prov_wl and not matches_any(prov_wl, prov):
-            # unless whitelisted via model
+        # whitelist is restrictive: if set, model must match to be included
+        if prov_wl:
+            if not matches_any(prov_wl, prov):
+                continue
+        if mod_wl:
             if not (matches_any(mod_wl, mid) or matches_any(mod_wl, routed) or matches_any(mod_wl, composite)):
                 continue
+        # blacklist is exclusive: if matches, exclude
         if prov_bl and matches_any(prov_bl, prov):
-            if not (matches_any(mod_wl, mid) or matches_any(mod_wl, routed)):
-                continue
-        # model whitelist immediate pass
-        is_mod_wl = matches_any(mod_wl, mid) or matches_any(mod_wl, routed) or matches_any(mod_wl, composite)
-        if is_mod_wl:
-            filtered.append(m); continue
+            continue
         if matches_any(mod_bl, mid) or matches_any(mod_bl, routed) or matches_any(mod_bl, composite):
             continue
         # free
