@@ -1,0 +1,31 @@
+# Caddyfile — Kandev reverse proxy (isolated snippet)
+# Placeholders: <DOMAIN> e.g. kandev.example.com ; <KANDEV_UPSTREAM> e.g. kandev:38429 (compose) or 127.0.0.1:38429 (service)
+# Recommended host layout for clean removal (§11.1):
+#   Main /etc/caddy/Caddyfile:  import /srv/kandev/Caddyfile.kandev
+#   This file:                  /srv/kandev/Caddyfile.kandev (isolated, one rm deletes it)
+# Then: caddy fmt --overwrite /etc/caddy/Caddyfile && caddy reload --config /etc/caddy/Caddyfile
+# Or with compose sidecar:  - ./Caddyfile:/etc/caddy/Caddyfile:ro  and  docker compose up -d caddy
+#
+# Kandev serves SPA + /api + /ws + /mcp + /health + /ready on one origin (port 38429).
+# Proxy the ENTIRE root path and preserve WebSocket upgrades; do NOT use a subpath (/kandev/).
+# Caddy handles Upgrade/Connection + X-Forwarded-* automatically.
+
+# --- host Caddy (Kandev as a Service, isolated snippet) ---
+# kandev.<DOMAIN> {
+#     reverse_proxy 127.0.0.1:<PORT>
+# }
+
+# --- compose Caddy sidecar (kandev:38429 internal) ---
+kandev.<DOMAIN> {
+    reverse_proxy <KANDEV_UPSTREAM>
+}
+
+# Optional: HSTS + logging (uncomment as needed)
+# kandev.<DOMAIN> {
+#     reverse_proxy <KANDEV_UPSTREAM>
+#     header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+#     log {
+#         output file /var/log/caddy/kandev.log
+#         format json
+#     }
+# }

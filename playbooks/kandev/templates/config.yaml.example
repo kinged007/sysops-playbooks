@@ -1,0 +1,87 @@
+# config.yaml.example — Kandev startup configuration
+# Load order (first existing wins, no merge): ./config.yaml → <KANDEV_HOME_DIR>/config.yaml → /etc/kandev/config.yaml
+# Later env vars (KANDEV_*) override file. Restart after any change. No --config flag.
+# Preferred location for removable Service installs: <KANDEV_HOME_DIR>/config.yaml (dies with rm -rf <home>)
+# See https://kandev.ai/docs/configuration for canonical field names + env alias mapping (Viper: KANDEV_ + upper + .→_).
+# Keep only deliberate overrides — do not copy the entire catalog.
+
+# ── Home note ─────────────────────────────────────────────────────────
+# homeDir cannot be set from a home-selected config file (it cannot relocate the directory that selected it).
+# For isolated service installs, pass --home-dir <KANDEV_HOME_DIR> at `kandev service install` time; the unit records it.
+
+# ── Server ────────────────────────────────────────────────────────────
+server:
+  host: "127.0.0.1"            # loopback when a reverse proxy terminates TLS; use 0.0.0.0 only behind auth+proxy
+  port: 38429                 # normally chosen by launcher; pin via KANDEV_BACKEND_PORT drop-in if needed (G2)
+  trustedProxies:             # IP or CIDR list of the proxy peer(s) seen by Kandev — NOT the client network
+    - "127.0.0.1"            # host Caddy/Nginx on same machine
+    # - "10.0.0.5"           # exact proxy IP (preferred over CIDR when stable)
+    # - "10.0.0.0/28"        # narrow CIDR if the proxy network is dynamic
+  # webTitlePrefix: ""        # prefix browser tab "Kandev" → "<prefix> Kandev" (e.g. TEST)
+
+# ── Database — choose ONE layout (P1/P2, see playbook §9.4) ──────────
+# Option 1 — SQLite inside home (default, co-located, one rm-able tree):
+database:
+  driver: "sqlite"
+  path: ""                    # empty → <KANDEV_HOME_DIR>/data/kandev.db (WAL sidecars + backups sibling)
+  # Backups at <home>/data/backups/ ; master.key at <home>/data/master.key (0600) — copy together.
+
+# Option 2 — SQLite custom path outside home (dedicated mount/subvolume):
+# database:
+#   driver: "sqlite"
+#   path: "/srv/kandev-data/kandev.db"  # KANDEV_DATABASE_PATH alias
+#   # Backups at /srv/kandev-data/backups/ ; master.key still at <home>/data/master.key
+
+# Option 3 — PostgreSQL (external, operator-managed, /data still required for worktrees/repos):
+# database:
+#   driver: "postgres"
+#   host: "postgres"          # or FQDN/IP
+#   port: 5432
+#   user: "kandev"
+#   password: ""              # prefer KANDEV_DATABASE_PASSWORD env + 0600 file — never commit here
+#   dbName: "kandev"
+#   sslMode: "disable"        # disable | require | verify-ca | verify-full
+#   # Backups via pg_dump (see playbook §16.3); System Backups UI is SQLite-only when driver=postgres.
+
+# ── Docker runtime ────────────────────────────────────────────────────
+docker:
+  enabled: true               # host Service default true; Docker image defaults false — flip to true for Local Docker executor
+  host: "unix:///var/run/docker.sock"  # DOCKER_HOST alias KANDEV_DOCKER_HOST also honoured
+  # apiVersion: ""            # empty → negotiation
+  # tlsVerify: false          # compatibility-only today
+
+# ── Logging ───────────────────────────────────────────────────────────
+logging:
+  level: "info"               # debug | info | warn | error  (explicit KANDEV_LOG_LEVEL wins over --verbose/--debug)
+  format: "text"              # text (local) or json (production/K8s — auto when KUBERNETES_SERVICE_HOST set)
+
+# ── Repository discovery (narrow scan roots) ──────────────────────────
+repositoryDiscovery:
+  roots: []
+    # - "/srv/repositories"
+  maxDepth: 5
+
+# ── Other common fields (see docs/configuration for full catalog) ─────
+# nats:
+#   url: ""
+# events:
+#   namespace: ""
+# tasks:
+#   preparationTimeout: "10m"    # Go duration; KANDEV_TASK_PREPARATION_TIMEOUT env alias
+# credentials:
+#   file: ""                   # optional JSON fallback, owner-only 0600
+# limits:
+#   ghMaxConcurrent: 8
+#   gitMaxConcurrent: 12
+#   lspMaxConnections: 8
+# agentctl:
+#   idleTimeout: "1h"
+#   idleReaperInterval: "1m"
+# auth:
+#   cookieName: ""             # empty → port-scoped auto (kandev_session vs kandev_session_<port>)
+#   # jwtSecret: ""            # compatibility-only — does NOT add auth (use KANDEV_FEATURES_AUTH)
+# office:
+#   jwtSigningKey: ""          # stable HMAC for Office runs surviving restarts
+# debug:
+#   devMode: false
+#   pprofEnabled: false

@@ -1,0 +1,77 @@
+# Kandev — Docker Compose (canonical)
+# Placeholders: <KANDEV_IMAGE_TAG> is a pinned version (e.g. 0.8.3) or digest, never "latest" moving tag.
+# Two forms of persistence are supported: named volume (kandev-data) or bind mount (/srv/kandev).
+# Usage:
+#   cp docker-compose.yml executions/kandev/compose/docker-compose.yml
+#   # edit <KANDEV_IMAGE_TAG> + env_file/secrets; then:
+#   docker compose -f executions/kandev/compose/docker-compose.yml up -d
+
+services:
+  kandev:
+    image: ghcr.io/kdlbs/kandev:<KANDEV_IMAGE_TAG>
+    ports:
+      # Publish on loopback only; the reverse proxy (Caddy/Nginx) terminates TLS on :443.
+      # To expose a different host port, change only the left side (e.g. "127.0.0.1:9080:38429").
+      # Do NOT replace the container's internal 38429 unless you also re-publish it.
+      - "127.0.0.1:38429:38429"
+    volumes:
+      # Named volume (default): single rm-able unit for all Kandev state.
+      - kandev-data:/data
+      # Bind-mount alternative (host-inspectable):
+      # - /srv/kandev:/data
+      # Custom SQLite path outside /data (only if KANDEV_DATABASE_PATH points outside /data — see §9.4):
+      # - kandev-db:/data/db-custom
+      # - /srv/kandev-db:/data/db-custom
+    environment:
+      # Auth — preferred ON for public hosts; stays unset/false for single-user private only.
+      KANDEV_FEATURES_AUTH: "${KANDEV_FEATURES_AUTH:-true}"
+      KANDEV_LOG_LEVEL: "${KANDEV_LOG_LEVEL:-info}"
+      # Proxy peer IP/CIDR — the TCP peer Kandev sees (not the browser network). Must match your proxy.
+      KANDEV_TRUSTED_PROXIES: "${KANDEV_TRUSTED_PROXIES:-}"
+      # DB driver — sqlite (default, inside /data) or postgres (external, see docker-compose.postgres.yml).
+      KANDEV_DATABASE_DRIVER: "${KANDEV_DATABASE_DRIVER:-sqlite}"
+      # Uncomment only when P2 = custom SQLite path outside /data:
+      # KANDEV_DATABASE_PATH: /data/db-custom/kandev.db
+      # KANDEV_DATABASE_HOST: "${KANDEV_DATABASE_HOST:-}"
+      # KANDEV_DATABASE_PORT: "${KANDEV_DATABASE_PORT:-5432}"
+      # KANDEV_DATABASE_USER: "${KANDEV_DATABASE_USER:-kandev}"
+      # KANDEV_DATABASE_PASSWORD: "${KANDEV_DB_PASSWORD:?set KANDEV_DB_PASSWORD}"
+      # KANDEV_DATABASE_DBNAME: "${KANDEV_DATABASE_DBNAME:-kandev}"
+      # KANDEV_DATABASE_SSLMODE: "${KANDEV_DATABASE_SSLMODE:-disable}"
+      # Optional: isolated GitHub credential broker for SSH/Sprites/Docker executors behind the proxy.
+      # KANDEV_GITHUB_CREDENTIAL_BROKER_PUBLIC_BASE_URL: "https://<DOMAIN>"
+    restart: unless-stopped
+    healthcheck:
+      # Use /ready (real traffic readiness), not /health (liveness before routes are wired).
+      test: ["CMD", "curl", "-f", "http://localhost:38429/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # Optional: pin resource limits per your host
+    # deploy:
+    #   resources:
+    #     limits: { cpus: '2', memory: 2G }
+    #     reservations: { cpus: '0.25', memory: 512M }
+
+  # Optional Caddy sidecar — proxies https://<DOMAIN> → kandev:38429 with auto-TLS.
+  # Uncomment when you want TLS co-located in compose rather than on the host Caddy/Nginx.
+  # caddy:
+  #   image: caddy:2-alpine
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy-data:/data
+  #     - caddy-config:/config
+  #   depends_on:
+  #     kandev:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+volumes:
+  kandev-data:
+  # kandev-db:        # only if KANDEV_DATABASE_PATH outside /data
+  # caddy-data:
+  # caddy-config:

@@ -1,0 +1,185 @@
+# Model Inventory Config - 9Router Playbook
+# ============================================================================
+# Copy this file to ONE of these locations (first found wins, or pass --config):
+#   1. ./model-inventory.config.yaml              (current directory)
+#   2. playbooks/9router/scripts/model-inventory.config.yaml
+#   3. executions/9router/model-inventory.config.yaml                (preferred — gitignored, holds your customizations)
+#   4. executions/9router-<suffix>/model-inventory.config.yaml       (variant-specific)
+#   5. Any executions/*9router*/**/model-inventory*.yaml             (recursive glob — e.g. executions/9router/model-inventory/model-inventory.yaml)
+# Or set via CLI: python playbooks/9router/scripts/model-inventory.py --config /path/to/config.yaml
+# The committed template (playbooks/.../model-inventory.config.example.yaml) is read-only —
+# real customizations live in executions/ (gitignored) so they are not committed.
+#
+# All ${VAR} placeholders are expanded from environment at runtime.
+# For CI/cron, prefer env vars over hardcoding keys here - this file may be
+# copied to a gitignored executions/ folder where it's safe, but keep the
+# committed template with placeholders only.
+#
+# See playbooks/9router/scripts/model-inventory.py for full docs.
+# ============================================================================
+
+general:
+  # Where the comprehensive spreadsheet and added lists are written.
+  # - Relative paths are resolved against the repo root OR current directory.
+  # - For personal use outside 9Router, change to e.g. "./model-inventory-output"
+  output_dir: "executions/9router/model-inventory"
+  # Main spreadsheet basename. Produces:
+  #   <output_dir>/models.csv  (always)
+  #   <output_dir>/models.json (always)
+  #   <output_dir>/models.xlsx (if openpyxl is installed)
+  spreadsheet_name: "models.csv"
+  json_name: "models.json"
+  # Per-run "added" list prefix: <output_dir>/added_YYYY-MM-DD.csv / .json
+  added_list_prefix: "added"
+  # Keep a snapshot of the raw provider payloads for debugging
+  save_raw_snapshot: true
+  raw_snapshot_name: "raw_snapshot_{{date}}.json"
+  # Sorting of the main spreadsheet
+  sort_by: "intelligence"   # intelligence | cost | provider | model
+  sort_order: "desc"         # asc | desc
+
+# Minimum intelligence threshold to INCLUDE a model.
+# 0 = include all (subject to blacklist/whitelist).
+# Models with unknown intelligence (null) are handled by include_unknown_intelligence.
+filters:
+  minimum_intelligence: 0
+  include_unknown_intelligence: true
+  # Glob patterns (fnmatch, case-insensitive). Applied AFTER whitelist check.
+  # Example: "llama-3.2-1b*" matches any id containing that substring as glob.
+  # Blacklist: models matching ANY pattern are EXCLUDED (unless whitelisted).
+  # Glob patterns (fnmatch, case-insensitive). Added to filter non-text modalities.
+  blacklist:
+    - "*transcribe*"
+    - "*image*"
+    - "*audio*"
+    - "lyria-3*"
+    - "*tts*"
+    - "*stt*"
+    - "*embedding*"
+    - "*nano-banana*"
+  # Whitelist: models matching ANY pattern are ALWAYS INCLUDED,
+  # even if blacklisted, below threshold, or intelligence is unknown/null.
+  # Supports both globs and exact ids.
+  whitelist:
+    - "big-pickle"
+    - "*big-pickle*"
+    # - "muse-spark-1.2-contributor"
+    # - "openrouter/*:free"
+
+# Intelligence — AA only, no heuristic/pattern fallback (scalable).
+# Set artificial_analysis.enabled: true and provide AA_API_KEY to fetch live scores.
+# If a model is not in AA (unbenchmarked), intelligence stays blank (null) — no pattern fallback.
+intelligence:
+  default_score: null   # null = keep as unknown (blank). Do not set a default if you want pure AA.
+  artificial_analysis:
+    enabled: true
+    # Correct endpoint per https://artificialanalysis.ai/data-api/docs — paginated free tier.
+    # Requires x-api-key header (free tier: 1k req/day). Set AA_API_KEY env or api_key below.
+    endpoint: "https://artificialanalysis.ai/api/v2/language/models/free"
+    api_key: "${AA_API_KEY}"
+    cache_file: "artificial_analysis_cache.json"
+    cache_ttl_hours: 24
+    # No fallback — AA live only. Old fallback_local_file (_enriched.json) removed per request.
+    # If AA live fails and cache expired/missing, intelligence stays blank (no heuristic).
+    fallback_local_file: ""
+  patterns: []  # intentionally empty — no pattern/heuristic fallback (AA only)
+
+# Vision / modalities — two columns: supports_vision (can read images) + supports_image_generation (can produce images).
+# Source priority: 1) OpenRouter architecture 2) Cloudflare task.name 3) models.dev/api.json cache 4) OpenRouter cross-ref.
+# models.dev is public (no key, ~7495 models, 4171 vision-input, 178 image-output) and is used to enrich providers
+# that do not expose modalities natively (google, opencode, ollama, command_code). Cloudflare native is authoritative.
+vision:
+  enabled: true
+  endpoint: "https://models.dev/api.json"
+  cache_file: "vision_cache.json"
+  cache_ttl_hours: 24
+
+# Cost — provider-reported pricing only, no static fallback (scalable).
+# If a model has no pricing from its provider API and no AA cost, cost stays blank.
+cost:
+  currency: "USD"
+  unit: "per_1M_tokens"
+  overrides:
+    "default": {"input": null, "output": null}
+
+api_keys:
+  # Each can be a literal key, a ${ENV_VAR} reference, or empty (provider will be skipped if required).
+  google: "${GOOGLE_API_KEY}"                    # also: ${GEMINI_API_KEY}, ${GOOGLE_GENERATIVE_AI_API_KEY}
+  opencode_zen: "${OPENCODE_ZEN_API_KEY}"        # also: ${ZEN_API_KEY}, ${OPENCODE_API_KEY}
+  opencode_go: "${OPENCODE_GO_API_KEY}"          # also: ${OPENCODE_API_KEY} fallback
+  cloudflare:
+    api_token: "${CLOUDFLARE_API_TOKEN}"         # Cloudflare API token with Workers AI read
+    account_id: "${CLOUDFLARE_ACCOUNT_ID}"
+  ollama_cloud: "${OLLAMA_API_KEY}"              # Bearer for Ollama Cloud; optional for public listing
+  openrouter: "${OPENROUTER_API_KEY}"            # optional - free models are public
+  command_code: "${COMMAND_CODE_API_KEY}"        # also: ${CMC_API_KEY}. Never a router key.
+
+endpoints:
+  google: "https://generativelanguage.googleapis.com/v1beta/models"
+  # OpenAI-compatible alternative (also works for Google): https://generativelanguage.googleapis.com/v1beta/openai/models
+  google_openai_compat: "https://generativelanguage.googleapis.com/v1beta/openai/models"
+  opencode_zen: "https://opencode.ai/zen/v1/models"
+  opencode_go: "https://opencode.ai/zen/go/v1/models"
+  # Cloudflare: {account_id} is substituted from api_keys.cloudflare.account_id
+  cloudflare: "https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/models/search"
+  cloudflare_fallback: "https://api.cloudflare.com/client/v4/ai/models"
+  ollama_cloud: "https://ollama.com/api/tags"
+  ollama_cloud_fallback: "https://api.ollama.ai/v1/models"
+  openrouter: "https://openrouter.ai/api/v1/models"
+  # CommandCode upstream. Never router.munyard.biz (the router is where collected
+  # models get stored, not a collection source).
+  command_code: "https://api.commandcode.ai/provider/v1/models"
+
+# Per-provider toggles and options
+# command_code IS an inventory source (upstream CommandCode provider). The script
+# copies raw ids verbatim and never adds prefixes itself (see fetch_command_code).
+# router.munyard.biz must NEVER appear as endpoints.command_code.
+providers:
+  enabled:
+    - "google"
+    - "opencode_zen"
+    - "opencode_go"
+    - "cloudflare"
+    - "ollama_cloud"
+    - "openrouter"
+    - "command_code"
+  google:
+    # google supports both ?key=API_KEY and x-goog-api-key: header; script tries both.
+    # Set to false to try unauthenticated (will fail for most models but useful for public list if Google allows)
+    require_key: false
+    page_size: 100
+    free: true            # provider free-tier: all google models classified as free (replaces hardcoded logic)
+  opencode_zen:
+    require_key: false   # public list available without key, but pricing/context may need key
+  opencode_go:
+    require_key: false
+  cloudflare:
+    require_key: false   # if false, skips gracefully when token/account missing; if true, errors when missing
+    free: true            # all cloudflare Workers AI models are free tier (config-driven, not hardcoded)
+  ollama_cloud:
+    require_key: false
+    free: true            # all ollama_cloud models are free (config-driven, replaces hardcoded ollama_free)
+  openrouter:
+    require_key: false
+    free_only: true       # when true, only keep models that are free (pricing==0 or :free suffix or free/big-pickle rule)
+  command_code:
+    require_key: false
+
+# Output columns customization (order matters for CSV/XLSX)
+output:
+  columns:
+    - "provider"
+    - "model_id"
+    - "display_name"
+    - "intelligence"
+    - "intelligence_source"   # pattern | artificial_analysis | fallback
+    - "cost_input_per_1M"
+    - "cost_output_per_1M"
+    - "cost_per_task"
+    - "free"
+    - "supports_vision"               # can read images (input contains image)
+    - "supports_image_generation"     # can produce images (output contains image)
+    - "vision_source"                 # openrouter_architecture | cloudflare_task | models_dev | openrouter_crossref | unknown
+    - "context_window"
+    - "owned_by"
+    - "last_seen"

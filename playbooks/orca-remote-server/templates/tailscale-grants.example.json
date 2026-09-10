@@ -1,0 +1,19 @@
+{
+  "_comment": "Minimal Tailscale grants skeleton for one Orca server + its clients. Placeholders only — fill from plan.md, apply in the admin console. Keep as narrow as the setup allows; WireGuard handshake + control-plane traffic are auto-allowed.",
+  "hosts": {
+    "orca-server": "<SERVER_TAILSCALE_IP>",
+    "orca-client-01": "<CLIENT_TAILSCALE_IP>"
+  },
+  "grants": [
+    {
+      "src": ["autogroup:member"],
+      "dst": ["orca-server", "orca-client-01"],
+      "ip": ["tcp:22", "icmp:*"]
+    },
+    {
+      "src": ["orca-client-01"],
+      "dst": ["orca-server"],
+      "ip": ["tcp:<ORCA_PORT>"]
+    }
+  ]
+}

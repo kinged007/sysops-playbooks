@@ -1,0 +1,41 @@
+# Kandev — Docker Compose Postgres overlay
+# Usage: include alongside docker-compose.yml when P1 = postgres
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
+# or merge the postgres service + env into the canonical file.
+# Kandev's built-in System backup/restore is SQLite-only; for Postgres use pg_dump (§16.3).
+# KANDEV_DATABASE_PASSWORD must be in a 0600 file referenced as ${KANDEV_DB_PASSWORD:?set ...} — never inline.
+
+services:
+  kandev:
+    environment:
+      KANDEV_DATABASE_DRIVER: postgres
+      KANDEV_DATABASE_HOST: postgres
+      KANDEV_DATABASE_PORT: "5432"
+      KANDEV_DATABASE_USER: kandev
+      KANDEV_DATABASE_PASSWORD: "${KANDEV_DB_PASSWORD:?set KANDEV_DB_PASSWORD}"
+      KANDEV_DATABASE_DBNAME: kandev
+      KANDEV_DATABASE_SSLMODE: "${KANDEV_DATABASE_SSLMODE:-disable}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # /data is still required for worktrees/repos/agent-sessions/master.key — do not remove the kandev-data mount.
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: kandev
+      POSTGRES_PASSWORD: "${KANDEV_DB_PASSWORD:?set KANDEV_DB_PASSWORD}"
+      POSTGRES_DB: kandev
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kandev -d kandev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    # Optional: tune for your host
+    # command: ["postgres", "-c", "max_connections=50", "-c", "shared_buffers=256MB"]
+
+volumes:
+  postgres-data:

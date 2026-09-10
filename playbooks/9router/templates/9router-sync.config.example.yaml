@@ -34,6 +34,7 @@ provider_mapping:
 
 # Combos: each block is applied to the *already globally filtered* set.
 # Allow any number of combos; the 5 defaults match the baseline in playbooks/9router/combos/.
+# Note: reasoning/thinking level is configured in 9Router UI, not via sync suffix.
 combos:
   free:
     description: "All free cost asc intelligence desc"
@@ -49,7 +50,6 @@ combos:
     model_whitelist: []
     model_blacklist: []
     favorites: []                # ordered fnmatch patterns, moved to top after sort
-    reasoning_level: 0           # 0=auto/none, 1=low, 2=medium, 3=high, 4=max (highest, e.g. max or xhigh)
   coding-free:
     description: "Coding free tier"
     sort_by: "cost"
@@ -58,7 +58,6 @@ combos:
     min_intelligence: 25
     max_intelligence: null
     favorites: ["deepseek-v4*","glm-5.3-flash"]
-    reasoning_level: 4           # max for coding
   coding-low:
     sort_by: "cost"
     sort_order: "asc"
@@ -67,7 +66,6 @@ combos:
     max_intelligence: null
     max_cost_per_task: 0.5
     favorites: ["mimo-v2.5*","hy3"]
-    reasoning_level: 4           # max for coding
   coding-med:
     sort_by: "cost"
     sort_order: "asc"
@@ -75,7 +73,6 @@ combos:
     min_intelligence: 40
     max_intelligence: null
     favorites: []
-    reasoning_level: 4           # max for coding
   coding-pro:
     sort_by: "cost"
     sort_order: "asc"
@@ -83,7 +80,6 @@ combos:
     min_intelligence: 50
     max_intelligence: null
     favorites: ["deepseek-v4*"]
-    reasoning_level: 4           # max for coding
   vision:
     description: "Vision-capable models, cheapest first"
     sort_by: "cost"
@@ -92,7 +88,6 @@ combos:
     supports_vision: true
     supports_image_generation: "both"
     favorites: []
-    reasoning_level: 0           # auto for non-coding
   gen-image:
     description: "Image generation models, cheapest first"
     sort_by: "cost"
@@ -101,7 +96,6 @@ combos:
     supports_image_generation: true
     supports_vision: "both"
     favorites: []
-    reasoning_level: 0           # auto
 
 # CLI generation (post-sync, after providers+combos are live)
 cli:

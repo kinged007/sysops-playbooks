@@ -1,0 +1,19 @@
+[Unit]
+Description=Orca Remote Server (headless orca serve)
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<SERVER_USER>
+# Pairing address must be reachable by clients (Tailscale IP/hostname, LAN IP,
+# or tunnel hostname). NEVER 127.0.0.1 for remote clients.
+ExecStart=/usr/local/bin/orca serve --pairing-address <SERVER_TAILSCALE_IP_OR_HOSTNAME> --port <PORT>
+Restart=on-failure
+RestartSec=10
+# Keep pairing URLs out of persistent logs when possible; journal still records stdout.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
