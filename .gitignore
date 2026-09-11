@@ -23,6 +23,7 @@ templates/**/*.tfvars.json
 *.tfvars
 
 # ---- Local scratch ----
+generated/
 *.local
 .env
 .env.*

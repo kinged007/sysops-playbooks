@@ -96,7 +96,7 @@ def write_opencode(models, base_url, api_key, out_dir, active_model):
             "9router": {
                 "npm": "@ai-sdk/openai-compatible",
                 "name": "9Router",
-                "options": {"baseURL": base_url.rstrip("/") + "/v1", "apiKey": "${NINEROUTER_KEY}"},
+                "options": {"baseURL": base_url.rstrip("/") + "/v1", "apiKey": "{env:NINEROUTER_KEY}"},
                 "models": provider_models,
             }
         },
@@ -106,7 +106,7 @@ def write_opencode(models, base_url, api_key, out_dir, active_model):
     p.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
     snippet = {"provider": {"9router": config["provider"]["9router"]}, "model": config["model"]}
     (out_dir / "opencode-snippet.json").write_text(json.dumps(snippet, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"opencode: {p} ({len(provider_models)} models, active {active_model}) — apiKey references ${{NINEROUTER_KEY}}, set env manually")
+    print(f"opencode: {p} ({len(provider_models)} models, active {active_model}) — apiKey references {{env:NINEROUTER_KEY}}, set env manually")
 
 def write_hermes(models, base_url, api_key, out_dir, active_model):
     # include all combos/models like opencode, referencing env var only

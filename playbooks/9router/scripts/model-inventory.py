@@ -585,6 +585,119 @@ def matches_any(patterns: List[str], text: str) -> bool:
     return False
 
 
+def apply_model_overrides(models: List[Dict[str, Any]], cfg: Dict[str, Any]) -> int:
+    """Apply per-model field overrides.
+
+    Config shape (any of):
+      overrides:
+        - pattern: "muse-spark-.*-contributor"   # regex or glob (fnmatch, case-insensitive)
+          providers: ["opencode_go", "command_code"]  # optional filter; alias commandcode -> command_code
+          cost_per_task: 0.2   # alias price_per_task also accepted
+          intelligence: 48.5   # any field is overrideable (free, supports_vision, etc.)
+      # per-provider shorthand also supported:
+      providers:
+        opencode_go:
+          overrides:
+            - pattern: "muse-spark-.*-contributor"
+              cost_per_task: 0.2
+    Later rules win. Matching uses fnmatch + regex via matches_any (case-insensitive).
+    Returns number of model/rule matches applied.
+    """
+    raw_overrides: List[Dict[str, Any]] = []
+    top = cfg.get("overrides") or cfg.get("model_overrides") or []
+    if isinstance(top, dict):
+        for k, v in top.items():
+            if isinstance(v, dict):
+                raw_overrides.append({"pattern": k, **v})
+            elif v is not None:
+                raw_overrides.append({"pattern": k, "cost_per_task": v})
+    elif isinstance(top, list):
+        raw_overrides.extend([o for o in top if isinstance(o, dict)])
+    provs = cfg.get("providers") or {}
+    if isinstance(provs, dict):
+        for prov_key, pc in provs.items():
+            if not isinstance(pc, dict):
+                continue
+            por = pc.get("overrides") or pc.get("model_overrides")
+            if not por:
+                continue
+            if isinstance(por, dict):
+                for k, v in por.items():
+                    if isinstance(v, dict):
+                        d = {"pattern": k, **v}
+                    elif v is not None:
+                        d = {"pattern": k, "cost_per_task": v}
+                    else:
+                        continue
+                    if "providers" not in d and "provider" not in d:
+                        d["providers"] = [prov_key]
+                    raw_overrides.append(d)
+            elif isinstance(por, list):
+                for o in por:
+                    if not isinstance(o, dict):
+                        continue
+                    d = dict(o)
+                    if "providers" not in d and "provider" not in d:
+                        d["providers"] = [prov_key]
+                    raw_overrides.append(d)
+    if not raw_overrides:
+        return 0
+    applied = 0
+    for m in models:
+        mid = m.get("model_id") or ""
+        prov = m.get("provider") or ""
+        prov_norm = prov.lower().replace("-", "_")
+        if prov_norm == "commandcode":
+            prov_norm = "command_code"
+        for ov in raw_overrides:
+            pat = ov.get("pattern") or ov.get("match") or ov.get("regex") or ov.get("model_pattern") or ""
+            if not pat:
+                continue
+            allowed = ov.get("providers") or ov.get("provider") or ov.get("providers_whitelist")
+            if allowed is not None:
+                if isinstance(allowed, str):
+                    allowed = [allowed]
+                norm_allowed: List[str] = []
+                for a in allowed:  # type: ignore
+                    an = str(a).lower().replace("-", "_")
+                    if an == "commandcode":
+                        an = "command_code"
+                    if an in ("opencode_go", "opencode-go"):
+                        an = "opencode_go"
+                    norm_allowed.append(an)
+                if prov_norm not in norm_allowed:
+                    continue
+            if not matches_any([pat], mid):
+                continue
+            for k, v in ov.items():
+                if k in ("pattern", "match", "regex", "model_pattern", "providers", "provider", "providers_whitelist"):
+                    continue
+                k2 = k
+                if k in ("price_per_task", "pricePerTask", "price", "cost"):
+                    k2 = "cost_per_task"
+                if isinstance(v, str) and k2 in ("free", "supports_vision", "supports_image_generation"):
+                    lv = v.lower()
+                    if lv in ("true", "1", "yes", "y"):
+                        v = True
+                    elif lv in ("false", "0", "no", "n"):
+                        v = False
+                m[k2] = v  # type: ignore
+                if k2 == "intelligence" and v is not None and "intelligence_source" not in ov:
+                    m["intelligence_source"] = "override"
+                if k2 == "cost_per_task":
+                    notes = (m.get("cost_notes") or "").strip()
+                    if "override" not in notes:
+                        m["cost_notes"] = (notes + " override").strip() if notes else "override"
+                    try:
+                        m["cost_per_task"] = float(v) if v is not None else None  # type: ignore
+                    except Exception:
+                        pass
+            applied += 1
+    if applied:
+        print(f"  overrides: applied {applied} matches from {len(raw_overrides)} rule(s)")
+    return applied
+
+
 # ---------------------------------------------------------------------------
 # Provider fetchers
 # Each returns List[Dict] with normalized fields
@@ -770,6 +883,10 @@ def fetch_opencode(provider_key: str, cfg: Dict[str, Any], timeout: int = 20) ->
                 pass
         intel, intel_src = estimate_intelligence(raw_id, cfg.get("intelligence", {}), cfg.get("_aa_cache"))
         free_flag = is_free(raw_id, cost_i, cost_o) or provider_assumes_free(provider_key, cfg)
+        free_only_cfg = ((cfg.get("providers", {}) or {}).get(provider_key, {}) or {})
+        free_only = free_only_cfg.get("free_only", False) if isinstance(free_only_cfg, dict) else False
+        if free_only and not free_flag:
+            continue
         _cpt = cost_per_task_estimate(cost_i, cost_o)
         _aa_cpt = get_aa_cost(raw_id, cfg.get("_aa_cache"))
         if _aa_cpt is not None:
@@ -790,7 +907,8 @@ def fetch_opencode(provider_key: str, cfg: Dict[str, Any], timeout: int = 20) ->
             "free": free_flag,
             "raw": m,
         })
-    print(f"  {provider_key}: fetched {len(out)} models")
+    suffix2 = " free_only" if free_only else ""
+    print(f"  {provider_key}: fetched {len(out)} models" + (f" (of {len(data_list)} total —{suffix2})" if suffix2 else ""))
     return out
 
 
@@ -1856,7 +1974,9 @@ def main() -> None:
         cfg = {}
 
     # Minimal defaults so script works without config
+    # ponytail: ceiling is per-run inventory files; if overrides need history/audit add override_source+applied_at columns.
     defaults: Dict[str, Any] = {
+        "overrides": [],
         "general": {"output_dir": "executions/9router/model-inventory", "spreadsheet_name": "models.csv", "json_name": "models.json", "added_list_prefix": "added", "save_raw_snapshot": True, "raw_snapshot_name": "raw_snapshot_{{date}}.json", "sort_by": "intelligence", "sort_order": "desc"},
         "filters": {"minimum_intelligence": 0, "include_unknown_intelligence": True, "blacklist": [], "whitelist": ["*big-pickle*", "*free*"] if False else ["big-pickle", "*big-pickle*"]},
         "intelligence": {"default_score": None, "artificial_analysis": {"enabled": True, "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free", "api_key": "", "cache_file": "artificial_analysis_cache.json", "cache_ttl_hours": 24, "fallback_local_file": ""}, "patterns": []},
@@ -2010,6 +2130,14 @@ def main() -> None:
             m["supports_vision"] = None
             m["supports_image_generation"] = None
             m["vision_source"] = "error"
+
+    # Per-model overrides (stored in inventory): regex model match + fields (cost_per_task/price, intelligence, booleans, etc.)
+    # Each rule: {pattern: regex/glob, providers?:[...], cost_per_task|price_per_task: 0.2, intelligence: .., free: ..}
+    # Top-level `overrides:` array wins, but per-provider `providers.<k>.overrides` also supported.
+    try:
+        apply_model_overrides(all_models, cfg)
+    except Exception as e:
+        print(f"WARN: overrides failed: {e}", file=sys.stderr)
 
     # annotate last_seen
     now_iso = datetime.datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')

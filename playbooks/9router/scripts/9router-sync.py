@@ -376,6 +376,25 @@ def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[st
     if not mod_wl and combo_cfg.get("whitelist"): mod_wl = combo_cfg.get("whitelist")
     if not mod_bl and combo_cfg.get("blacklist"): mod_bl = combo_cfg.get("blacklist")
 
+    # favorites bypass: collect favorite matching models first (they bypass intel/cost/free/whitelist filters)
+    fav_bypass: List[Dict[str, Any]] = []
+    fav_keys: set = set()
+    if favorites:
+        for m in models:
+            prov = m.get("provider","") or m.get("mapped_provider","")
+            mid = m.get("model_id","")
+            routed = m.get("routed","") or f"{prov}/{mid}"
+            composite = f"{prov}/{mid}"
+            for pat in favorites:
+                if matches_any([pat], mid) or matches_any([pat], routed) or matches_any([pat], composite):
+                    # still respect model/provider blacklist for safety? No — favorites supersede like whitelist. Only skip if blacklisted via model_blacklist/provider_blacklist.
+                    # But per request: favorites should supersede — so skip blacklist check too. Keep exactly like inventory whitelist: favorites win unconditionally.
+                    k = m.get("routed") or f"{prov}/{mid}"
+                    if k not in fav_keys:
+                        fav_bypass.append(m)
+                        fav_keys.add(k)
+                    break
+
     filtered=[]
     for m in models:
         prov = m.get("provider","") or m.get("mapped_provider","")
@@ -423,9 +442,12 @@ def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[st
                 if max_intel is not None and float(intel) > float(max_intel):
                     continue
             except: pass
-        # cost
+        # cost: null fails when a bound is set (avoids passing blank-cost expensive unknowns)
         cpt=m.get("cost_per_task")
-        if cpt is not None:
+        if cpt is None or (isinstance(cpt, str) and not cpt.strip()):
+            if min_cpt is not None or max_cpt is not None:
+                continue
+        else:
             try:
                 if max_cpt is not None and float(cpt) > float(max_cpt): continue
                 if min_cpt is not None and float(cpt) < float(min_cpt): continue
@@ -469,13 +491,33 @@ def apply_combo_pipeline(routed_models: List[Dict[str, Any]], combo_cfg: Dict[st
     else: # model
         filtered = sorted(filtered, key=lambda m: (m.get("model_id") or "").lower(), reverse=reverse)
 
-    # favorites promotion: stable move to top in config order
+    # merge bypassed favorites that were not already in filtered (respect deduplication, then re-rank)
+    if fav_bypass:
+        for fb in fav_bypass:
+            k = fb.get("routed") or f"{fb.get('provider','')}/{fb.get('model_id','')}"
+            if k not in {m.get("routed") or f"{m.get('provider','')}/{m.get('model_id','')}" for m in filtered}:
+                filtered.append(fb)
+        # re-apply same sort so bypassed items interleave correctly, then promote favorites to top
+        if key in ("intelligence","intel"):
+            if not reverse:
+                filtered = sorted(filtered, key=lambda m: (m.get("intelligence") is None, m.get("intelligence") if m.get("intelligence") is not None else 999999, m.get("cost_per_task") or 999999))
+            else:
+                filtered = sorted(filtered, key=lambda m: (m.get("intelligence") is None, -(m.get("intelligence") or 0) if reverse else (m.get("intelligence") or 0), m.get("cost_per_task") if m.get("cost_per_task") is not None else 999999))
+        elif key in ("cost","cost_per_task","costpertask"):
+            filtered = sorted(filtered, key=cost_key)
+            if reverse:
+                filtered = list(reversed(filtered))
+        elif key == "provider":
+            filtered = sorted(filtered, key=lambda m: (m.get("provider") or "", m.get("model_id") or ""), reverse=reverse)
+        else:
+            filtered = sorted(filtered, key=lambda m: (m.get("model_id") or "").lower(), reverse=reverse)
+
+    # favorites promotion: stable move to top in config order (includes bypassed)
     if favorites:
         pool = list(filtered)
         fav_ordered=[]
         for pat in favorites:
             matched = [x for x in pool if matches_any([pat], x.get("routed","") or x.get("model_id","")) or matches_any([pat], x.get("model_id","")) or matches_any([pat], x.get("provider","")+ "/" + x.get("model_id",""))]
-            # keep matched in current sorted order
             for m in matched:
                 if m in pool:
                     fav_ordered.append(m)
@@ -762,7 +804,7 @@ def write_opencode(models, base_url, api_key, out_dir, active_model):
             "9router": {
                 "npm": "@ai-sdk/openai-compatible",
                 "name": "9Router",
-                "options": {"baseURL": base_url.rstrip("/") + "/v1", "apiKey": "${NINEROUTER_KEY}"},
+                "options": {"baseURL": base_url.rstrip("/") + "/v1", "apiKey": "{env:NINEROUTER_KEY}"},
                 "models": provider_models,
             }
         },
@@ -772,7 +814,7 @@ def write_opencode(models, base_url, api_key, out_dir, active_model):
     p.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
     snippet = {"provider": {"9router": config["provider"]["9router"]}, "model": config["model"]}
     (out_dir / "opencode-snippet.json").write_text(json.dumps(snippet, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"opencode: {p} ({len(provider_models)} models, active {active_model}) — apiKey references ${{NINEROUTER_KEY}}, set env manually")
+    print(f"opencode: {p} ({len(provider_models)} models, active {active_model}) — apiKey references {{env:NINEROUTER_KEY}}, set env manually")
 
 def write_hermes(models, base_url, api_key, out_dir, active_model):
     # include all combos/models like opencode, referencing env var only
@@ -931,6 +973,36 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
     # 2. global filter
     global_filtered = apply_global_filter(models, cfg["global_filter"])
     print(f"  global filtered: {len(global_filtered)} / {len(models)}")
+
+    # 2b. rescue combo favorites dropped by global filter (favorites supersede global intel/cost/whitelist)
+    # ponytail: ceiling is config-declared favorites only; if favorites need audit add favorite_source column
+    try:
+        _fav_pats: List[str] = []
+        for _cc in (cfg.get("combos") or {}).values():
+            _f = (_cc or {}).get("favorites") or (_cc or {}).get("favorite") or []
+            if isinstance(_f, str):
+                _f = [_f]
+            _fav_pats.extend([str(x) for x in _f if x])
+        if _fav_pats:
+            _have = {f"{m.get('provider','')}/{m.get('model_id','')}" for m in global_filtered}
+            _rescued = 0
+            for _m in models:
+                _mid = _m.get("model_id", "") or ""
+                _comp = f"{_m.get('provider','')}/{_mid}"
+                if _comp in _have:
+                    continue
+                if matches_any(_fav_pats, _mid) or matches_any(_fav_pats, _comp):
+                    # still respect global model_blacklist (explicit exclusion wins over favorites)
+                    _gbl = [str(x) for x in (cfg.get("global_filter", {}) or {}).get("model_blacklist", []) or []]
+                    if _gbl and (matches_any(_gbl, _mid) or matches_any(_gbl, _comp)):
+                        continue
+                    global_filtered.append(_m)
+                    _have.add(_comp)
+                    _rescued += 1
+            if _rescued:
+                print(f"  favorites rescued from global filter: {_rescued}")
+    except Exception as _e:
+        print(f"WARN: favorites rescue failed: {_e}", file=sys.stderr)
 
     # 3. provider mapping -> routed + group by alias
     mapping = cfg["provider_mapping"]

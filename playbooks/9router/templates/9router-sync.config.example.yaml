@@ -8,9 +8,9 @@
 
 # Global filter — applied to ALL models from model-inventory before provider mapping.
 global_filter:
-  min_intelligence: 0
+  min_intelligence: 20
   include_null_intelligence: true
-  max_cost_per_task: null        # null = no cap; else e.g. 0.5
+  max_cost_per_task: 1        # null = no cap; else e.g. 0.5
   min_cost_per_task: null        # optional
   provider_whitelist: []         # fnmatch, case-insensitive. [] = all. e.g. ["opencode_zen","google"]
   provider_blacklist: []         # e.g. ["cloudflare"]
@@ -33,7 +33,7 @@ provider_mapping:
   google: "gemini"
 
 # Combos: each block is applied to the *already globally filtered* set.
-# Allow any number of combos; the 5 defaults match the baseline in playbooks/9router/combos/.
+# Allow any number of combos; the 8 defaults match the baseline in playbooks/9router/combos/.
 # Note: reasoning/thinking level is configured in 9Router UI, not via sync suffix.
 combos:
   free:
@@ -52,34 +52,43 @@ combos:
     favorites: []                # ordered fnmatch patterns, moved to top after sort
   coding-free:
     description: "Coding free tier"
-    sort_by: "cost"
-    sort_order: "asc"
+    sort_by: "intelligence"
+    sort_order: "desc"
     free: true
-    min_intelligence: 25
+    min_intelligence: 20
     max_intelligence: null
-    favorites: ["deepseek-v4*","glm-5.3-flash"]
   coding-low:
     sort_by: "cost"
     sort_order: "asc"
-    free: "both"
-    min_intelligence: 30
+    free: false
+    min_intelligence: 25
     max_intelligence: null
-    max_cost_per_task: 0.5
-    favorites: ["mimo-v2.5*","hy3"]
+    max_cost_per_task: 0.1
+    min_cost_per_task: 0.0001
+    favorites: []
   coding-med:
     sort_by: "cost"
     sort_order: "asc"
-    free: "both"
-    min_intelligence: 40
+    free: false
+    min_intelligence: 35
     max_intelligence: null
-    favorites: []
-  coding-pro:
+    max_cost_per_task: 0.4
+    favorites: ["*muse-spark-1.3-contributor*","*muse-spark-1.2-contributor*","*glm-5.3-flash*","*deepseek-v4.1-flash*"]
+  coding-manual:
     sort_by: "cost"
     sort_order: "asc"
-    free: "both"
-    min_intelligence: 50
+    free: false
+    min_intelligence: 39
     max_intelligence: null
-    favorites: ["deepseek-v4*"]
+    model_whitelist: ["*muse-spark-1.3-contributor*","*muse-spark-1.2-contributor*","*glm-5.3-flash*","*deepseek-v4.1-flash*"]
+  coding-pro:
+    sort_by: "intelligence"
+    sort_order: "desc"
+    free: "both"
+    min_intelligence: 39
+    max_intelligence: null
+    max_cost_per_task: 0.9
+    favorites: []
   vision:
     description: "Vision-capable models, cheapest first"
     sort_by: "cost"

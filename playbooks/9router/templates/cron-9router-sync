@@ -1,35 +1,43 @@
-# cron-9router-sync — crontab fragment for 9Router weekly sync
-# Every Monday at 16:00 (4pm) — syncs model-inventory -> 9Router providers/combos + CLI configs
-#
-# Two complementary cron jobs (install both, or systemd timer alternative):
-#   15:00 inventory fetch (model-inventory-cron.sh) — hits upstream APIs, updates executions/<variant>/model-inventory/
-#   16:00 sync to 9Router (9router-sync-cron.sh) — reads the fresh inventory, updates /api/models/custom + /api/combos, regenerates generated/
-#
-# Install (host):
-#   # Option A: system crontab (needs /opt/sysops-playbooks checkout)
-#   sudo crontab -e
-#   # add:
-#   0 15 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
-#   0 16 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
-#
-#   # Option B: user crontab (no sudo, repo under $HOME)
-#   crontab -e
-#   # add:
-#   0 15 * * 1 /home/<user>/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> /home/<user>/sysops-playbooks/executions/9router/logs/cron.log 2>&1
-#   0 16 * * 1 /home/<user>/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> /home/<user>/sysops-playbooks/executions/9router/logs/cron.log 2>&1
-#
-# Verify:
-#   ./playbooks/9router/scripts/9router-sync-cron.sh --dry-run --verbose
-#   ls -lh executions/9router/logs/*9router-sync-cron.log
-#   cat executions/9router/combos/free.csv | head -n 10
-#
-# Systemd timer alternative (preferred on modern hosts):
-#   sudo cp playbooks/9router/templates/systemd-9router-sync.{service,timer} /etc/systemd/system/
-#   sudo systemctl daemon-reload && sudo systemctl enable --now 9router-sync.timer
-#
-# --- Cron lines (copy-paste) ---
-# Inventory fetch — Monday 15:00
-0 15 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
-# 9Router sync — Monday 16:00 (1h after inventory)
-0 16 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
+# 9Router Model Inventory + Sync Cron — Every 3 Days
+# =====================================================
+# Install: sudo cp cron-9router-sync /etc/cron.d/9router-sync
+# Or user crontab: crontab -e  → paste the line below
+# (requires cron daemon running: sudo systemctl enable --now cron)
 
+# Runs every 3 days at 03:30 UTC (adjust time as needed)
+# Model inventory runs first (~15-30 min), then sync runs (~5-15 min)
+# Logs: executions/9router/logs/<timestamp>-model-inventory-cron.log
+#       executions/9router/logs/<timestamp>-9router-sync-cron.log
+
+# System-wide (needs root):
+# 30 3 */3 * * root /home/coder/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
+# 45 3 */3 * * root /home/coder/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
+
+# User crontab (no root):
+# 30 3 */3 * * /home/coder/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> ~/model-inventory-cron.log 2>&1
+# 45 3 */3 * * /home/coder/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> ~/9router-sync-cron.log 2>&1
+
+# Alternative: systemd timer (recommended for servers)
+# See templates/systemd-9router-sync.{service,timer}
+# Install:
+#   sudo cp templates/systemd-9router-sync.service /etc/systemd/system/
+#   sudo cp templates/systemd-9router-sync.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now 9router-sync.timer
+# Timer runs every 3 days (OnCalendar=*-*-*/3 03:30)
+
+# Environment for cron (user crontab needs these):
+# REPO_ROOT=/home/coder/sysops-playbooks
+# PYTHON_BIN=/home/coder/sysops-playbooks/.venv/bin/python
+# NINEROUTER_URL=https://router.munyard.biz
+# AA_API_KEY=...  (optional, for Artificial Analysis intelligence scores)
+# GOOGLE_API_KEY=...
+# OPENCODE_ZEN_API_KEY=...
+# OPENCODE_GO_API_KEY=...
+# CLOUDFLARE_API_TOKEN=...
+# CLOUDFLARE_ACCOUNT_ID=...
+# OLLAMA_API_KEY=...
+# OPENROUTER_API_KEY=...
+# COMMAND_CODE_API_KEY=...
+
+# Note: The scripts auto-discover the execution variant (executions/9router/ or
+# executions/9router-<suffix>/) and use its config/secrets. No config args needed.

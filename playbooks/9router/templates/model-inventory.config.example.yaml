@@ -102,6 +102,16 @@ cost:
   overrides:
     "default": {"input": null, "output": null}
 
+# Per-model overrides (stored in inventory): regex model match + fields.
+# Each entry matches model_id case-insensitively (glob + regex via fnmatch/re.search).
+# Cost alias: `cost_per_task` or `price_per_task` (both map to cost_per_task). Cost notes auto-append "override".
+# Other overrideable fields: `intelligence` (source set to "override" unless intelligence_source given), booleans `free`/`supports_vision`/etc.
+# Later entries win; per-provider form also supported: providers.<name>.overrides[].
+overrides:
+  - pattern: "muse-spark-.*-contributor*"
+    providers: ["opencode_go", "command_code"]
+    cost_per_task: 0.1
+
 api_keys:
   # Each can be a literal key, a ${ENV_VAR} reference, or empty (provider will be skipped if required).
   google: "${GOOGLE_API_KEY}"                    # also: ${GEMINI_API_KEY}, ${GOOGLE_GENERATIVE_AI_API_KEY}
