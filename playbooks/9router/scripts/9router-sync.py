@@ -790,14 +790,20 @@ def sync_combos(session, url: str, desired_combos: Dict[str, List[str]], dry_run
             if verbose: print(f"    POST combo {name} {len(desired_models)} models -> {code} {str(body)[:300]}")
     return True
 
-def write_opencode(models, base_url, api_key, out_dir, active_model):
+def write_opencode(models, base_url, api_key, out_dir, active_model, max_tokens=262144):
     # api_key is ignored — never hardcode, reference env var only (per user request)
+    # max_tokens: limit.context for combos (no context_length of their own); default 256k.
+    # ponytail: ceiling is fixed default; live per-combo min(context_length) needs a combo-members lookup
     provider_models = {}
     for m in models:
         mid = m.get("id")
         if not mid:
             continue
-        provider_models[mid] = {"name": mid, "modalities": {"input": ["text", "image"], "output": ["text"]}}
+        entry = {"name": mid, "modalities": {"input": ["text", "image"], "output": ["text"]}}
+        limit_ctx = m.get("context_length") if m.get("owned_by") != "combo" else (m.get("context_length") or max_tokens)
+        if limit_ctx:
+            entry["limit"] = {"context": limit_ctx}
+        provider_models[mid] = entry
     config = {
         "$schema": "https://opencode.ai/config.json",
         "provider": {
@@ -816,7 +822,7 @@ def write_opencode(models, base_url, api_key, out_dir, active_model):
     (out_dir / "opencode-snippet.json").write_text(json.dumps(snippet, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"opencode: {p} ({len(provider_models)} models, active {active_model}) — apiKey references {{env:NINEROUTER_KEY}}, set env manually")
 
-def write_hermes(models, base_url, api_key, out_dir, active_model):
+def write_hermes(models, base_url, api_key, out_dir, active_model, max_tokens=262144):
     # include all combos/models like opencode, referencing env var only
     base_url_v1 = base_url.rstrip("/") + "/v1"
     # Build providers block with all models for Desktop picker
@@ -825,8 +831,11 @@ def write_hermes(models, base_url, api_key, out_dir, active_model):
         mid = m.get("id")
         if not mid:
             continue
-        # per-model context_length if available, else omitted
+        # per-model context_length if available, else max_tokens fallback for combos
+        ctx = m.get("context_length") or (max_tokens if m.get("owned_by") == "combo" else None)
         models_yaml += f"      {mid}:\n        display_name: {mid}\n"
+        if ctx:
+            models_yaml += f"        context_length: {ctx}\n"
     yaml_block = f"""model:
   default: "{active_model}"
   provider: "custom"
@@ -875,6 +884,19 @@ def write_claude(base_url, api_key, out_dir, active_model):
     (out_dir / "claude-settings.json").write_text(json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
     (out_dir / "claude-env.sh").write_text(f"export ANTHROPIC_BASE_URL=\"{base_url_v1}\"\nexport ANTHROPIC_AUTH_TOKEN=\"${{NINEROUTER_KEY}}\"  # set NINEROUTER_KEY manually\n", encoding="utf-8")
     print(f"claude: {out_dir/'claude-settings.json'} — token references ${{NINEROUTER_KEY}}")
+
+def write_pi(models, base_url, api_key, out_dir, active_model, max_tokens=262144):
+    # pi reads ~/.pi/agent/models.json; this snippet merges under providers."9router".models.
+    # Only combos need contextWindow (pi defaults to 128k without it); live models
+    # already advertise context_length via /v1/models which pi resolves itself.
+    # ponytail: full 113-model emit needs live context_length plumbing; combos-only is the fix
+    combos = [m for m in models if m.get("owned_by") == "combo" and m.get("id")]
+    snippet = {"providers": {"9router": {"models": [
+        {"id": m["id"], "name": m["id"], "input": ["text", "image"],
+         "contextWindow": m.get("context_length") or max_tokens}
+        for m in combos]}}}
+    (out_dir / "pi-models-snippet.json").write_text(json.dumps(snippet, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"pi: {out_dir/'pi-models-snippet.json'} ({len(combos)} combos, contextWindow {max_tokens}) — merge into ~/.pi/agent/models.json")
 
 def write_generic(base_url, api_key, out_dir, active_model):
     base_url_v1 = base_url.rstrip("/") + "/v1"
@@ -925,12 +947,13 @@ def fetch_live_v1_models(url: str, api_key: str) -> List[Dict[str, Any]]:
         return body.get("data", [])
     return []
 
-def write_cli_configs(live_models: List[Dict[str, Any]], base_url: str, out_dir: pathlib.Path, active_model: str = "free") -> None:
+def write_cli_configs(live_models: List[Dict[str, Any]], base_url: str, out_dir: pathlib.Path, active_model: str = "free", max_tokens: int = 262144) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     # adapt writers to accept live_models list as [{"id":..., "owned_by":...}]
     # copy implementations from generate-configs.py verbatim
-    write_opencode(live_models, base_url, "sk-placeholder", out_dir, active_model)
-    write_hermes(live_models, base_url, "sk-placeholder", out_dir, active_model)
+    write_opencode(live_models, base_url, "sk-placeholder", out_dir, active_model, max_tokens)
+    write_hermes(live_models, base_url, "sk-placeholder", out_dir, active_model, max_tokens)
+    write_pi(live_models, base_url, "sk-placeholder", out_dir, active_model, max_tokens)
     write_codex(base_url, "sk-placeholder", out_dir, active_model)
     write_claude(base_url, "sk-placeholder", out_dir, active_model)
     write_generic(base_url, "sk-placeholder", out_dir, active_model)
@@ -945,7 +968,7 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
         "global_filter": {"min_intelligence":0,"include_null_intelligence":True,"max_cost_per_task":None,"provider_whitelist":[],"model_blacklist":[],"model_whitelist":[],"free":"both","supports_vision":"both","supports_image_generation":"both"},
         "provider_mapping": {"opencode_zen":"oc","opencode_go":"ocg","ollama_cloud":"ollama","openrouter":"openrouter","command_code":"cmc","cloudflare":"","google":"gemini"},
         "combos": {},
-        "cli": {"enabled":True,"output_dir":"generated","active_model":"free","writers":["opencode","hermes","codex","claude","generic"]},
+        "cli": {"enabled":True,"output_dir":"generated","active_model":"free","max_tokens":262144,"writers":["opencode","hermes","codex","claude","generic"]},
         "ninerouter": {"url":"","api_key_file":"secrets/9router-api-key.txt","dashboard_password_file":"secrets/dashboard-password.txt"},
         "options": {"dry_run":False,"check_diff_before_write":True,"remove_all_before_add":True}
     }
@@ -1140,7 +1163,8 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
         else:
             out_dir = out_dir.resolve()
         active = cfg["cli"].get("active_model","free")
-        write_cli_configs(live_models, url or "https://router.example.com", out_dir, active)
+        max_tokens = cfg["cli"].get("max_tokens", 262144)
+        write_cli_configs(live_models, url or "https://router.example.com", out_dir, active, max_tokens)
         print(f"  cli configs -> {out_dir}")
 
     # 7. save state snapshot alongside config

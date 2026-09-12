@@ -155,6 +155,34 @@ def test_cli_generation(tmp_path):
     assert (out / "opencode.json").exists()
     assert (out / "claude-settings.json").exists()
 
+def test_combo_limit_context(tmp_path):
+    import json
+    from playbooks_9router_scripts_9router_sync import write_cli_configs
+    models=[{"id":"oc/grok-4.6","owned_by":"oc","context_length":1000000}, {"id":"free","owned_by":"combo"}]
+    out=tmp_path / "generated"
+    write_cli_configs(models, "https://router.example.com", out, "free")
+    cfg=json.loads((out / "opencode.json").read_text(encoding="utf-8"))
+    ms=cfg["provider"]["9router"]["models"]
+    assert ms["free"]["limit"]=={"context":262144}
+    assert ms["oc/grok-4.6"]["limit"]=={"context":1000000}
+    out2=tmp_path / "generated2"
+    write_cli_configs(models, "https://router.example.com", out2, "free", 1048576)
+    cfg2=json.loads((out2 / "opencode.json").read_text(encoding="utf-8"))
+    assert cfg2["provider"]["9router"]["models"]["free"]["limit"]=={"context":1048576}
+    try:
+        import yaml
+        h=yaml.safe_load((out / "hermes-config.yaml").read_text(encoding="utf-8"))
+    except ImportError:
+        h=None
+    if h:
+        hm=h["providers"]["9router"]["models"]
+        assert hm["free"]["context_length"]==262144
+        assert hm["oc/grok-4.6"]["context_length"]==1000000
+    pi=json.loads((out / "pi-models-snippet.json").read_text(encoding="utf-8"))
+    pm={m["id"]:m for m in pi["providers"]["9router"]["models"]}
+    assert pm["free"]["contextWindow"]==262144
+    assert "oc/grok-4.6" not in pm
+
 
 def test_no_unnecessary_writes(monkeypatch):
     from playbooks_9router_scripts_9router_sync import sync_providers

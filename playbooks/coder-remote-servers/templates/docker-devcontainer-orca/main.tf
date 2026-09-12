@@ -263,6 +263,40 @@ resource "coder_agent" "main" {
     # Add any commands that should be executed at workspace startup
     # (e.g. install requirements, start a program, etc) here.
 
+    # ORCA experiment: self-heal the Orca server after rebuild/reboot.
+    # Rebuild wipes /opt (system layer); $HOME persists. Reinstall the .deb
+    # when orca-ide is missing, then (re)start serve via nohup (no systemd
+    # in containers). Pairing address = host tailnet IP + published ext
+    # port; internal bind stays 6768. Idempotent: skips a live listener.
+    # NOTE: the advertised host IP is baked at template push time via
+    # var.orca_publish_ip (same var as the docker publish). If the host
+    # tailnet IP changes, push the template with the new IP and restart.
+    %{ if var.orca_publish_ip != "" }
+    (
+      export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+      if ! command -v orca-ide >/dev/null 2>&1; then
+        echo "Orca missing after rebuild — reinstalling..."
+        ORCA_VER=$(curl -fsSL https://api.github.com/repos/stablyai/orca/releases/latest | grep -m1 '"tag_name"' | cut -d'"' -f4 | tr -d v) || ORCA_VER="1.4.200"
+        cd /tmp && curl -fsSLO "https://github.com/stablyai/orca/releases/download/v$${ORCA_VER}/orca-ide_$${ORCA_VER}_amd64.deb" \
+          && sudo dpkg -i "orca-ide_$${ORCA_VER}_amd64.deb" \
+          && sudo apt-get install -f -y \
+          && sudo apt-get install -y libasound2t64 libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxrandr2 libgbm1 libgtk-3-0 libnotify4 libxss1 libxtst6 xdg-utils libatspi2.0-0 libsecret-1-0 \
+          && echo "Orca reinstalled: $(orca-ide --version 2>/dev/null)" \
+          || echo "WARNING: Orca reinstall failed — start orca-ide serve manually"
+      fi
+      if command -v orca-ide >/dev/null 2>&1; then
+        if (ss -tln 2>/dev/null || netstat -tln 2>/dev/null) | grep -q ':6768 '; then
+          echo "Orca serve already listening on 6768 — leaving it alone"
+        else
+          echo "Starting orca-ide serve (advertise ${var.orca_publish_ip}:${data.coder_parameter.orca_port.value})..."
+          setsid nohup orca-ide serve --port 6768 --pairing-address ${var.orca_publish_ip}:${data.coder_parameter.orca_port.value} > "$HOME/.orca-serve.out" 2>&1 < /dev/null &
+          sleep 12
+          grep -a -E "Bound endpoint|Advertised endpoint" "$HOME/.orca-serve.out" | head -4 || echo "WARNING: serve log has no endpoints yet — check ~/.orca-serve.out"
+        fi
+      fi
+    )
+    %{ endif }
+
     # ORCA experiment: `preview` shell helper — print this workspace's Coder
     # preview URL for a local port (usage: preview 5173). Compensates for
     # Orca terminal links opening client-localhost: Orca does not honour

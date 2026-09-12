@@ -111,6 +111,10 @@ cli:
   enabled: true
   output_dir: "generated"        # relative to config dir, or absolute
   active_model: "free"           # default model for generated configs
+  # Combo context window advertised to clients (opencode limit.context).
+  # 9Router combos carry no context_length of their own, so clients fall back
+  # to 128k without this. Live per-model context_length always wins.
+  max_tokens: 262144             # default 256k; raise to 1048576 if all combo members allow it
   # Which writers to run (subset of opencode/hermes/codex/claude/generic)
   writers: ["opencode","hermes","codex","claude","generic"]
 
