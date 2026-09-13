@@ -790,12 +790,17 @@ def sync_combos(session, url: str, desired_combos: Dict[str, List[str]], dry_run
             if verbose: print(f"    POST combo {name} {len(desired_models)} models -> {code} {str(body)[:300]}")
     return True
 
+def active_first(models, active_model):
+    # pi-style agents treat list position as default: active model goes first.
+    ms = [m for m in models if m.get("id")]
+    return sorted(ms, key=lambda m: 0 if m.get("id") == active_model else 1)
+
 def write_opencode(models, base_url, api_key, out_dir, active_model, max_tokens=262144):
     # api_key is ignored — never hardcode, reference env var only (per user request)
     # max_tokens: limit.context for combos (no context_length of their own); default 256k.
     # ponytail: ceiling is fixed default; live per-combo min(context_length) needs a combo-members lookup
     provider_models = {}
-    for m in models:
+    for m in active_first(models, active_model):
         mid = m.get("id")
         if not mid:
             continue
@@ -827,7 +832,7 @@ def write_hermes(models, base_url, api_key, out_dir, active_model, max_tokens=26
     base_url_v1 = base_url.rstrip("/") + "/v1"
     # Build providers block with all models for Desktop picker
     models_yaml = ""
-    for m in models:
+    for m in active_first(models, active_model):
         mid = m.get("id")
         if not mid:
             continue
@@ -890,11 +895,14 @@ def write_pi(models, base_url, api_key, out_dir, active_model, max_tokens=262144
     # Only combos need contextWindow (pi defaults to 128k without it); live models
     # already advertise context_length via /v1/models which pi resolves itself.
     # ponytail: full 113-model emit needs live context_length plumbing; combos-only is the fix
-    combos = [m for m in models if m.get("owned_by") == "combo" and m.get("id")]
-    snippet = {"providers": {"9router": {"models": [
-        {"id": m["id"], "name": m["id"], "input": ["text", "image"],
-         "contextWindow": m.get("context_length") or max_tokens}
-        for m in combos]}}}
+    combos = [m for m in active_first(models, active_model) if m.get("owned_by") == "combo" and m.get("id")]
+    base_url_v1 = base_url.rstrip("/") + "/v1"
+    snippet = {"providers": {"9router": {
+        "baseUrl": base_url_v1, "api": "openai-completions", "apiKey": "$NINEROUTER_KEY",
+        "models": [
+            {"id": m["id"], "name": m["id"], "input": ["text", "image"],
+             "contextWindow": m.get("context_length") or max_tokens}
+            for m in combos]}}}
     (out_dir / "pi-models-snippet.json").write_text(json.dumps(snippet, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"pi: {out_dir/'pi-models-snippet.json'} ({len(combos)} combos, contextWindow {max_tokens}) — merge into ~/.pi/agent/models.json")
 

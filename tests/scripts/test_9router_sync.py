@@ -183,6 +183,22 @@ def test_combo_limit_context(tmp_path):
     assert pm["free"]["contextWindow"]==262144
     assert "oc/grok-4.6" not in pm
 
+def test_active_model_first(tmp_path):
+    import json
+    from playbooks_9router_scripts_9router_sync import write_cli_configs
+    models=[{"id":"a","owned_by":"oc"},{"id":"free","owned_by":"combo"},{"id":"coding-manual","owned_by":"combo"}]
+    out=tmp_path / "generated"
+    write_cli_configs(models, "https://router.example.com", out, "coding-manual")
+    cfg=json.loads((out / "opencode.json").read_text(encoding="utf-8"))
+    assert list(cfg["provider"]["9router"]["models"].keys())[0]=="coding-manual"
+    pi=json.loads((out / "pi-models-snippet.json").read_text(encoding="utf-8"))
+    assert pi["providers"]["9router"]["baseUrl"]=="https://router.example.com/v1"
+    assert pi["providers"]["9router"]["api"]=="openai-completions"
+    assert pi["providers"]["9router"]["apiKey"]=="$NINEROUTER_KEY"
+    assert [m["id"] for m in pi["providers"]["9router"]["models"]][0]=="coding-manual"
+    first_hermes=[l.strip() for l in (out / "hermes-config.yaml").read_text(encoding="utf-8").splitlines() if l.startswith("      ") and l.strip().endswith(":")][0]
+    assert first_hermes=="coding-manual:"
+
 
 def test_no_unnecessary_writes(monkeypatch):
     from playbooks_9router_scripts_9router_sync import sync_providers
