@@ -797,7 +797,7 @@ def active_first(models, active_model):
 
 def write_opencode(models, base_url, api_key, out_dir, active_model, max_tokens=262144):
     # api_key is ignored — never hardcode, reference env var only (per user request)
-    # max_tokens: limit.context for combos (no context_length of their own); default 256k.
+    # max_tokens: limit.context for combos (no context_length of their own); default 256k. Output cap 16384 applies to every entry.
     # ponytail: ceiling is fixed default; live per-combo min(context_length) needs a combo-members lookup
     provider_models = {}
     for m in active_first(models, active_model):
@@ -807,7 +807,7 @@ def write_opencode(models, base_url, api_key, out_dir, active_model, max_tokens=
         entry = {"name": mid, "modalities": {"input": ["text", "image"], "output": ["text"]}}
         limit_ctx = m.get("context_length") if m.get("owned_by") != "combo" else (m.get("context_length") or max_tokens)
         if limit_ctx:
-            entry["limit"] = {"context": limit_ctx}
+            entry["limit"] = {"context": limit_ctx, "output": 16384}
         provider_models[mid] = entry
     config = {
         "$schema": "https://opencode.ai/config.json",
