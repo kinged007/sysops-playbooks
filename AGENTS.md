@@ -226,11 +226,18 @@ of `logs/` is sufficient to reconstruct full context.
 ## 7. Committing rules (repo is publishable)
 
 **Committed** (safe for a public repo): `README.md`, `AGENTS.md`,
-`playbooks/`, `docs/`, `.gitignore`, `.gitattributes` — placeholders only,
+`playbooks/`, `docs/`, `.gitignore`, `.gitattributes`, `pyproject.toml`,
+`.github/workflows/ci.yml` — placeholders only,
 zero real IPs/hostnames/usernames/domains/keys.
 
 **NEVER committed:** anything under `executions/`, `secrets/`, `servers/`
 (if they exist), any `*.pem`, `*.key`, `*.tfvars`, `.env` anywhere.
+
+**Branch and PR workflow:** never push code changes directly to `master`. Create a feature branch, push it, and open a pull request. CI must be green before merge.
+
+**How to run checks:** `pytest -q` (tests), `ruff check .` (lint), `mypy .` (types). See `pyproject.toml` for tool config. The `playbooks/` helpers are excluded from lint/type gates and tracked separately.
+
+Do not commit secrets (API keys, tokens, .env). Only .env.example belongs in the repo.
 
 Before every commit, run:
 ```powershell
@@ -247,8 +254,10 @@ rotate the credential if it was ever committed.
 
 | Path | Purpose | Committed? |
 |---|---|---|
-| `AGENTS.md` | This guide | ✅ |
-| `README.md` | Public overview | ✅ |
+| `AGENTS.md` | Agent guide: doctrine, lifecycle, checks, branch/PR, permission model | ✅ |
+| `README.md` | Public overview (what/screenshot/install/usage/tested + badges) | ✅ |
+| `pyproject.toml` | Pytest + ruff + mypy config | ✅ |
+| `.github/workflows/ci.yml` | CI: pytest + ruff + mypy on push/PR to master | ✅ |
 | `playbooks/_playbook-template/` | Skeleton for new playbooks | ✅ |
 | `playbooks/<name>/` | One folder per subject: README, playbook.md, plan/runbook templates, templates/, scripts/, notes/ | ✅ |
 | `executions/<playbook>/` | Persistent per-variant state: plan, runbook, inventory, notes, secrets, logs (append-only) | ❌ gitignored |

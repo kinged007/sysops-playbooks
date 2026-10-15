@@ -43,7 +43,7 @@ def test_find_configs_discovers_execution_variant():
 
 
 def test_load_inventory_and_map(tmp_path):
-    import json, pathlib
+    import json
     from playbooks_9router_scripts_9router_sync import load_inventory, map_provider
     inv_dir = tmp_path / "model-inventory"
     inv_dir.mkdir()
