@@ -1,0 +1,37 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SesSendAndVerify",
+      "Effect": "Allow",
+      "Action": [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+        "ses:VerifyDomainIdentity",
+        "ses:VerifyEmailIdentity",
+        "ses:GetAccount",
+        "ses:GetSendQuota",
+        "ses:GetSendStatistics",
+        "ses:ListIdentities",
+        "ses:GetIdentityVerificationAttributes",
+        "ses:GetIdentityDkimAttributes",
+        "ses:GetIdentityNotificationAttributes",
+        "ses:SetIdentityNotificationTopic",
+        "ses:SetIdentityFeedbackForwardingEnabled"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IdentityAndStsReads",
+      "Effect": "Allow",
+      "Action": [
+        "iam:ListUsers",
+        "iam:ListAttachedUserPolicies",
+        "iam:GetUser",
+        "iam:GetUserPolicy",
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
