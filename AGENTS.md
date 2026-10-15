@@ -237,7 +237,7 @@ zero real IPs/hostnames/usernames/domains/keys.
 
 **How to run checks:** `pytest -q` (tests), `ruff check .` (lint), `mypy .` (types). See `pyproject.toml` for tool config. The `playbooks/` helpers are excluded from lint/type gates and tracked separately.
 
-Do not publish anything derived from private `tenantflex` org repos without written approval from the org owner.
+Do not commit secrets (API keys, tokens, .env). Only .env.example belongs in the repo.
 
 Before every commit, run:
 ```powershell

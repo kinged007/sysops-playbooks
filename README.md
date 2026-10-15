@@ -8,8 +8,6 @@ Reusable SysOps runbooks executed by agents under a strict read-only-by-default 
 
 > Agent-operated runbooks for repeatable server work — fleet setup, migrations, service configuration, and hardening — with a safety doctrine that keeps production read-only until the operator explicitly allows writes. See `AGENTS.md` §1 for the full permission model.
 
-![Demo](./docs/screenshot.png)
-*Screenshot to be added — shows an agent discovering a playbook's execution folder and executing steps under the permission model.*
 
 ## What it is
 
