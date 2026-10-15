@@ -1,0 +1,25 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["playbooks", ".commandcode"]
+
+[tool.ruff.lint]
+select = ["E", "F"]
+ignore = ["E741"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/scripts/test_9router_sync.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_return_any = false
+warn_unused_ignores = false
+disallow_untyped_defs = false
+check_untyped_defs = false
+exclude = "playbooks"
+
