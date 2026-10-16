@@ -89,6 +89,7 @@ ARNs, profile names) live only in the execution's `inventory.md` and
 | `templates/aws-config.example.ini` | Example `~/.aws/config` with SSO and static profiles |
 | `templates/aws-credentials.example.ini` | Example `~/.aws/credentials` (placeholder values only) |
 | `templates/ssm-automation.example.yaml` | Minimal SSM Automation document skeleton |
+| `templates/ses-send-only.json` | Send-only IAM policy: `ses:SendEmail` + `ses:SendRawEmail` for `my-tech.uk` (eu-west-1) — no other permissions |
 | `scripts/install-aws-cli.sh` | Install/upgrade AWS CLI v2 (Linux/macOS) |
 | `scripts/aws-doctor.sh` | Read-only diagnostics: CLI, auth, region, permissions |
 | `notes/playbook-concept.md` | Summary of the Well-Architected Playbook concept |

@@ -340,6 +340,16 @@ and hook it to an event rather than running the CLI by hand.
       `aws events delete-rule --name <RULE_NAME>` /
       `aws ssm delete-document --name <DOC_NAME>`.
 
+## 5a. SES domain verification (when SES is the task)
+
+General task §4 covers SES via this pre-baked sub-flow (placeholders only).
+
+- [ ] Reads: `aws ses list-identities --region <AWS_REGION> --profile <PROFILE>`, `aws sesv2 get-account --region <AWS_REGION> --profile <PROFILE>`, `aws ses get-identity-verification-attributes --identities <DOMAIN> --region <AWS_REGION> --profile <PROFILE>` — confirm whether domain already exists and its `VerificationStatus` / `DkimVerificationStatus`.
+- [ ] **WRITE** `aws ses verify-domain-identity --domain <DOMAIN> --region <AWS_REGION> --profile <PROFILE>` → capture `VerificationToken`; then `aws ses verify-domain-dkim --domain <DOMAIN> --region <AWS_REGION> --profile <PROFILE>` → capture `DkimTokens[3]` (IAM needs `ses:VerifyDomainDkim`, not `sesv2:*` — see notes/gotchas.md G1). Rollback: `aws ses delete-identity --identity <DOMAIN> --region <AWS_REGION> --profile <PROFILE>`.
+- [ ] **WRITE** DNS (Cloudflare or Route53): upsert `TXT _amazonses.<DOMAIN>` = verification token + 3× `CNAME <token>._domainkey.<DOMAIN> → <token>.dkim.amazonses.com` (ttl 300, proxied false). Check existing mail-provider keys first — SES tokens are random, separate labels, so no clash with e.g. migadu `key1/2/3` (see G3). Rollback: `DELETE` each record.
+- [ ] **WRITE** SPF merge (only if SPF exists without `include:amazonses.com`): `v=spf1 ... include:amazonses.com -all` — preserve existing includes (G3). Rollback: restore prior SPF value (record in runbook). Keep hosted verification TXT untouched.
+- [ ] Poll (reads): DoH `https://cloudflare-dns.com/dns-query?name=<record>&type=16` / `type=5` plus `aws ses get-identity-verification-attributes` / `get-identity-dkim-attributes` / `sesv2 get-email-identity` until `Success` / `SUCCESS` (see G5). Then test `aws ses send-email --from noreply@<DOMAIN> --to <RECIPIENT> ... --region <AWS_REGION> --profile <PROFILE>` — with CLI v2.38 use `--from/--to/--subject/--text` (G4).
+
 ## 6. Verification
 
 - [ ] CLI: `aws --version` + `aws sts get-caller-identity --profile <PROFILE>` → expected identity
