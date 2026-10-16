@@ -8,7 +8,6 @@ Reusable SysOps runbooks executed by agents under a strict read-only-by-default 
 
 > Agent-operated runbooks for repeatable server work — fleet setup, migrations, service configuration, and hardening — with a safety doctrine that keeps production read-only until the operator explicitly allows writes. See `AGENTS.md` §1 for the full permission model.
 
-
 ## What it is
 
 This repo stores **procedures, not state**. Each playbook is one subject — e.g. `coder-remote-servers`, `netdata-monitoring`, `9router` — as a canonical, copy-paste executable procedure with placeholder values only, plus templates, scripts, and lessons learned. Nothing committed contains real IPs, hostnames, or credentials. Real values live in a **persistent, gitignored execution folder** (`executions/<playbook>[-<suffix>]/`) that survives across sessions so the agent reuses secrets and history.
