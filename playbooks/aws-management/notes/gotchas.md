@@ -86,3 +86,14 @@ the replacement in notes; keep `inventory.md`'s Domain field current.
 management. Applications that only *send* should use a different IAM user
 (e.g. `ses-sender`) with only `ses:SendEmail` / `ses:SendRawEmail` scoped to
 the domain resource — never reuse the management keys.
+
+## G11 — Custom MAIL FROM (bounce.my-tech.uk) needs two DNS + one SES call
+
+SPF alignment strict requires `bounce.my-tech.uk` MX →
+`feedback-smtp.eu-west-1.amazonses.com` + TXT
+`v=spf1 include:amazonses.com -all`, then
+`aws ses set-identity-mail-from-domain --identity <DOMAIN>
+ --mail-from-domain bounce.<DOMAIN>` (needs
+`ses:SetIdentityMailFromDomain`). Without it envelope is
+`@amazonses.com` and DMARC alignment stays relaxed. DNS shows via CF
+`GET` immediately but DoH `Status 3` for a minute due to negative cache.
