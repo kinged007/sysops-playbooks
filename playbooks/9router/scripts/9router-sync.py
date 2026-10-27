@@ -797,8 +797,7 @@ def active_first(models, active_model):
 
 def write_opencode(models, base_url, api_key, out_dir, active_model, max_tokens=262144):
     # api_key is ignored — never hardcode, reference env var only (per user request)
-    # max_tokens: limit.context for combos (no context_length of their own); default 256k. Output cap 16384 applies to every entry.
-    # ponytail: ceiling is fixed default; live per-combo min(context_length) needs a combo-members lookup
+    # max_tokens: hard cap for limit.context on every entry (default 256k); live context_length wins only when <= cap. Output cap 16384 applies to every entry.
     provider_models = {}
     for m in active_first(models, active_model):
         mid = m.get("id")
@@ -807,7 +806,7 @@ def write_opencode(models, base_url, api_key, out_dir, active_model, max_tokens=
         entry = {"name": mid, "modalities": {"input": ["text", "image"], "output": ["text"]}}
         limit_ctx = m.get("context_length") if m.get("owned_by") != "combo" else (m.get("context_length") or max_tokens)
         if limit_ctx:
-            entry["limit"] = {"context": limit_ctx, "output": 16384}
+            entry["limit"] = {"context": min(limit_ctx, max_tokens), "output": 16384}
         provider_models[mid] = entry
     config = {
         "$schema": "https://opencode.ai/config.json",
@@ -836,11 +835,11 @@ def write_hermes(models, base_url, api_key, out_dir, active_model, max_tokens=26
         mid = m.get("id")
         if not mid:
             continue
-        # per-model context_length if available, else max_tokens fallback for combos
+        # per-model context_length capped at max_tokens; combos fall back to max_tokens
         ctx = m.get("context_length") or (max_tokens if m.get("owned_by") == "combo" else None)
         models_yaml += f"      {mid}:\n        display_name: {mid}\n"
         if ctx:
-            models_yaml += f"        context_length: {ctx}\n"
+            models_yaml += f"        context_length: {min(ctx, max_tokens)}\n"
     yaml_block = f"""model:
   default: "{active_model}"
   provider: "custom"
@@ -901,7 +900,7 @@ def write_pi(models, base_url, api_key, out_dir, active_model, max_tokens=262144
         "baseUrl": base_url_v1, "api": "openai-completions", "apiKey": "$NINEROUTER_KEY",
         "models": [
             {"id": m["id"], "name": m["id"], "input": ["text", "image"],
-             "contextWindow": m.get("context_length") or max_tokens}
+             "contextWindow": min(m.get("context_length") or max_tokens, max_tokens)}
             for m in combos]}}}
     (out_dir / "pi-models-snippet.json").write_text(json.dumps(snippet, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"pi: {out_dir/'pi-models-snippet.json'} ({len(combos)} combos, contextWindow {max_tokens}) — merge into ~/.pi/agent/models.json")
