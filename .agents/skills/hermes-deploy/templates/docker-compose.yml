@@ -1,0 +1,107 @@
+# Standard Hermes deployment — Dokploy Compose template
+# Services: hermes agent (+ built-in dashboard). Optional: term (web shell).
+# No FileBrowser — the Hermes dashboard is the file explorer.
+#
+# HOW TO USE
+# 1. Fill every ${VAR} from the run's .env (see templates/.env.example).
+#    Never commit real values.
+# 2. Domains are added in the Dokploy UI/API (Domains tab), NOT as labels here.
+#    Keep `expose:` (not `ports:`) so Traefik routes to the containers.
+# 3. Persistence uses Dokploy relative binds (`../files/...`), which survive
+#    redeploys. NEVER use absolute host paths (e.g. /home/user:/data) — Dokploy
+#    cleans them on redeploy.
+# 4. Validate before pushing: `docker compose config` AND strict YAML parse
+#    (`python3 -c "import yaml; yaml.safe_load(...)"`) — compose tolerates
+#    duplicate keys (last-wins), Dokploy fails the deploy.
+#
+# SHARED LAYOUT (all services see the same files):
+#   <appdir>/files/hermes-data/          <- host dir (XFS image mounted here if quota used)
+#     .hermes/                           <- agent home, mounted as /opt/data in hermes
+#     .termrc  .hushlogin  .bash_history <- terminal workspace files (only if term enabled)
+#     <colleague files>                  <- uncluttered shared root
+#
+# DISK QUOTA — three options, pick ONE per run (host ext4 + overlay2/extfs
+# silently ignores `docker --storage-opt size=`; that flag only works on XFS+pquota):
+#   A. XFS loop image (hard cap, recommended): create once per app (see skill
+#      procedure), mount onto <appdir>/files/hermes-data with pquota, persist
+#      in /etc/fstab. Writes past the cap get ENOSPC. Works on ext4 hosts
+#      because the loop image carries its own XFS.
+#   B. Plain Dokploy named volume (no hard cap): replace the ../files binds
+#      with `hermes-data:/opt/data`-style named volumes. Rely on monitoring.
+#   C. Skip limits: same binds as below, no image. Document that choice.
+
+services:
+#  term:  # OFF BY DEFAULT. To enable: uncomment this block, build the local
+#         # terminal image (see skill procedure), set TTYD_* creds, recreate the
+#         # terminal domain (port 7681) + DNS if removed, then redeploy.
+#    # Local derived image: stock ttyd + nano + vim. Build on the target host
+#    # (Dockerfile in skill references), NEVER pull editors at runtime.
+#    # pull_policy never = always use the local build, never touch Docker Hub.
+#    image: local/hermes-term:1
+#    pull_policy: never
+#    restart: unless-stopped
+#    # Same place Hermes lives: /opt/data here IS the agent's $HOME (same bind).
+#    # ttyd 1.7.x flags: -w = working dir, -W = allow writing (readonly default),
+#    # -c = basic auth (MANDATORY — never run without it), -m 2 = max clients.
+#    command: ["ttyd", "-p", "7681", "-w", "/opt/data", "-W", "-m", "2", "-c", "${TTYD_USER}:${TTYD_PASS}", "bash", "--rcfile", "/opt/data/.termrc"]
+#    expose:
+#      - "7681"
+#    volumes:
+#      - ../files/hermes-data:/opt/data
+#    working_dir: /opt/data
+#    # No env_file: TTYD creds come from command interpolation only, so agent
+#    # secrets are not leaked into this container.
+#    mem_limit: 128m
+#    cpus: 0.25
+#    pids_limit: 64
+#    cap_drop:
+#      - ALL
+#    cap_add:
+#      - CHOWN
+#      - SETGID
+#      - SETUID
+#      - DAC_OVERRIDE
+#    security_opt:
+#      - no-new-privileges:true
+#    # Same uid/gid as the hermes agent (10000:10000): the shared volume is
+#    # hermes-owned, so the shell must run as the same uid to read AND write
+#    # agent files. No passwd entry exists for it — set a static prompt + HOME.
+#    user: "10000:10000"
+#    environment:
+#      - HOME=/opt/data
+#    networks:
+#      - internal
+#    # No healthcheck: the ttyd image has no curl/wget; Dokploy log monitoring
+#    # covers liveness. Add one only if the image has a probe.
+
+  hermes:
+    # Official image, entrypoint UNMODIFIED (s6-overlay needs PID 1; overriding
+    # entrypoint breaks supervision and volume-ownership repair).
+    image: ${HERMES_IMAGE:-nousresearch/hermes-agent:stable}
+    command: ["gateway", "run"]
+    restart: unless-stopped
+    volumes:
+      - ../files/hermes-data/.hermes:/opt/data
+    working_dir: /opt/data
+    # Bootstrap env only — process env wins over /opt/data/.env by design.
+    # Dashboard creds live HERE (Dokploy env). Agent secrets (provider keys,
+    # bot tokens) live in /opt/data/.env, managed via terminal or dashboard.
+    environment:
+      - HERMES_DASHBOARD=${HERMES_DASHBOARD:-}
+      - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_DASHBOARD_BASIC_AUTH_USERNAME:-}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD:-}
+      - HERMES_DASHBOARD_BASIC_AUTH_SECRET=${HERMES_DASHBOARD_BASIC_AUTH_SECRET:-}
+    # No ports published: gateway API (8642) and dashboard (9119) stay
+    # container-local; Traefik reaches them via Dokploy domains. Never run two
+    # gateways against the same data dir.
+    # No user/cap overrides: the entrypoint starts as root to fix volume
+    # ownership, then drops to the hermes user itself.
+    mem_limit: 2g
+    cpus: 1.5
+    pids_limit: 256
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
