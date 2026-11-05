@@ -11,7 +11,7 @@ pythonpath = ["."]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-exclude = ["playbooks", ".commandcode"]
+exclude = ["playbooks", ".agents", ".commandcode"]
 
 [tool.ruff.lint]
 select = ["E", "F"]
@@ -27,5 +27,5 @@ warn_return_any = false
 warn_unused_ignores = false
 disallow_untyped_defs = false
 check_untyped_defs = false
-exclude = "playbooks"
+exclude = "(playbooks|\\.agents)"
 

@@ -42,3 +42,6 @@ __pycache__/
 Thumbs.db
 .idea/
 .vscode/
+
+# uv (repo does not use uv)
+uv.lock

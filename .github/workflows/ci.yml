@@ -23,9 +23,9 @@ jobs:
       - name: Tests
         run: pytest -q
       - name: Lint (ruff)
-        run: ruff check .
+        run: ruff check . bin/ops
       - name: Type check (mypy)
-        run: mypy .
+        run: mypy . bin/ops
       - name: Leak scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
