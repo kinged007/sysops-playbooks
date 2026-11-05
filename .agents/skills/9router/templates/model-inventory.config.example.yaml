@@ -7,7 +7,7 @@
 #   4. runs/9router-<suffix>/model-inventory.config.yaml       (variant-specific)
 #   5. Any runs/*9router*/**/model-inventory*.yaml             (recursive glob — e.g. runs/9router/model-inventory/model-inventory.yaml)
 # Or set via CLI: python .agents/skills/9router/scripts/model-inventory.py --config /path/to/config.yaml
-# The committed template (playbooks/.../model-inventory.config.example.yaml) is read-only —
+# The committed template (.agents/skills/9router/templates/model-inventory.config.example.yaml) is read-only —
 # real customizations live in runs/ (gitignored) so they are not committed.
 #
 # All ${VAR} placeholders are expanded from environment at runtime.

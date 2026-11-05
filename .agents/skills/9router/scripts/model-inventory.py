@@ -1997,7 +1997,7 @@ def main() -> None:
     output_dir = pathlib.Path(cfg["general"]["output_dir"])
     # resolve relative against repo root if needed
     if not output_dir.is_absolute():
-        # try repo root discovery: look for playbooks folder
+        # try repo root discovery: look for the repo root
         cwd = pathlib.Path.cwd()
         repo_root = cwd
         # if cwd is inside repo, output_dir relative to repo root is fine
