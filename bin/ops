@@ -1,0 +1,531 @@
+#!/usr/bin/env python3
+"""ops: fleet admin CLI (init, inventory, ssh, exec, log, inbox, wake, incident, secret, doctor)."""
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+import re
+import shlex
+import shutil
+import signal
+import subprocess
+import sys
+from pathlib import Path
+
+import requests
+import yaml
+
+ROOT = Path(__file__).resolve().parent.parent
+FLEET_FILES = ["servers", "sites", "services", "providers", "notify"]
+SEVERITIES = ["info", "warn", "crit"]
+CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+LEAK = re.compile(
+    r"tskey-|BEGIN (?:[A-Z]+ )?PRIVATE KEY|BEGIN CERTIFICATE|AKIA[0-9A-Z]{16}|sk-ant-|ghp_"
+)
+PLACEHOLDER = re.compile(r"^(<.*>|CHANGE_?ME|TODO|)$", re.I)
+HOOKS_PATH_KEY = "core.hooksPath"
+
+DEFAULTS: dict[str, dict] = {
+    "wake": {
+        "agent_cmd": "claude",
+        "model": "claude-sonnet-5-5",
+        "flags": ["-p"],
+        "prompt": "Process incidents/inbox.md per AGENTS.md and report via notify target.",
+        "inbox": "incidents/inbox.md",
+        "lock": ".ops-wake.lock",
+        "state": ".ops-wake.state",
+        "path": "/usr/local/bin:/usr/bin:/bin",
+        "notify": "operator",
+    },
+    "inbox": {"sources": ["cron", "netdata", "uptime", "webhook", "operator"]},
+    "vault": {"rotation_days": 90},
+}
+
+
+def now() -> dt.datetime:
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
+
+
+def load_config() -> dict:
+    cfg = {k: dict(v) for k, v in DEFAULTS.items()}
+    path = ROOT / "ops.config.yaml"
+    if path.exists():
+        for key, val in (yaml.safe_load(path.read_text()) or {}).items():
+            cfg.setdefault(key, {}).update(val or {})
+    return cfg
+
+
+def load_fleet(name: str) -> list[dict]:
+    path = ROOT / "fleet" / f"{name}.yaml"
+    if not path.exists():
+        return []
+    data = yaml.safe_load(path.read_text()) or []
+    if not isinstance(data, list):
+        raise ValueError(f"{path.name}: expected a list of records")
+    return data
+
+
+def find_record(name: str, rec: str) -> dict:
+    for item in load_fleet(name):
+        if item.get("name") == rec:
+            return item
+    raise SystemExit(f"ops: no record '{rec}' in fleet/{name}.yaml")
+
+
+def parse_env_file(path: Path) -> dict[str, str]:
+    env = {}
+    for line in path.read_text().splitlines():
+        if "=" in line and not line.lstrip().startswith("#"):
+            key, value = line.split("=", 1)
+            env[key.strip()] = value.strip().strip("\"'")
+    return env
+
+
+# shortcut: vault is plaintext 0600 files; upgrade is sops + age with the key outside the workspace.
+def vault_value(name: str) -> str:
+    path = ROOT / "vault" / f"{name}.env"
+    if not path.exists():
+        raise SystemExit(f"ops: no vault entry '{name}'")
+    values = list(parse_env_file(path).values())
+    if not values:
+        raise SystemExit(f"ops: vault entry '{name}' has no value")
+    return values[0]
+
+
+def vault_values() -> list[str]:
+    values: list[str] = []
+    for path in sorted((ROOT / "vault").glob("*.env")):
+        values += [v for v in parse_env_file(path).values() if len(v) >= 4]
+    return values
+
+
+def redact(text: str) -> str:
+    for value in sorted(vault_values(), key=len, reverse=True):
+        text = text.replace(value, "[REDACTED]")
+    return text
+
+
+def audit(action: str, target: str = "", via: str = "", cmd: str = "", result: str = "ok",
+          ref: str = "") -> None:
+    entry = {
+        "ts": now().isoformat(),
+        "actor": os.environ.get("USER") or os.environ.get("LOGNAME") or "unknown",
+        "action": action,
+        "target": target,
+        "via": via,
+        "cmd": redact(cmd),
+        "result": result,
+        "ref": ref,
+    }
+    path = ROOT / "logs" / "audit" / f"{now():%Y-%m}.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a") as fh:
+        fh.write(json.dumps(entry) + "\n")
+
+
+def perm_problems() -> list[str]:
+    vault = ROOT / "vault"
+    if not vault.exists():
+        return []
+    problems = []
+    for path in [vault, *vault.rglob("*")]:
+        if path.is_symlink():
+            continue
+        if path.stat().st_mode & 0o077:
+            problems.append(f"{path.relative_to(ROOT)}: group/world accessible")
+    return problems
+
+
+def pending_lines(inbox: Path) -> list[str]:
+    if not inbox.exists():
+        return []
+    lines = [ln.strip() for ln in inbox.read_text().splitlines()]
+    return [ln for ln in lines if ln and not ln.startswith("#")]
+
+
+def pending_hash(lines: list[str]) -> str:
+    return hashlib.sha256("\n".join(lines).encode()).hexdigest()
+
+
+def cmd_init(args) -> int:
+    (ROOT / "fleet").mkdir(exist_ok=True)
+    for name in FLEET_FILES:
+        real = ROOT / "fleet" / f"{name}.yaml"
+        example = ROOT / "fleet" / f"{name}.example.yaml"
+        if not real.exists() and example.exists():
+            shutil.copyfile(example, real)
+            print(f"created {real.relative_to(ROOT)}")
+    config = ROOT / "ops.config.yaml"
+    config_example = ROOT / "ops.config.example.yaml"
+    if not config.exists() and config_example.exists():
+        shutil.copyfile(config_example, config)
+        print("created ops.config.yaml")
+    vault = ROOT / "vault"
+    if not vault.exists():
+        vault.mkdir(mode=0o700)
+        vault.chmod(0o700)
+    index = vault / "index.yaml"
+    if not index.exists():
+        index.write_text("# names only, never values\n[]\n")
+        index.chmod(0o600)
+    inbox = ROOT / load_config()["wake"]["inbox"]
+    inbox.parent.mkdir(exist_ok=True)
+    if not inbox.exists():
+        inbox.touch()
+    (ROOT / "logs" / "audit").mkdir(parents=True, exist_ok=True)
+    (ROOT / "runs").mkdir(exist_ok=True)
+    hooks = subprocess.run(["git", "config", HOOKS_PATH_KEY, ".githooks"], cwd=ROOT,
+                           capture_output=True, text=True)
+    if hooks.returncode != 0:
+        print(f"warning: could not set git hooks path: {hooks.stderr.strip()}")
+    for problem in perm_problems():
+        print(f"warning: {problem}")
+    audit("init")
+    print("next: fill fleet/*.yaml and ops.config.yaml with real values, then run `ops doctor`")
+    return 0
+
+
+def cmd_inventory(args) -> int:
+    if args.stale:
+        return print_stale()
+    for name in FLEET_FILES:
+        records = load_fleet(name)
+        print(f"== {name} ({len(records)})")
+        for rec in records:
+            fields = [f"{k}={v}" for k, v in rec.items()
+                      if k != "name" and not isinstance(v, (list, dict))]
+            print(f"  {rec.get('name', '?'):<24} {' '.join(fields)}")
+    return 0
+
+
+def print_stale() -> int:
+    index = ROOT / "vault" / "index.yaml"
+    entries = (yaml.safe_load(index.read_text()) or []) if index.exists() else []
+    window = int(load_config()["vault"]["rotation_days"])
+    today = now().date()
+    stale = 0
+    for entry in entries:
+        rotated = entry.get("last_rotated")
+        expires = entry.get("expires")
+        reason = ""
+        if not rotated:
+            reason = "never rotated"
+        elif (today - dt.date.fromisoformat(str(rotated))).days > window:
+            reason = f"rotated {rotated}, window {window}d"
+        if expires and dt.date.fromisoformat(str(expires)) < today:
+            reason = f"expired {expires}"
+        if reason:
+            stale += 1
+            print(f"{entry.get('name')}: {reason}")
+    print(f"{stale} stale")
+    return 0
+
+
+def connect_argv(server: dict, via: str | None, extra: list[str]) -> tuple[str, list[str]]:
+    blocks = server.get("connect") or []
+    block = next((b for b in blocks if via is None or b.get("via") == via), None)
+    if block is None:
+        raise SystemExit(f"ops: server '{server['name']}' has no connect block for via={via}")
+    kind = block["via"]
+    if kind == "ssh":
+        argv = ["ssh", "-i", str(ROOT / block["key"]), "-l", block["user"], block["host"]]
+    elif kind == "coder":
+        argv = ["coder", "ssh", block["workspace"]]
+    elif kind == "docker-context":
+        argv = ["docker", "--context", block["context"]]
+    else:
+        raise SystemExit(f"ops: server '{server['name']}': unsupported via '{kind}'")
+    return kind, argv + extra
+
+
+def cmd_ssh(args) -> int:
+    server = find_record("servers", args.server)
+    via, argv = connect_argv(server, args.via, args.cmd)
+    audit("ssh", target=args.server, via=via, cmd=" ".join(args.cmd) or "interactive session")
+    return subprocess.run(argv).returncode
+
+
+def cmd_exec(args) -> int:
+    service = find_record("services", args.service)
+    env = dict(os.environ)
+    for entry in service.get("vault") or []:
+        env.update(parse_env_file(ROOT / "vault" / f"{entry}.env"))
+    proc = subprocess.run(shlex.split(args.cmd), cwd=ROOT, env=env, capture_output=True, text=True)
+    sys.stdout.write(redact(proc.stdout))
+    sys.stderr.write(redact(proc.stderr))
+    audit("exec", target=args.service, cmd=args.cmd,
+          result="ok" if proc.returncode == 0 else "fail")
+    return proc.returncode
+
+
+def cmd_log(args) -> int:
+    audit(args.action, target=args.target, result=args.result)
+    return 0
+
+
+def format_inbox_line(source: str, severity: str, summary: str, sources: list[str]) -> str:
+    if source not in sources:
+        raise ValueError(f"source must be one of {', '.join(sources)}")
+    if severity not in SEVERITIES:
+        raise ValueError(f"severity must be one of {', '.join(SEVERITIES)}")
+    summary = CONTROL.sub(" ", summary).strip()[:200]
+    if not summary:
+        raise ValueError("summary is empty")
+    return f"{now().isoformat()} | {source} | {severity} | {summary}"
+
+
+def cmd_inbox_add(args) -> int:
+    cfg = load_config()
+    try:
+        line = format_inbox_line(args.source, args.severity, args.summary, cfg["inbox"]["sources"])
+    except ValueError as exc:
+        print(f"ops: {exc}", file=sys.stderr)
+        return 2
+    inbox = ROOT / cfg["wake"]["inbox"]
+    inbox.parent.mkdir(exist_ok=True)
+    with inbox.open("a") as fh:
+        fh.write(line + "\n")
+    audit("inbox add", target=args.source, cmd=line)
+    return 0
+
+
+def notify_telegram(name: str, text: str) -> None:
+    record = find_record("notify", name)
+    token = vault_value(record["token"])
+    resp = requests.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                         json={"chat_id": record["chat_id"], "text": text}, timeout=15)
+    resp.raise_for_status()
+
+
+def pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def acquire_lock(lock: Path) -> bool:
+    if lock.exists():
+        try:
+            if pid_alive(int(lock.read_text().strip())):
+                return False
+        except ValueError:
+            pass
+        lock.unlink(missing_ok=True)
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "w") as fh:
+        fh.write(str(os.getpid()))
+    return True
+
+
+def cmd_wake(args) -> int:
+    wake = load_config()["wake"]
+    inbox = ROOT / wake["inbox"]
+    lock = ROOT / wake["lock"]
+    state = ROOT / wake["state"]
+    pending = pending_lines(inbox)
+    if not pending:
+        return 0
+    if not acquire_lock(lock):
+        return 0
+    try:
+        signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+        if not args.force and state.exists() and state.read_text().strip() == pending_hash(pending):
+            return 0
+        argv = [wake["agent_cmd"]]
+        if wake.get("model"):
+            argv += ["--model", wake["model"]]
+        argv += [*wake["flags"], wake["prompt"]]
+        audit("wake start", target=str(len(pending)), cmd=" ".join(argv))
+        env = dict(os.environ, PATH=wake["path"])
+        rc = 1
+        try:
+            rc = subprocess.run(argv, cwd=ROOT, env=env).returncode
+        finally:
+            remaining = pending_lines(inbox)
+            state.write_text(pending_hash(remaining))
+            audit("wake end", target=str(len(remaining)), result="ok" if rc == 0 else f"exit {rc}")
+        if remaining:
+            try:
+                notify_telegram(wake["notify"],
+                                f"ops wake: {len(remaining)} inbox line(s) still pending, "
+                                f"agent exit status {rc}")
+            except Exception as exc:
+                print(f"ops: notification failed: {type(exc).__name__}", file=sys.stderr)
+        return rc
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:50] or "incident"
+
+
+def cmd_incident_new(args) -> int:
+    inbox = ROOT / load_config()["wake"]["inbox"]
+    source_line = ""
+    if args.from_inbox:
+        lines = inbox.read_text().splitlines() if inbox.exists() else []
+        matches = [ln for ln in lines if ln.strip() == args.from_inbox.strip()]
+        if not matches:
+            print("ops: inbox line not found", file=sys.stderr)
+            return 2
+        source_line = matches[0]
+        lines.remove(source_line)
+        inbox.write_text("".join(ln + "\n" for ln in lines))
+    folder = ROOT / "incidents" / f"{now():%Y-%m-%d}-{slugify(args.title)}"
+    folder.mkdir(parents=True, exist_ok=True)
+    templates = {
+        "issue.md": f"# {args.title}\n\nSource: {source_line or 'operator'}\n\n"
+                    "## Symptom\n\n## Independent verification\n",
+        "plan.md": "# Plan\n\nWrite the plan before any write. Flag each production write WRITE.\n",
+        "actions.log": "",
+        "resolution.md": "# Resolution\n\n## Fix\n\n## Verification\n\n## Follow-ups\n\n"
+                         "What check would have caught this, and does it now run fleet-wide?\n",
+    }
+    for name, content in templates.items():
+        if not (folder / name).exists():
+            (folder / name).write_text(content)
+    audit("incident new", target=folder.name, ref=source_line)
+    print(folder.name)
+    return 0
+
+
+def cmd_incident_close(args) -> int:
+    found = [p for p in (ROOT / "incidents").glob(f"{args.id}*") if p.is_dir()]
+    if len(found) != 1:
+        print(f"ops: expected one incident matching '{args.id}', found {len(found)}",
+              file=sys.stderr)
+        return 2
+    with (found[0] / "actions.log").open("a") as fh:
+        fh.write(f"{now().isoformat()} closed\n")
+    audit("incident close", target=found[0].name)
+    return 0
+
+
+def cmd_secret_check(args) -> int:
+    problems = perm_problems()
+    scan = [ROOT / "vault" / "index.yaml", ROOT / "ops.config.example.yaml",
+            *(ROOT / "fleet").glob("*.example.yaml")]
+    for path in scan:
+        if path.exists() and LEAK.search(path.read_text()):
+            problems.append(f"{path.relative_to(ROOT)}: matches a leak pattern")
+    for path in sorted((ROOT / "vault").glob("*.env")):
+        for key, value in parse_env_file(path).items():
+            if PLACEHOLDER.match(value):
+                problems.append(f"{path.relative_to(ROOT)}: {key} is empty or a placeholder")
+    for problem in problems:
+        print(problem)
+    print(f"{len(problems)} problem(s)")
+    return 1 if problems else 0
+
+
+def cmd_secret_fingerprint(args) -> int:
+    value = vault_value(args.name)
+    print(f"sha256:{hashlib.sha256(value.encode()).hexdigest()[:12]} last4:{value[-4:]}")
+    audit("secret fingerprint", target=args.name)
+    return 0
+
+
+def cmd_doctor(args) -> int:
+    problems = perm_problems()
+    for name in FLEET_FILES:
+        try:
+            load_fleet(name)
+        except Exception as exc:
+            problems.append(f"fleet/{name}.yaml: {exc}")
+        if not (ROOT / "fleet" / f"{name}.yaml").exists():
+            problems.append(f"fleet/{name}.yaml: missing (run ops init)")
+    index = ROOT / "vault" / "index.yaml"
+    try:
+        entries = (yaml.safe_load(index.read_text()) or []) if index.exists() else []
+        indexed = {e["name"] for e in entries}
+        present = {p.stem for p in (ROOT / "vault").glob("*.env")}
+        problems += [f"vault: {n} indexed but no file" for n in sorted(indexed - present)]
+        problems += [f"vault: {n} has a file but no index entry" for n in sorted(present - indexed)]
+    except Exception as exc:
+        problems.append(f"vault/index.yaml: {exc}")
+    hooks = subprocess.run(["git", "config", HOOKS_PATH_KEY], cwd=ROOT,
+                           capture_output=True, text=True).stdout.strip()
+    if hooks != ".githooks":
+        problems.append("git hooks: hooks path is not .githooks (run ops init)")
+    elif not (ROOT / ".githooks" / "pre-commit").exists():
+        problems.append("git hooks: .githooks/pre-commit missing")
+    for problem in problems:
+        print(problem)
+    print("ok" if not problems else f"{len(problems)} problem(s)")
+    return 1 if problems else 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="ops")
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("init").set_defaults(func=cmd_init)
+    p = sub.add_parser("inventory")
+    p.add_argument("--stale", action="store_true")
+    p.set_defaults(func=cmd_inventory)
+    p = sub.add_parser("ssh")
+    p.add_argument("server")
+    p.add_argument("--via")
+    p.add_argument("cmd", nargs="*")
+    p.set_defaults(func=cmd_ssh)
+    p = sub.add_parser("exec")
+    p.add_argument("service")
+    p.add_argument("cmd")
+    p.set_defaults(func=cmd_exec)
+    p = sub.add_parser("log")
+    p.add_argument("action")
+    p.add_argument("--target", default="")
+    p.add_argument("--result", choices=["ok", "fail"], default="ok")
+    p.set_defaults(func=cmd_log)
+    inbox = sub.add_parser("inbox").add_subparsers(dest="sub", required=True)
+    p = inbox.add_parser("add")
+    p.add_argument("source")
+    p.add_argument("severity")
+    p.add_argument("summary")
+    p.set_defaults(func=cmd_inbox_add)
+    p = sub.add_parser("wake")
+    p.add_argument("--force", action="store_true")
+    p.set_defaults(func=cmd_wake)
+    inc = sub.add_parser("incident").add_subparsers(dest="sub", required=True)
+    p = inc.add_parser("new")
+    p.add_argument("title")
+    p.add_argument("--from-inbox")
+    p.set_defaults(func=cmd_incident_new)
+    p = inc.add_parser("close")
+    p.add_argument("id")
+    p.set_defaults(func=cmd_incident_close)
+    sec = sub.add_parser("secret").add_subparsers(dest="sub", required=True)
+    sec.add_parser("check").set_defaults(func=cmd_secret_check)
+    p = sec.add_parser("fingerprint")
+    p.add_argument("name")
+    p.set_defaults(func=cmd_secret_fingerprint)
+    sub.add_parser("doctor").set_defaults(func=cmd_doctor)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.command not in ("init", "doctor"):
+        problems = perm_problems()
+        if problems:
+            print("ops: refusing to run, fix permissions (chmod go-rwx):", file=sys.stderr)
+            for problem in problems:
+                print(f"  {problem}", file=sys.stderr)
+            return 1
+    try:
+        return args.func(args)
+    except ValueError as exc:
+        print(f"ops: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
