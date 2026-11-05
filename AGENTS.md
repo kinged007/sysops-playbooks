@@ -102,7 +102,8 @@ runs/                    planned-work state per variant (gitignored)
 incidents/               reactive work and the inbox (gitignored except README and example)
 logs/audit/              local audit trail, JSONL per month (gitignored)
 ops.config.yaml          wake and vault settings (gitignored); ops.config.example.yaml committed
-bin/ops                  the CLI
+ops.py                   the CLI module (`ops` command after `uv tool install --editable .`)
+bin/ops                  shim that runs ops.py without installing
 docs/                    specs and plans
 ```
 
@@ -228,14 +229,15 @@ Placeholders and synthetic values only.
 `vault/`, `incidents/*` (other than the two allowlisted files), `logs/`,
 `ops.config.yaml`, `*.pem`, `*.key`, `*.tfvars`, `.env`.
 
-Setup: run `bin/ops init` once per clone. It creates the gitignored files and
+Setup: run `uv tool install --editable .` from the repo root, then `ops init` once per
+clone (`bin/ops` works without the install). It creates the gitignored files and
 sets `git config core.hooksPath .githooks`.
 
 Before every commit:
 
 ```sh
 git status               # runs/, vault/, fleet/*.yaml must NOT appear
-bin/ops secret check     # vault permissions, leak patterns, placeholders
+ops secret check         # vault permissions, leak patterns, placeholders
 ```
 
 `.githooks/pre-commit` blocks staged private paths and secret patterns, and runs
@@ -248,8 +250,8 @@ ever committed.
 Create a feature branch, push it, and open a pull request. CI must be green
 before merge.
 
-**Checks:** `pytest -q` (tests), `ruff check . bin/ops` (lint),
-`mypy . bin/ops` (types). See `pyproject.toml` for tool config. Skill helper
+**Checks:** `pytest -q` (tests), `ruff check .` (lint),
+`mypy .` (types). See `pyproject.toml` for tool config. Skill helper
 scripts under `.agents/` are excluded from the lint and type gates.
 
 ## 8. File map
@@ -258,7 +260,7 @@ scripts under `.agents/` are excluded from the lint and type gates.
 |---|---|---|
 | `AGENTS.md` | Agent guide: doctrine, lanes, lookup, checks | yes |
 | `README.md` | Public overview | yes |
-| `bin/ops` | CLI | yes |
+| `ops.py`, `bin/ops` | CLI module and shim | yes |
 | `.agents/skills/<name>/` | Procedures with scripts, templates, references | yes |
 | `fleet/*.example.yaml` | Synthetic inventory examples | yes |
 | `fleet/*.yaml` | Real inventory | no |

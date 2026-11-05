@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """ops: fleet admin CLI (init, inventory, ssh, exec, log, inbox, wake, incident, secret, doctor)."""
 import argparse
 import datetime as dt
@@ -20,7 +19,9 @@ try:
 except ImportError as exc:
     sys.exit(f"ops: missing Python module '{exc.name}'; install with: pip install pyyaml requests")
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent
+if not (ROOT / "AGENTS.md").exists() and not (ROOT / ".agents").is_dir():
+    sys.exit("ops: ops must be installed editable: uv tool install --editable <repo>")
 FLEET_FILES = ["servers", "sites", "services", "providers", "notify"]
 SEVERITIES = ["info", "warn", "crit"]
 CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")

@@ -6,7 +6,7 @@
 
 A DevOps admin workspace for an agent working on servers, sites, and
 deployments. It holds a fleet inventory, a credential vault, procedures
-(skills), an incident inbox, and a CLI (`bin/ops`). Production is read-only
+(skills), an incident inbox, and a CLI (`ops`). Production is read-only
 until the operator allows writes. See `AGENTS.md` for the safety doctrine.
 
 The repo is public. Procedures and tooling are committed with placeholder
@@ -17,7 +17,7 @@ values. Real hosts, credentials, and run state stay local and gitignored.
 | Path | Contents | Committed? |
 |---|---|---|
 | `.agents/skills/<name>/` | Procedures: `SKILL.md`, `scripts/`, `templates/`, `references/` | yes |
-| `bin/ops`, `tests/`, `.githooks/`, `.claude/`, `.github/` | CLI, tests, hooks, CI | yes |
+| `ops.py`, `bin/ops`, `tests/`, `.githooks/`, `.claude/`, `.github/` | CLI, tests, hooks, CI | yes |
 | `fleet/*.example.yaml`, `ops.config.example.yaml`, `incidents/inbox.example.md` | Synthetic examples (RFC 5737 IPs, `example.*` domains) | yes |
 | `fleet/*.yaml` | Real servers, sites, services, providers, notify channels | no |
 | `vault/` | Credentials, ssh keys, and `index.yaml` (names, owners, `used_by`, rotation dates) | no |
@@ -31,16 +31,19 @@ values. Real hosts, credentials, and run state stay local and gitignored.
 ```bash
 git clone https://github.com/kinged007/sysops-playbooks
 cd sysops-playbooks
-pip install pyyaml requests
-bin/ops init          # creates gitignored files from examples, installs git hooks
+uv tool install --editable .   # puts `ops` on PATH (~/.local/bin); must stay editable
+ops init                       # creates gitignored files from examples, installs git hooks
 ```
+
+`bin/ops` runs without the install (needs `pyyaml` and `requests` in the Python
+used), for example from cron.
 
 1. Fill `fleet/servers.yaml`, `sites.yaml`, `services.yaml`, `providers.yaml`,
    and `notify.yaml`, using the `*.example.yaml` files as a guide.
 2. Put credentials in `vault/<client>-<provider>-<purpose>.env` (`chmod 600`)
    and ssh keys in `vault/ssh/`. List each in `vault/index.yaml`.
 3. Edit `ops.config.yaml` (agent command, model, launch flags, notify target).
-4. Run `bin/ops doctor` to check the fleet files, vault index, and hooks.
+4. Run `ops doctor` to check the fleet files, vault index, and hooks.
 
 Then ask the agent to run a skill, for example "run `netdata-monitoring` on
 `<server>`". The agent finds or creates `runs/<skill>[-<suffix>]/`, proposes a
@@ -104,8 +107,8 @@ CI runs on every push and pull request to `master`:
 ```bash
 pip install pyyaml requests pytest ruff mypy types-PyYAML types-requests
 pytest -q
-ruff check . bin/ops
-mypy . bin/ops
+ruff check .
+mypy .
 ```
 
 CI also runs `gitleaks` and `trufflehog`. Skill helper scripts under `.agents/`

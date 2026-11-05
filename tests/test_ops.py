@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-OPS_PATH = Path(__file__).resolve().parent.parent / "bin" / "ops"
+OPS_PATH = Path(__file__).resolve().parent.parent / "ops.py"
+SHIM_PATH = OPS_PATH.parent / "bin" / "ops"
 SECRET = "sk_test_abcdef123456WXYZ"
 LINE = "2026-11-05T10:00:00+00:00 | cron | warn | disk at 91%"
 
@@ -421,7 +422,15 @@ def test_init_links_executions_to_runs(tmp_path, monkeypatch):
 def test_missing_python_module_gives_clear_message():
     import subprocess
     import sys
-    proc = subprocess.run([sys.executable, "-S", "-I", str(OPS_PATH), "doctor"],
+    proc = subprocess.run([sys.executable, "-S", "-I", str(SHIM_PATH), "doctor"],
                           capture_output=True, text=True)
     assert proc.returncode != 0 and "Traceback" not in proc.stderr
     assert "pip install" in proc.stderr
+
+
+def test_shim_runs_help():
+    import subprocess
+    import sys
+    cmd = [sys.executable, str(SHIM_PATH), "--help"]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    assert proc.returncode == 0 and "usage" in proc.stdout.lower()
