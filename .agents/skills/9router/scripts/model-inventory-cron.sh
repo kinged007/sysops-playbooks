@@ -5,15 +5,15 @@
 # logs to executions/<variant>/logs/ and stdout.
 #
 # Usage (manual):
-#   ./playbooks/9router/scripts/model-inventory-cron.sh [--config PATH] [--output-dir DIR] [--verbose] [--no-sync] [--dry-run]
-#   ./playbooks/9router/scripts/model-inventory-cron.sh --help
+#   ./.agents/skills/9router/scripts/model-inventory-cron.sh [--config PATH] [--output-dir DIR] [--verbose] [--no-sync] [--dry-run]
+#   ./.agents/skills/9router/scripts/model-inventory-cron.sh --help
 #
 # Cron (every Monday 15:00):
-#   0 15 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
+#   0 15 * * 1 /opt/sysops-playbooks/.agents/skills/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
 #   # or user crontab:
-#   0 15 * * 1 /home/<user>/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh
+#   0 15 * * 1 /home/<user>/sysops-playbooks/.agents/skills/9router/scripts/model-inventory-cron.sh
 #
-# Systemd timer alternative: see notes/ below — the script is timer-friendly.
+# Systemd timer alternative: see the skill README section on systemd timers — the script is timer-friendly.
 #
 # What it does:
 #   1. Resolves repo root from its own location (so cron CWD does not matter)
@@ -25,8 +25,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# playbooks/9router/scripts -> repo root is 3 levels up
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+# .agents/skills/9router/scripts -> repo root is 4 levels up
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
 CONFIG=""
 OUTPUT_DIR=""
@@ -178,7 +178,7 @@ fi
 if [[ -n "${VERBOSE}" ]]; then INV_ARGS+=("${VERBOSE}"); fi
 if [[ -n "${DRY_RUN}" ]]; then INV_ARGS+=("${DRY_RUN}"); fi
 
-PY_SCRIPT="$(to_py_path "${REPO_ROOT}/playbooks/9router/scripts/model-inventory.py")"
+PY_SCRIPT="$(to_py_path "${REPO_ROOT}/.agents/skills/9router/scripts/model-inventory.py")"
 echo "--- running model-inventory.py ${INV_ARGS[*]:-} ---"
 set +e
 "${PYTHON}" "${PY_SCRIPT}" "${INV_ARGS[@]}"
@@ -209,7 +209,7 @@ if [[ -z "${NO_SYNC}" ]]; then
     for sc in "${SYNC_CFGS[@]}"; do
       echo "  config: ${sc}"
     done
-    PY_SYNC="$(to_py_path "${REPO_ROOT}/playbooks/9router/scripts/9router-sync.py")"
+    PY_SYNC="$(to_py_path "${REPO_ROOT}/.agents/skills/9router/scripts/9router-sync.py")"
     set +e
     "${PYTHON}" "${PY_SYNC}" ${VERBOSE:-} ${DRY_RUN:-}
     SYNC_RC=$?

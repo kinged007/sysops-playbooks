@@ -1,17 +1,17 @@
 # Runbook: <RUN NAME>
 
-Snapshot of `playbooks/<name>/playbook.md` being executed, with real values
+Snapshot of `.agents/skills/<name>/SKILL.md` procedure being executed, with real values
 filled in. State lives here and in `logs/` — any agent session can resume from
-these files alone. This folder is persistent per playbook variant
-(`executions/<playbook>[/-<suffix>]/`); subsequent invocations append to it,
+these files alone. This folder is persistent per skill variant
+(`runs/<skill>[-<suffix>]/`); subsequent invocations append to it,
 never replace it. `logs/` is append-only — each session adds timestamp-prefixed
 files (e.g. `logs/2026-08-29T143000-01-discover.log`).
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | <playbook-name> |
-| Execution folder | `executions/<playbook>/` or `executions/<playbook>-<suffix>/` |
+| Skill | <skill-name> |
+| Run folder | `runs/<skill>/` or `runs/<skill>-<suffix>/` |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
 
@@ -30,4 +30,4 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 ## Close-out
 - [ ] Runbook complete (all steps done or blocked+explained)
 - [ ] Findings appended to `notes.md` (cumulative history — do not overwrite)
-- [ ] Promotion candidates proposed to operator (→ playbook `notes/`)
+- [ ] Promotion candidates proposed to operator (→ skill `references/`)

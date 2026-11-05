@@ -1,17 +1,17 @@
 # Runbook: <RUN NAME>
 
-Snapshot of `playbooks/9router/playbook.md` being executed, with real values
+Snapshot of the `.agents/skills/9router/SKILL.md` procedure being executed, with real values
 filled in. State lives here and in `logs/` — any agent session can resume from
-these files alone. This folder is persistent per playbook variant
-(`executions/9router[/-<suffix>]/`); subsequent invocations append to it,
+these files alone. This folder is persistent per skill variant
+(`runs/9router[-<suffix>]/`); subsequent invocations append to it,
 never replace it. `logs/` is append-only — each session adds timestamp-prefixed
 files (e.g. `logs/2026-08-29T143000-01-discover.log`).
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | `9router` |
-| Execution folder | `executions/9router/` or `executions/9router-<suffix>/` |
+| Skill | `9router` |
+| Run folder | `runs/9router/` or `runs/9router-<suffix>/` |
 | Client | <client> |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
@@ -35,9 +35,9 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 - [ ] **3. Prepare host** (read) — status: pending
   - Log: `logs/<timestamp>-03-prepare-host.log`
 
-- [ ] **4. Prepare DATA_DIR + secrets** (**WRITE**) — status: pending
+- [ ] **4. Prepare DATA_DIR + vault entries** (**WRITE**) — status: pending
   - Log: `logs/<timestamp>-04-secrets.log` (redact SECRET/PASSWORD/KEY/TOKEN)
-  - Mode A note: operator confirmation required before writing secrets/env.
+  - Mode A note: operator confirmation required before writing vault entries/env.
 
 - [ ] **5. Install 9Router (mode branch)** (**WRITE**) — status: pending
   - Log: `logs/<timestamp>-05-install.log`
@@ -82,7 +82,7 @@ Anything not in the plan → STOP, record here, ask operator. Never improvise.
 
 - [ ] Runbook complete (all steps done or blocked+explained)
 - [ ] `scripts/health-check.sh` (or manual §8 probes) passes — health OK, at least one model answers
-- [ ] Every **WRITE** has a rollback recorded (secrets `*.prev-*`, `.env.prev-*`, compose prev, image prev tag, DB backup path, proxy/firewall revert)
-- [ ] `git status` clean of `executions/` / `*.pem` / `*.key` / `*.crt` / `.tfvars` leaks (AGENTS.md §7)
-- [ ] Findings appended to `executions/9router[-<suffix>]/notes.md` (cumulative history — do not overwrite)
-- [ ] Promotion candidates proposed to operator (→ playbook `notes/gotchas.md`)
+- [ ] Every **WRITE** has a rollback recorded (vault entry previous value, `.env.prev-*`, compose prev, image prev tag, DB backup path, proxy/firewall revert)
+- [ ] `git status` clean of `runs/` / `vault/` / `*.pem` / `*.key` / `*.crt` / `.tfvars` leaks (AGENTS.md §7)
+- [ ] Findings appended to `runs/9router[-<suffix>]/notes.md` (cumulative history — do not overwrite)
+- [ ] Promotion candidates proposed to operator (→ skill `references/gotchas.md`)

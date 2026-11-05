@@ -2,11 +2,11 @@
 # ============================================================================
 # Copy this file to ONE of these locations (first found wins, or pass --config):
 #   1. ./model-inventory.config.yaml              (current directory)
-#   2. playbooks/9router/scripts/model-inventory.config.yaml
+#   2. .agents/skills/9router/scripts/model-inventory.config.yaml
 #   3. executions/9router/model-inventory.config.yaml                (preferred — gitignored, holds your customizations)
 #   4. executions/9router-<suffix>/model-inventory.config.yaml       (variant-specific)
 #   5. Any executions/*9router*/**/model-inventory*.yaml             (recursive glob — e.g. executions/9router/model-inventory/model-inventory.yaml)
-# Or set via CLI: python playbooks/9router/scripts/model-inventory.py --config /path/to/config.yaml
+# Or set via CLI: python .agents/skills/9router/scripts/model-inventory.py --config /path/to/config.yaml
 # The committed template (playbooks/.../model-inventory.config.example.yaml) is read-only —
 # real customizations live in executions/ (gitignored) so they are not committed.
 #
@@ -15,7 +15,7 @@
 # copied to a gitignored executions/ folder where it's safe, but keep the
 # committed template with placeholders only.
 #
-# See playbooks/9router/scripts/model-inventory.py for full docs.
+# See .agents/skills/9router/scripts/model-inventory.py for full docs.
 # ============================================================================
 
 general:

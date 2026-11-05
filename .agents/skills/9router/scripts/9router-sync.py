@@ -18,7 +18,7 @@ except ImportError:
 
 DEFAULT_SYNC_CONFIG_CANDIDATES = [
     pathlib.Path("9router-sync.config.yaml"),
-    pathlib.Path("playbooks/9router/templates/9router-sync.config.example.yaml"),
+    pathlib.Path(".agents/skills/9router/templates/9router-sync.config.example.yaml"),
     pathlib.Path("executions/9router/9router-sync.config.yaml"),
 ]
 
@@ -84,7 +84,7 @@ def find_sync_configs(cli_path: Optional[str] = None, search_root: Optional[path
         for base in [pathlib.Path("executions"), pathlib.Path("D:/Data/git/sysops-playbooks/executions")]:
             if base.exists(): roots.append(base)
         try:
-            repo_root = pathlib.Path(__file__).resolve().parents[3]
+            repo_root = pathlib.Path(__file__).resolve().parents[4]
             rr = repo_root / "executions"
             if rr.exists() and rr not in roots: roots.append(rr)
         except: pass
@@ -1087,7 +1087,7 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
         combos_out_dir.mkdir(parents=True, exist_ok=True)
         for combo_name, routed_ids in desired_combos.items():
             members = desired_members.get(combo_name, [])
-            # JSON file — mirrors playbooks/9router/combos/*.json structure
+            # JSON file — mirrors .agents/skills/9router/combos/*.json structure
             jpath = combos_out_dir / f"{combo_name}.json"
             payload = {
                 "name": combo_name,
@@ -1192,7 +1192,7 @@ def main():
     configs=find_sync_configs(args.config)
     if not configs:
         print("ERR: no 9router-sync config found", file=sys.stderr)
-        print("Hint: copy playbooks/9router/templates/9router-sync.config.example.yaml to executions/9router/9router-sync.config.yaml", file=sys.stderr)
+        print("Hint: copy .agents/skills/9router/templates/9router-sync.config.example.yaml to executions/9router/9router-sync.config.yaml", file=sys.stderr)
         sys.exit(2)
     print(f"Found {len(configs)} config(s): {[str(p) for p in configs]}")
     ok=True

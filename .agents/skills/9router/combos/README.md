@@ -29,9 +29,9 @@ Applies to all levels as secondary sort after `cost` (so cheaper models first, b
 
 ## Updating
 
-- Add providers/models via Dashboard, then `GET /v1/models` → refresh `models.json` here, or run `python playbooks/9router/scripts/generate-configs.py` (live fetch) and `python scripts/generate-threshold.py` (with your thresholds 50/40/30) then copy the edited `executions/9router/combos/*.json|*.csv` to here.
+- Add providers/models via Dashboard, then `GET /v1/models` → refresh `models.json` here, or run `python .agents/skills/9router/scripts/generate-configs.py` (live fetch) and `python scripts/generate-threshold.py` (with your thresholds 50/40/30) then copy the edited `executions/9router/combos/*.json|*.csv` to here.
 - Or edit `executions/9router/combos/*.csv` order directly, then `python fix-ranks.py` to re-sequence ranks and sync `*.json`.
 
 ## Generated configs
 
-`executions/9router/generated/` (gitignored) is built from live `GET /v1/models` via `playbooks/9router/scripts/generate-configs.py:1` — contains `opencode.json`, `hermes-config.yaml`, `codex-config.toml`, `claude-settings.json`, `generic-env.sh` copy-paste for remote servers. The baseline combos here are the source of truth for `provider/model` ids used in those generated configs.
+`executions/9router/generated/` (gitignored) is built from live `GET /v1/models` via `.agents/skills/9router/scripts/generate-configs.py:1` — contains `opencode.json`, `hermes-config.yaml`, `codex-config.toml`, `claude-settings.json`, `generic-env.sh` copy-paste for remote servers. The baseline combos here are the source of truth for `provider/model` ids used in those generated configs.

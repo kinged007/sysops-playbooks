@@ -3,22 +3,22 @@
 | Field | Value |
 |---|---|
 | Client | <client> |
-| Playbook | `9router` |
-| Execution folder | `executions/9router/` or `executions/9router-<suffix>/` |
+| Skill | `9router` |
+| Run folder | `runs/9router/` or `runs/9router-<suffix>/` |
 | Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
 | Status | draft → approved → executing → closed |
 
 ## Servers involved (THIS variant only)
 
-| Alias (ssh config) | Role | Purpose | Access key |
+| Fleet server record (`fleet/servers.yaml`) | Role | Purpose | Access key |
 |---|---|---|---|
-| <alias> | app | 9Router host (single server; optionally fronted by its own reverse proxy) | `~/.ssh/<key>` |
+| <server name> | app | 9Router host (single server; optionally fronted by its own reverse proxy); service `9router` in `fleet/services.yaml` | vault `ssh/<client>-<server>` |
 
 If the run uses a reverse proxy that is the same host, note it inline
 (e.g. `<alias> (also Nginx/Traefik on same host)`). A second alias is only
 needed when the proxy is on a different machine — record it as a second row.
 
-## Deployment mode (operator choice — §2 of playbook.md)
+## Deployment mode (operator choice — §2 of SKILL.md)
 
 | Field | Value |
 |---|---|
@@ -34,22 +34,21 @@ needed when the proxy is on a different machine — record it as a second row.
 | Image tag (if B/C) | <TAG> (default `decolua/9router:latest`; pin for rollback) |
 | Prev version/tag | <PREV> (for rollback) |
 
-## Credentials / secrets (THIS variant only)
+## Vault entries (THIS variant only)
 
-Files in `secrets/` of this execution folder; never inline values here.
-Secrets persist in this folder across invocations — update in place when rotating.
+Vault entry names; never inline values here. Entries persist across runs — rotate in place.
 
-| Secret | File in `secrets/` | Notes |
+| Secret | Vault entry | Notes |
 |---|---|---|
-| JWT secret | `jwt-secret.txt` | `openssl rand -base64 48` |
-| Dashboard initial password | `initial-password.txt` | rotated after first login |
-| Dashboard current password | `dashboard-password.txt` | after first-login rotation |
-| 9Router API key (NINEROUTER_KEY) | `9router-api-key.txt` | Dashboard → Keys; value for `Authorization: Bearer` |
-| API key HMAC secret | `api-key-secret.txt` | `API_KEY_SECRET` |
-| Machine ID salt | `machine-id-salt.txt` | `MACHINE_ID_SALT` |
-| Vertex SA JSON (if used) | `vertex-sa.json` | GCP service-account JSON; gitignored |
-| Tailscale / proxy token (if any) | `<token>.txt` | only if tailnet or CF tunnel used |
-| Prev secrets | `*.prev-<timestamp>` | kept on rotation for rollback |
+| JWT secret | `<client>-9router-jwt-secret` | `openssl rand -base64 48` |
+| Dashboard initial password | `<client>-9router-initial-password` | rotated after first login |
+| Dashboard current password | `<client>-9router-dashboard-password` | after first-login rotation |
+| 9Router API key (NINEROUTER_KEY) | `<client>-9router-api-key` | Dashboard → Keys; value for `Authorization: Bearer` |
+| API key HMAC secret | `<client>-9router-api-key-secret` | `API_KEY_SECRET` |
+| Machine ID salt | `<client>-9router-machine-id-salt` | `MACHINE_ID_SALT` |
+| Vertex SA JSON (if used) | `<client>-gcp-vertex-sa` | GCP service-account JSON |
+| Tailscale / proxy token (if any) | `<client>-<provider>-<purpose>` | only if tailnet or CF tunnel used |
+| Previous values | `<entry>.prev-<timestamp>` | kept on rotation for rollback |
 
 Env file on the host (`<COMPOSE_DIR>/.env` or `<APP_DIR>/.env` or
 `<DATA_DIR>/.env`) is built from `templates/env.example` + these secrets.
@@ -60,11 +59,11 @@ The env file itself is never committed or logged (redact `SECRET/PASSWORD/KEY/TO
 Numbered steps mirroring `runbook.md`, with **WRITE** flags. The operator
 reviews this list at approval and sets the permission mode.
 
-1. Pre-flight: fetch 9Router skill + read `notes/gotchas.md` (read)
+1. Pre-flight: fetch 9Router skill + read `references/gotchas.md` (read)
 2. Discover current state on `<alias>` — existing install, ports, health (read)
 3. Decide deployment mode + exposure + proxy + Headroom (ask operator; read)
 4. Prepare host: verify Docker/Node/ports/disk (read)
-5. Prepare DATA_DIR + generate secrets into `secrets/` (**WRITE** — local secrets + remote DATA_DIR/env prep)
+5. Prepare DATA_DIR + generate secrets into the vault (**WRITE** — local secrets + remote DATA_DIR/env prep)
 6. Install — branch on mode:
    - A: npm global (**WRITE** on `<alias>`)
    - B: docker run (**WRITE** on `<alias>`)
@@ -89,7 +88,7 @@ What could go wrong; blast radius; rollback plan:
 - **Env / secret misconfig (`DATA_DIR` mismatch, wrong `BASE_URL`):** volume not
   mounted or sync callbacks fail. Rollback = restore previous `.env` + restart.
 - **Public exposure without `REQUIRE_API_KEY=true`:** bearerless access to
-  `/v1/*` (cost/abuse). Mitigation: playbook forces the question at §2; the
+  `/v1/*` (cost/abuse). Mitigation: skill forces the question at §2; the
   plan must set `REQUIRE_API_KEY=true` when `Exposure=internet-exposed`.
 - **SQLite data loss on downgrade/upgrade:** schema drift. Mitigation: mandatory
   hot backup before any upgrade; restore via `scripts/restore.sh`.
@@ -102,5 +101,5 @@ What could go wrong; blast radius; rollback plan:
 
 - [ ] Operator reviewed plan and set permission mode: <A or B>
 - [ ] Operator approved deployment mode + exposure + proxy choice on <date>
-- [ ] Operator confirmed secrets are available or may be generated into `secrets/`
+- [ ] Operator confirmed secrets are available or may be generated into the vault
 - [ ] Operator approved execution on <date>

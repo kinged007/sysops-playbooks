@@ -3,19 +3,19 @@
 | Field | Value |
 |---|---|
 | Client | <client> |
-| Playbook | `<playbook-name>` |
-| Execution folder | `executions/<playbook>/` or `executions/<playbook>-<suffix>/` |
+| Skill | `<skill-name>` |
+| Run folder | `runs/<skill>/` or `runs/<skill>-<suffix>/` |
 | Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
 | Status | draft → approved → executing → closed |
 
-## Servers involved (THIS variant only)
-| Alias (ssh config) | Role | Purpose | Access key |
-|---|---|---|---|
-| <alias> | <source/prod/dest> | <what it does in this run> | `~/.ssh/<key>` |
+## Fleet refs (THIS variant only)
+| Fleet record | Role | Purpose |
+|---|---|---|
+| `fleet/servers.yaml`: <server name> | <source/prod/dest> | <what it does in this run> |
+| `fleet/services.yaml`: <service name> | <service> | <what it does in this run> |
 
-## Credentials / secrets (THIS variant only)
-<Files in `secrets/` of this execution folder; never inline values here>
-Secrets persist in this folder across invocations — update in place when rotating.
+## Vault entries (THIS variant only)
+<Vault entry names `<client>-<provider>-<purpose>`; never inline values here>
 
 ## Steps
 Numbered steps mirroring `runbook.md`, with **WRITE** flags:

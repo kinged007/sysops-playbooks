@@ -12,10 +12,10 @@ opencode/hermes/codex/claude configs from the live gateway.
 
 Usage:
   NINEROUTER_URL=http://development-9router-fe01c0-62-171-191-174.sslip.io \
-  NINEROUTER_KEY=sk-... python playbooks/9router/scripts/generate-configs.py
+  NINEROUTER_KEY=sk-... python .agents/skills/9router/scripts/generate-configs.py
 
-  python playbooks/9router/scripts/generate-configs.py --url http://host --key sk-... --out executions/9router/generated --active-model free
-  python playbooks/9router/scripts/generate-configs.py --url http://host:20128 --key-file executions/9router/secrets/9router-api-key.txt
+  python .agents/skills/9router/scripts/generate-configs.py --url http://host --key sk-... --out executions/9router/generated --active-model free
+  python .agents/skills/9router/scripts/generate-configs.py --url http://host:20128 --key-file executions/9router/secrets/9router-api-key.txt
 
 Outputs (gitignored, persistent per-variant):
   executions/9router/generated/opencode.json         (~/.config/opencode/opencode.json)
@@ -238,7 +238,7 @@ def main():
     out_dir = pathlib.Path(args.out) if args.out else pathlib.Path(__file__).resolve().parents[1] / "generated" if (pathlib.Path(__file__).resolve().parents[1] / "generated").exists() or True else pathlib.Path("generated")
     # prefer executions/9router/generated when run from playbooks, else ./generated
     try:
-        # if script is in playbooks/9router/scripts, generated should be executions/9router/generated
+        # if script is in .agents/skills/9router/scripts, generated should be executions/9router/generated
         if "playbooks" in str(pathlib.Path(__file__).resolve()):
             cand = pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/generated")
             if cand.exists() or True:

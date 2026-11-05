@@ -10,13 +10,13 @@
 #   4. Logs to executions/<variant>/logs/<ISO>-9router-sync-cron.log (+ stdout for cron mail)
 #
 # Usage (manual):
-#   ./playbooks/9router/scripts/9router-sync-cron.sh [--config PATH] [--verbose] [--dry-run]
-#   ./playbooks/9router/scripts/9router-sync-cron.sh --help
+#   ./.agents/skills/9router/scripts/9router-sync-cron.sh [--config PATH] [--verbose] [--dry-run]
+#   ./.agents/skills/9router/scripts/9router-sync-cron.sh --help
 #
 # Cron (every Monday 16:00):
-#   0 16 * * 1 /opt/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
+#   0 16 * * 1 /opt/sysops-playbooks/.agents/skills/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
 #   # or user crontab:
-#   0 16 * * 1 /home/<user>/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh
+#   0 16 * * 1 /home/<user>/sysops-playbooks/.agents/skills/9router/scripts/9router-sync-cron.sh
 #
 # Systemd timer alternative:
 #   See templates/systemd-9router-sync.{service,timer}
@@ -29,8 +29,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# playbooks/9router/scripts -> repo root is 3 levels up
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+# .agents/skills/9router/scripts -> repo root is 4 levels up
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../../.." && pwd)"
 
 CONFIG=""
 VERBOSE=""
@@ -125,7 +125,7 @@ if [[ -n "${DRY_RUN}" ]]; then SYNC_ARGS+=("${DRY_RUN}"); fi
 
 echo "--- running 9router-sync.py ${SYNC_ARGS[*]:-} ---"
 set +e
-"${PYTHON}" "${REPO_ROOT}/playbooks/9router/scripts/9router-sync.py" "${SYNC_ARGS[@]}"
+"${PYTHON}" "${REPO_ROOT}/.agents/skills/9router/scripts/9router-sync.py" "${SYNC_ARGS[@]}"
 SYNC_RC=$?
 set -e
 if [[ ${SYNC_RC} -ne 0 ]]; then

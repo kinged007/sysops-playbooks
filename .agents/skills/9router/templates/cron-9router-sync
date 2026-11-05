@@ -10,12 +10,12 @@
 #       executions/9router/logs/<timestamp>-9router-sync-cron.log
 
 # System-wide (needs root):
-# 30 3 */3 * * root /home/coder/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
-# 45 3 */3 * * root /home/coder/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
+# 30 3 */3 * * root /home/coder/sysops-playbooks/.agents/skills/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
+# 45 3 */3 * * root /home/coder/sysops-playbooks/.agents/skills/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
 
 # User crontab (no root):
-# 30 3 */3 * * /home/coder/sysops-playbooks/playbooks/9router/scripts/model-inventory-cron.sh >> ~/model-inventory-cron.log 2>&1
-# 45 3 */3 * * /home/coder/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh >> ~/9router-sync-cron.log 2>&1
+# 30 3 */3 * * /home/coder/sysops-playbooks/.agents/skills/9router/scripts/model-inventory-cron.sh >> ~/model-inventory-cron.log 2>&1
+# 45 3 */3 * * /home/coder/sysops-playbooks/.agents/skills/9router/scripts/9router-sync-cron.sh >> ~/9router-sync-cron.log 2>&1
 
 # Alternative: systemd timer (recommended for servers)
 # See templates/systemd-9router-sync.{service,timer}

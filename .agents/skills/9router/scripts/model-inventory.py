@@ -18,17 +18,17 @@ Produces:
 config patterns + static maps + optional ArtificialAnalysis cache.
 
 Usage:
-  python playbooks/9router/scripts/model-inventory.py
-  python playbooks/9router/scripts/model-inventory.py --config /path/to/config.yaml
-  python playbooks/9router/scripts/model-inventory.py --output-dir ./out --dry-run
-  python playbooks/9router/scripts/model-inventory.py --providers google,openrouter
+  python .agents/skills/9router/scripts/model-inventory.py
+  python .agents/skills/9router/scripts/model-inventory.py --config /path/to/config.yaml
+  python .agents/skills/9router/scripts/model-inventory.py --output-dir ./out --dry-run
+  python .agents/skills/9router/scripts/model-inventory.py --providers google,openrouter
 
 Config:
-  See playbooks/9router/templates/model-inventory.config.example.yaml
+  See .agents/skills/9router/templates/model-inventory.config.example.yaml
   Copy it to executions/9router/model-inventory.config.yaml for real keys (gitignored).
 
 Automation (cron / systemd timer / GitHub Actions):
-  0 6 * * * /usr/bin/python3 /opt/sysops-playbooks/playbooks/9router/scripts/model-inventory.py --config /opt/sysops-playbooks/executions/9router/model-inventory.config.yaml >> /var/log/model-inventory.log 2>&1
+  0 6 * * * /usr/bin/python3 /opt/sysops-playbooks/.agents/skills/9router/scripts/model-inventory.py --config /opt/sysops-playbooks/executions/9router/model-inventory.config.yaml >> /var/log/model-inventory.log 2>&1
 """
 from __future__ import annotations
 
@@ -63,10 +63,10 @@ except ImportError:
 # ---------------------------------------------------------------------------
 DEFAULT_CONFIG_CANDIDATES = [
     pathlib.Path("model-inventory.config.yaml"),
-    pathlib.Path("playbooks/9router/scripts/model-inventory.config.yaml"),
+    pathlib.Path(".agents/skills/9router/scripts/model-inventory.config.yaml"),
     pathlib.Path("executions/9router/model-inventory.config.yaml"),
     pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/model-inventory.config.yaml"),
-    pathlib.Path("playbooks/9router/templates/model-inventory.config.example.yaml"),
+    pathlib.Path(".agents/skills/9router/templates/model-inventory.config.example.yaml"),
 ]
 
 # Cost — no static fallback (AA/provider only). Keep empty to force blank when no provider pricing.
@@ -285,9 +285,9 @@ def find_config(cli_path: Optional[str]) -> Optional[pathlib.Path]:
                 search_roots.append(pathlib.Path("executions"))
         except Exception:
             pass
-        # Repo-root relative (script at playbooks/9router/scripts/model-inventory.py -> repo root = parents[3])
+        # Repo-root relative (script at .agents/skills/9router/scripts/model-inventory.py -> repo root = parents[4])
         try:
-            repo_root = pathlib.Path(__file__).resolve().parents[3]
+            repo_root = pathlib.Path(__file__).resolve().parents[4]
             rr_exec = repo_root / "executions"
             if rr_exec.exists() and rr_exec not in search_roots:
                 search_roots.append(rr_exec)
@@ -2003,7 +2003,7 @@ def main() -> None:
         # if cwd is inside repo, output_dir relative to repo root is fine
         # We'll resolve against cwd, then ensure parent exists
         output_dir = (cwd / output_dir).resolve() if not output_dir.exists() else output_dir.resolve()
-        # fallback: if we are in playbooks/9router/scripts vs repo root, adjust
+        # fallback: if we are in .agents/skills/9router/scripts vs repo root, adjust
         # keep as is - mkdir will create correctly
     ensure_output_dir(output_dir)
 

@@ -1,8 +1,8 @@
 # systemd timer for 9Router weekly sync — every Monday 16:00
 #
 # Install:
-#   sudo cp playbooks/9router/templates/systemd-9router-sync.service /etc/systemd/system/9router-sync.service
-#   sudo cp playbooks/9router/templates/systemd-9router-sync.timer /etc/systemd/system/9router-sync.timer
+#   sudo cp .agents/skills/9router/templates/systemd-9router-sync.service /etc/systemd/system/9router-sync.service
+#   sudo cp .agents/skills/9router/templates/systemd-9router-sync.timer /etc/systemd/system/9router-sync.timer
 #   # Edit <USER> and <REPO_ROOT> in the .service above
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now 9router-sync.timer
@@ -34,4 +34,4 @@ WantedBy=timers.target
 # Manual trigger (without waiting for Monday):
 #   sudo systemctl start 9router-sync.service
 # Dry-run:
-#   /opt/sysops-playbooks/playbooks/9router/scripts/9router-sync-cron.sh --dry-run --verbose
+#   /opt/sysops-playbooks/.agents/skills/9router/scripts/9router-sync-cron.sh --dry-run --verbose
