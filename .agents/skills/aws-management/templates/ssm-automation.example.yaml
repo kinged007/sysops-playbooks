@@ -19,4 +19,4 @@ mainSteps:
       Parameters:
         commands:
           - 'echo hello from {{ InstanceId }}'
-    description: Example step — replace with the playbook's investigation logic
+    description: Example step — replace with the skill investigation logic

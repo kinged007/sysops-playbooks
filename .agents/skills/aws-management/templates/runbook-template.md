@@ -1,6 +1,6 @@
 # Runbook: <RUN NAME>
 
-Snapshot of `playbooks/aws-management/playbook.md` being executed, with
+Snapshot of `.agents/skills/aws-management/SKILL.md` being executed, with
 real values filled in. State lives here and in `logs/` — any agent session can
 resume from these files alone. This folder is persistent per playbook variant
 (`executions/aws-management[/-<suffix>]/`); subsequent invocations append to it,

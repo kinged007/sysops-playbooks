@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Read-only AWS diagnostics — safe on any host, no writes, no secrets printed.
-# Usage: bash playbooks/aws-management/scripts/aws-doctor.sh [--profile PROFILE] [--region REGION]
+# Usage: bash .agents/skills/aws-management/scripts/aws-doctor.sh [--profile PROFILE] [--region REGION]
 set -uo pipefail
 
 PROFILE="${1:-}"
@@ -111,4 +111,4 @@ fi
 
 echo ""
 echo "Done. Fix WARN/FAIL items above, then re-run."
-echo "Next: fill executions/aws-management[-<suffix>]/inventory.md and plan.md per the playbook."
+echo "Next: fill executions/aws-management[-<suffix>]/inventory.md and plan.md per the skill."

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install or upgrade AWS CLI v2 — Linux (x86_64/aarch64) and macOS.
 # Idempotent: uses --update if already installed.
-# Usage: bash playbooks/aws-management/scripts/install-aws-cli.sh
+# Usage: bash .agents/skills/aws-management/scripts/install-aws-cli.sh
 set -euo pipefail
 
 arch="$(uname -m)"
