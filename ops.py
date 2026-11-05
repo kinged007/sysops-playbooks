@@ -499,6 +499,12 @@ def cmd_doctor(args) -> int:
         entries = (yaml.safe_load(index.read_text()) or []) if index.exists() else []
         indexed = {e["name"] for e in entries}
         present = {p.stem for p in (ROOT / "vault").glob("*.env")}
+        present |= {p.name for p in (ROOT / "vault" / "files").glob("*") if p.is_dir()}
+        for entry in entries:
+            for fname in entry.get("files") or []:
+                path = ROOT / "vault" / "files" / entry["name"] / fname
+                if Path(fname).name != fname or not path.is_file():
+                    problems.append(f"vault: {entry['name']} lists missing file '{fname}'")
         problems += [f"vault: {n} indexed but no file" for n in sorted(indexed - present)]
         problems += [f"vault: {n} has a file but no index entry" for n in sorted(present - indexed)]
     except Exception as exc:

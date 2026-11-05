@@ -434,3 +434,56 @@ def test_shim_runs_help():
     cmd = [sys.executable, str(SHIM_PATH), "--help"]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     assert proc.returncode == 0 and "usage" in proc.stdout.lower()
+
+
+def vault_files_entry(root, name="acme-ssh", files=("key",), create=True):
+    vault = root / "vault"
+    (vault / "index.yaml").write_text(yaml.safe_dump([{"name": name, "files": list(files)}]))
+    (vault / "index.yaml").chmod(0o600)
+    if create:
+        folder = vault / "files" / name
+        folder.mkdir(parents=True)
+        for path in (vault / "files", folder):
+            path.chmod(0o700)
+        for fname in files:
+            (folder / fname).write_text("data\n")
+            (folder / fname).chmod(0o600)
+
+
+@pytest.fixture
+def doctor_ready(ops, tmp_path, monkeypatch):
+    for name in ops.FLEET_FILES:
+        (tmp_path / "fleet" / f"{name}.yaml").write_text("[]\n")
+    (tmp_path / ".githooks").mkdir()
+    (tmp_path / ".githooks" / "pre-commit").write_text("")
+    monkeypatch.setattr(ops.subprocess, "run", lambda *a, **k: ops.subprocess.CompletedProcess(
+        a, 0, stdout=".githooks\n", stderr=""))
+    (tmp_path / "vault" / "ops-telegram-bot.env").unlink()
+    return tmp_path
+
+
+def test_doctor_accepts_indexed_vault_files(ops, doctor_ready, capsys):
+    vault_files_entry(doctor_ready)
+    assert ops.main(["doctor"]) == 0
+    assert ops.main(["secret", "check"]) == 0
+
+
+def test_doctor_flags_missing_vault_file_and_unindexed_folder(ops, doctor_ready, capsys):
+    vault_files_entry(doctor_ready, files=("key", "gone"), create=False)
+    folder = doctor_ready / "vault" / "files" / "acme-ssh"
+    folder.mkdir(parents=True)
+    (doctor_ready / "vault" / "files").chmod(0o700)
+    folder.chmod(0o700)
+    (folder / "key").write_text("data\n")
+    (folder / "key").chmod(0o600)
+    (doctor_ready / "vault" / "files" / "stray").mkdir(mode=0o700)
+    assert ops.main(["doctor"]) == 1
+    out = capsys.readouterr().out
+    assert "lists missing file 'gone'" in out
+    assert "stray has a file but no index entry" in out
+
+
+def test_ssh_accepts_absolute_key_path(ops):
+    block = {"via": "ssh", "key": "/home/u/.ssh/id_ed25519", "user": "u", "host": "h"}
+    _, argv = ops.connect_argv({"name": "s", "connect": [block]}, None, [])
+    assert argv[:3] == ["ssh", "-i", "/home/u/.ssh/id_ed25519"]
