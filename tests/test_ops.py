@@ -1,4 +1,5 @@
 import fcntl
+import io
 import json
 import os
 import stat
@@ -323,13 +324,13 @@ def test_incident_new_from_inbox_and_close(ops, tmp_path):
     assert "closed" in (folder / "actions.log").read_text()
 
 
-def test_stale_inventory(ops, tmp_path, capsys):
+def test_secret_list_stale(ops, tmp_path, capsys):
     (tmp_path / "vault" / "index.yaml").write_text(yaml.safe_dump([
         {"name": "old", "last_rotated": "2020-01-01"},
         {"name": "fresh", "last_rotated": ops.now().date().isoformat()},
     ]))
     (tmp_path / "vault" / "index.yaml").chmod(0o600)
-    ops.main(["inventory", "--stale"])
+    ops.main(["secret", "list", "--stale"])
     out = capsys.readouterr().out
     assert "old" in out and "fresh" not in out
 
@@ -366,7 +367,7 @@ def exec_service(ops, tmp_path):
 
 def test_exec_unknown_command_is_a_clean_error(ops, exec_service, capsys):
     assert ops.main(["exec", "svc", "definitely-not-a-command"]) == 127
-    assert "cannot run" in capsys.readouterr().err
+    assert "not found" in capsys.readouterr().err
 
 
 def test_exec_empty_command_and_missing_vault_entry(ops, exec_service):
@@ -378,13 +379,13 @@ def test_exec_empty_command_and_missing_vault_entry(ops, exec_service):
 
 
 def test_exec_binary_output_does_not_crash(ops, exec_service, capsys):
-    assert ops.main(["exec", "svc", "sh -c 'printf \"\\377ok\"'"]) == 0
+    assert ops.main(["exec", "svc", "printf '\\377ok'"]) == 0
     assert "ok" in capsys.readouterr().out
 
 
 def test_malformed_fleet_yaml_is_a_clean_error(ops, tmp_path, capsys):
     (tmp_path / "fleet" / "servers.yaml").write_text("a: [unclosed\n")
-    assert ops.main(["inventory"]) == 1
+    assert ops.main(["fleet", "list", "servers"]) == 1
     assert capsys.readouterr().err.startswith("ops:")
 
 
@@ -487,3 +488,215 @@ def test_ssh_accepts_absolute_key_path(ops):
     block = {"via": "ssh", "key": "/home/u/.ssh/id_ed25519", "user": "u", "host": "h"}
     _, argv = ops.connect_argv({"name": "s", "connect": [block]}, None, [])
     assert argv[:3] == ["ssh", "-i", "/home/u/.ssh/id_ed25519"]
+
+
+@pytest.fixture
+def fleet_data(ops, tmp_path):
+    (tmp_path / "fleet" / "servers.yaml").write_text(yaml.safe_dump([
+        {"name": "router-62", "role": "gateway",
+         "connect": [{"via": "ssh", "host": "192.0.2.62", "user": "root", "key": "vault/ssh/k"}]},
+        {"name": "web-1", "role": "web", "connect": [{"via": "coder", "workspace": "ws1"}]},
+    ]))
+    (tmp_path / "fleet" / "servers.example.yaml").write_text("- name: example-only\n")
+    (tmp_path / "fleet" / "sites.yaml").write_text(
+        yaml.safe_dump([{"name": "www", "host": "web-1"}]))
+
+
+def test_fleet_list_kinds_and_records(ops, fleet_data, capsys):
+    assert ops.main(["fleet", "list"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert "servers: 2" in out and "sites: 1" in out and "notify: 1" in out
+    assert not any("example" in line for line in out)
+    assert ops.main(["fleet", "list", "servers"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["router-62 role=gateway", "web-1 role=web"]
+    with pytest.raises(SystemExit) as exc:
+        ops.main(["fleet", "list", "nope"])
+    assert "servers" in str(exc.value)
+
+
+def test_fleet_search_or_patterns_and_paths(ops, fleet_data, capsys):
+    assert ops.main(["fleet", "search", "192.0.2.62"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["servers: router-62 (connect[0].host)"]
+    assert ops.main(["fleet", "search", "WS1|gateway", "www"]) == 0
+    out = capsys.readouterr().out
+    assert "servers: web-1 (connect[0].workspace)" in out
+    assert "servers: router-62 (role)" in out and "sites: www (name)" in out
+    assert ops.main(["fleet", "search", "no-such-thing"]) == 1
+    assert capsys.readouterr().out == ""
+
+
+def test_fleet_view_flattens_one_record(ops, fleet_data, capsys):
+    assert ops.main(["fleet", "view", "servers", "router-62"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert "connect[0].via: ssh" in out and "name: router-62" in out
+    assert not any("web-1" in line for line in out)
+    with pytest.raises(SystemExit) as exc:
+        ops.main(["fleet", "view", "servers", "zzz"])
+    assert "router-62" in str(exc.value) and "web-1" in str(exc.value)
+    with pytest.raises(SystemExit) as exc:
+        ops.main(["fleet", "view", "zzz", "x"])
+    assert "available" in str(exc.value)
+
+
+LONG = "L" * 8 + "middle-part-that-stays-hidden" + "R" * 8
+MID = "mid-value-1234567890WXYZ"
+
+
+@pytest.fixture
+def vault_entries(ops, tmp_path):
+    vault = tmp_path / "vault"
+    (vault / "index.yaml").write_text(yaml.safe_dump([
+        {"name": "acme-svc-multi", "owner": "acme", "purpose": "multi var entry",
+         "used_by": ["file:" + str(tmp_path / "app.env"), "service:x"]},
+        {"name": "acme-cert", "owner": "acme", "purpose": "cert files"},
+    ]))
+    env = vault / "acme-svc-multi.env"
+    env.write_text(f"LONGVAR={LONG}\nMIDVAR={MID}\nSHORTVAR=tiny-secret\n")
+    folder = vault / "files" / "acme-cert"
+    folder.mkdir(parents=True)
+    (folder / "cert.pem").write_text("file-body-content")
+    for path in [vault / "index.yaml", env, vault / "files", folder, folder / "cert.pem"]:
+        path.chmod(0o700 if path.is_dir() else 0o600)
+
+
+def test_secret_list_and_search(ops, vault_entries, capsys):
+    assert ops.main(["secret", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "acme-svc-multi  acme  multi var entry" in out
+    assert ops.main(["secret", "search", "CERT|nothing"]) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "secrets: acme-cert (name)", "secrets: acme-cert (purpose)"]
+    assert ops.main(["secret", "search", "tiny-secret"]) == 1
+
+
+def test_secret_view_masks_values(ops, vault_entries, capsys):
+    assert ops.main(["secret", "view", "acme-svc-multi"]) == 0
+    out = capsys.readouterr().out
+    assert "LLLLL…RRRRR" in out and "…WXYZ" in out
+    assert "middle-part" not in out and "tiny-secret" not in out and MID not in out
+    short = next(ln for ln in out.splitlines() if ln.startswith("var SHORTVAR"))
+    assert short.endswith(ops.digest("tiny-secret")) and "length=11" in short
+    assert "Values are never shown in full." in out
+    assert ops.main(["secret", "view", "acme-cert"]) == 0
+    out = capsys.readouterr().out
+    assert "file cert.pem: size=17 " in out and "file-body-content" not in out
+    with pytest.raises(SystemExit):
+        ops.main(["secret", "view", "../x"])
+
+
+def test_secret_run_expands_var_in_subprocess_and_redacts(ops, capsys, monkeypatch):
+    monkeypatch.setenv("TOKEN", "outer")
+    assert ops.main(["secret", "run", "ops-telegram-bot", "--", 'echo "[$TOKEN]"; exit 3']) == 3
+    out = capsys.readouterr().out
+    assert SECRET not in out and "[[REDACTED]]" in out
+    log = next((ops.ROOT / "logs" / "audit").glob("*.jsonl")).read_text()
+    assert "secret run" in log and "ops-telegram-bot" in log and SECRET not in log
+    with pytest.raises(SystemExit):
+        ops.main(["secret", "run", "nope", "--", "true"])
+
+
+class FakeRun:
+    def __init__(self, files=None, rc=0):
+        self.calls = []
+        self.files = files or {}
+        self.rc = rc
+
+    def __call__(self, argv, **kw):
+        self.calls.append((argv, kw.get("input")))
+
+        class P:
+            returncode = self.rc
+            stdout = ""
+            stderr = ""
+
+        if "test -f" in " ".join(argv):
+            P.stdout = self.files.get("remote", "")
+            P.returncode = 0 if "remote" in self.files else 1
+        return P
+
+
+def test_insert_file_target_upserts_keeping_other_lines(ops, vault_entries, tmp_path, capsys):
+    target = tmp_path / "app.env"
+    target.write_text("A=1\nMIDVAR=old\nB=2\n")
+    target.chmod(0o640)
+    args = ["secret", "insert", "acme-svc-multi", "--var", "MIDVAR"]
+    assert ops.main([*args, f"file:{target}"]) == 0
+    assert target.read_text() == f"A=1\nMIDVAR={MID}\nB=2\n"
+    assert stat.S_IMODE(target.stat().st_mode) == 0o640
+    assert MID not in capsys.readouterr().out
+    fresh = tmp_path / "new.env"
+    ops.main(["secret", "insert", "acme-svc-multi", "--var", "SHORTVAR", f"file:{fresh}"])
+    assert fresh.read_text() == "SHORTVAR=tiny-secret\n"
+    assert stat.S_IMODE(fresh.stat().st_mode) == 0o600
+    log = "".join(p.read_text() for p in (tmp_path / "logs" / "audit").glob("*.jsonl"))
+    assert "secret insert" in log and MID not in log and ops.digest(MID) in log
+
+
+def test_insert_requires_var_when_ambiguous(ops, vault_entries):
+    with pytest.raises(SystemExit) as exc:
+        ops.main(["secret", "insert", "acme-svc-multi", "file:/tmp/x"])
+    assert "LONGVAR" in str(exc.value) and "--var" in str(exc.value)
+    with pytest.raises(SystemExit):
+        ops.main(["secret", "insert", "acme-svc-multi", "--var", "NOPE", "file:/tmp/x"])
+
+
+def test_insert_unsupported_target_and_dry_run(ops, vault_entries, capsys, monkeypatch):
+    fake = FakeRun()
+    monkeypatch.setattr(ops.subprocess, "run", fake)
+    with pytest.raises(SystemExit) as exc:
+        ops.main(["secret", "insert", "acme-svc-multi", "--var", "MIDVAR", "service:x"])
+    assert "unsupported target" in str(exc.value)
+    args = ["secret", "insert", "acme-svc-multi", "--var", "MIDVAR"]
+    assert ops.main([*args, "--all", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "would insert MIDVAR into file:" in out and "service:x" not in out and MID not in out
+    assert fake.calls == []
+
+
+def test_insert_host_streams_value_over_stdin_not_argv(ops, vault_entries, tmp_path, monkeypatch):
+    (tmp_path / "fleet" / "servers.yaml").write_text(yaml.safe_dump([
+        {"name": "srv", "connect": [{"via": "ssh", "host": "192.0.2.5", "user": "root",
+                                     "key": "vault/ssh/k"}]}]))
+    fake = FakeRun({"remote": "A=1\nMIDVAR=old\n"})
+    monkeypatch.setattr(ops.subprocess, "run", fake)
+    assert ops.main(["secret", "insert", "acme-svc-multi", "--var", "MIDVAR",
+                     "host:srv:/srv/app/.env"]) == 0
+    (read_argv, _), (write_argv, stdin) = fake.calls
+    assert all(MID not in a for a in read_argv + write_argv)
+    assert write_argv[0] == "ssh" and "cat > /srv/app/.env.tmp" in " ".join(write_argv)
+    assert stdin == f"A=1\nMIDVAR={MID}\n"
+
+
+def test_insert_github_value_on_stdin_only(ops, vault_entries, monkeypatch):
+    fake = FakeRun()
+    monkeypatch.setattr(ops.subprocess, "run", fake)
+    assert ops.main(["secret", "insert", "acme-svc-multi", "--var", "MIDVAR",
+                     "github:acme/web:API_KEY"]) == 0
+    argv, stdin = fake.calls[0]
+    assert argv == ["gh", "secret", "set", "API_KEY", "--repo", "acme/web"]
+    assert stdin == MID
+
+
+def test_insert_failure_returns_1_and_logs_fail(ops, vault_entries, monkeypatch, tmp_path):
+    monkeypatch.setattr(ops.subprocess, "run", FakeRun(rc=1))
+    assert ops.main(["secret", "insert", "acme-svc-multi", "--var", "MIDVAR",
+                     "github:acme/web:API_KEY"]) == 1
+    log = "".join(p.read_text() for p in (tmp_path / "logs" / "audit").glob("*.jsonl"))
+    assert '"result": "fail"' in log
+
+
+def test_log_from_hook_records_bash_and_never_fails(ops, tmp_path, monkeypatch, capsys):
+    payload = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "session_id": "s1",
+               "tool_input": {"command": f"curl -H 'x: {SECRET}' host"}}
+    monkeypatch.setattr(ops.sys, "stdin", io.StringIO(json.dumps(payload)))
+    assert ops.main(["log", "--from-hook"]) == 0
+    payload["hook_event_name"] = "PostToolUseFailure"
+    monkeypatch.setattr(ops.sys, "stdin", io.StringIO(json.dumps(payload)))
+    assert ops.main(["log", "--from-hook"]) == 0
+    monkeypatch.setattr(ops.sys, "stdin", io.StringIO("not json"))
+    assert ops.main(["log", "--from-hook"]) == 0
+    lines = [json.loads(ln) for p in (tmp_path / "logs" / "audit").glob("*.jsonl")
+             for ln in p.read_text().splitlines()]
+    assert [(e["actor"], e["action"], e["result"], e["ref"]) for e in lines] == [
+        ("claude", "bash", "ok", "s1"), ("claude", "bash", "fail", "s1")]
+    assert SECRET not in json.dumps(lines)
