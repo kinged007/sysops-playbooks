@@ -2,6 +2,7 @@
 """ops: fleet admin CLI (init, inventory, ssh, exec, log, inbox, wake, incident, secret, doctor)."""
 import argparse
 import datetime as dt
+import fcntl
 import hashlib
 import json
 import os
@@ -19,12 +20,13 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 FLEET_FILES = ["servers", "sites", "services", "providers", "notify"]
 SEVERITIES = ["info", "warn", "crit"]
-CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 LEAK = re.compile(
     r"tskey-|BEGIN (?:[A-Z]+ )?PRIVATE KEY|BEGIN CERTIFICATE|AKIA[0-9A-Z]{16}|sk-ant-|ghp_"
 )
 PLACEHOLDER = re.compile(r"^(<.*>|CHANGE_?ME|TODO|)$", re.I)
 HOOKS_PATH_KEY = "core.hooksPath"
+MIN_SECRET_LINE = 6
 
 DEFAULTS: dict[str, dict] = {
     "wake": {
@@ -95,8 +97,17 @@ def vault_value(name: str) -> str:
 
 def vault_values() -> list[str]:
     values: list[str] = []
-    for path in sorted((ROOT / "vault").glob("*.env")):
-        values += [v for v in parse_env_file(path).values() if len(v) >= 4]
+    for path in sorted((ROOT / "vault").rglob("*")):
+        if path.is_symlink() or not path.is_file() or path.name == "index.yaml":
+            continue
+        try:
+            text = path.read_text(errors="replace")
+        except OSError:
+            continue
+        lines = [ln.strip().strip("\"'") for ln in text.split("\n")]
+        values += [ln for ln in lines if len(ln) >= MIN_SECRET_LINE]
+        if path.suffix == ".env":
+            values += [v for v in parse_env_file(path).values() if len(v) >= 4]
     return values
 
 
@@ -111,16 +122,18 @@ def audit(action: str, target: str = "", via: str = "", cmd: str = "", result: s
     entry = {
         "ts": now().isoformat(),
         "actor": os.environ.get("USER") or os.environ.get("LOGNAME") or "unknown",
-        "action": action,
-        "target": target,
+        "action": redact(action),
+        "target": redact(target),
         "via": via,
         "cmd": redact(cmd),
         "result": result,
-        "ref": ref,
+        "ref": redact(ref),
     }
     path = ROOT / "logs" / "audit" / f"{now():%Y-%m}.jsonl"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a") as fh:
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path.parent.chmod(0o700)
+    fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    with os.fdopen(fd, "a") as fh:
         fh.write(json.dumps(entry) + "\n")
 
 
@@ -140,7 +153,7 @@ def perm_problems() -> list[str]:
 def pending_lines(inbox: Path) -> list[str]:
     if not inbox.exists():
         return []
-    lines = [ln.strip() for ln in inbox.read_text().splitlines()]
+    lines = [ln.strip() for ln in inbox.read_text().split("\n")]
     return [ln for ln in lines if ln and not ln.startswith("#")]
 
 
@@ -228,12 +241,15 @@ def connect_argv(server: dict, via: str | None, extra: list[str]) -> tuple[str, 
     if block is None:
         raise SystemExit(f"ops: server '{server['name']}' has no connect block for via={via}")
     kind = block["via"]
+    for field in ("host", "user", "workspace", "context"):
+        if str(block.get(field, "")).startswith("-"):
+            raise SystemExit(f"ops: server '{server['name']}': invalid {field} value")
     if kind == "ssh":
-        argv = ["ssh", "-i", str(ROOT / block["key"]), "-l", block["user"], block["host"]]
+        argv = ["ssh", "-i", str(ROOT / block["key"]), "-l", block["user"], "--", block["host"]]
     elif kind == "coder":
-        argv = ["coder", "ssh", block["workspace"]]
+        argv = ["coder", "ssh", "--", block["workspace"]]
     elif kind == "docker-context":
-        argv = ["docker", "--context", block["context"]]
+        argv = ["docker", f"--context={block['context']}"]
     else:
         raise SystemExit(f"ops: server '{server['name']}': unsupported via '{kind}'")
     return kind, argv + extra
@@ -298,31 +314,30 @@ def notify_telegram(name: str, text: str) -> None:
     resp.raise_for_status()
 
 
-def pid_alive(pid: int) -> bool:
+def acquire_lock(lock: Path) -> int | None:
+    fd = os.open(lock, os.O_CREAT | os.O_WRONLY, 0o600)
     try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return None
+    os.ftruncate(fd, 0)
+    os.write(fd, str(os.getpid()).encode())
+    return fd
 
 
-def acquire_lock(lock: Path) -> bool:
-    if lock.exists():
-        try:
-            if pid_alive(int(lock.read_text().strip())):
-                return False
-        except ValueError:
-            pass
-        lock.unlink(missing_ok=True)
+def run_agent(argv: list[str], env: dict) -> int:
     try:
-        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError:
-        return False
-    with os.fdopen(fd, "w") as fh:
-        fh.write(str(os.getpid()))
-    return True
+        proc = subprocess.Popen(argv, cwd=ROOT, env=env, start_new_session=True)
+    except OSError as exc:
+        print(f"ops: cannot start agent: {type(exc).__name__}", file=sys.stderr)
+        return 127
+    try:
+        return proc.wait()
+    except BaseException:
+        os.killpg(proc.pid, signal.SIGTERM)
+        proc.wait()
+        raise
 
 
 def cmd_wake(args) -> int:
@@ -333,10 +348,12 @@ def cmd_wake(args) -> int:
     pending = pending_lines(inbox)
     if not pending:
         return 0
-    if not acquire_lock(lock):
+    previous = signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+    lock_fd = acquire_lock(lock)
+    if lock_fd is None:
+        signal.signal(signal.SIGTERM, previous)
         return 0
     try:
-        signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
         if not args.force and state.exists() and state.read_text().strip() == pending_hash(pending):
             return 0
         argv = [wake["agent_cmd"]]
@@ -347,21 +364,22 @@ def cmd_wake(args) -> int:
         env = dict(os.environ, PATH=wake["path"])
         rc = 1
         try:
-            rc = subprocess.run(argv, cwd=ROOT, env=env).returncode
+            rc = run_agent(argv, env)
         finally:
             remaining = pending_lines(inbox)
-            state.write_text(pending_hash(remaining))
+            state.write_text(pending_hash([ln for ln in remaining if ln in pending]))
             audit("wake end", target=str(len(remaining)), result="ok" if rc == 0 else f"exit {rc}")
         if remaining:
             try:
                 notify_telegram(wake["notify"],
                                 f"ops wake: {len(remaining)} inbox line(s) still pending, "
                                 f"agent exit status {rc}")
-            except Exception as exc:
+            except (Exception, SystemExit) as exc:
                 print(f"ops: notification failed: {type(exc).__name__}", file=sys.stderr)
         return rc
     finally:
-        lock.unlink(missing_ok=True)
+        os.close(lock_fd)
+        signal.signal(signal.SIGTERM, previous)
 
 
 def slugify(text: str) -> str:
@@ -372,7 +390,9 @@ def cmd_incident_new(args) -> int:
     inbox = ROOT / load_config()["wake"]["inbox"]
     source_line = ""
     if args.from_inbox:
-        lines = inbox.read_text().splitlines() if inbox.exists() else []
+        lines = inbox.read_text().split("\n") if inbox.exists() else []
+        if lines and lines[-1] == "":
+            lines.pop()
         matches = [ln for ln in lines if ln.strip() == args.from_inbox.strip()]
         if not matches:
             print("ops: inbox line not found", file=sys.stderr)
@@ -429,7 +449,11 @@ def cmd_secret_check(args) -> int:
 
 def cmd_secret_fingerprint(args) -> int:
     value = vault_value(args.name)
-    print(f"sha256:{hashlib.sha256(value.encode()).hexdigest()[:12]} last4:{value[-4:]}")
+    digest = f"sha256:{hashlib.sha256(value.encode()).hexdigest()[:12]}"
+    if len(value) >= 16:
+        print(f"{digest} last4:{value[-4:]}")
+    else:
+        print(f"{digest} (value is short, last characters not shown)")
     audit("secret fingerprint", target=args.name)
     return 0
 
@@ -474,7 +498,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("ssh")
     p.add_argument("server")
     p.add_argument("--via")
-    p.add_argument("cmd", nargs="*")
+    p.add_argument("cmd", nargs=argparse.REMAINDER)
     p.set_defaults(func=cmd_ssh)
     p = sub.add_parser("exec")
     p.add_argument("service")

@@ -1,3 +1,4 @@
+import fcntl
 import json
 import os
 import stat
@@ -81,18 +82,20 @@ def test_empty_inbox_starts_nothing(ops, tmp_path):
 
 def test_held_lock_starts_nothing(ops, tmp_path):
     inbox(tmp_path, LINE + "\n")
-    (tmp_path / ".ops-wake.lock").write_text(str(os.getpid()))
-    assert ops.main(["wake"]) == 0
+    fd = os.open(tmp_path / ".ops-wake.lock", os.O_CREAT | os.O_WRONLY)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    try:
+        assert ops.main(["wake"]) == 0
+    finally:
+        os.close(fd)
     assert runs(tmp_path) == []
-    assert (tmp_path / ".ops-wake.lock").exists()
 
 
-def test_stale_lock_is_cleared(ops, tmp_path):
+def test_leftover_lock_file_does_not_block(ops, tmp_path):
     inbox(tmp_path, LINE + "\n")
-    (tmp_path / ".ops-wake.lock").write_text("999999999")
+    (tmp_path / ".ops-wake.lock").write_text(str(os.getpid()))
     ops.main(["wake"])
     assert len(runs(tmp_path)) == 1
-    assert not (tmp_path / ".ops-wake.lock").exists()
 
 
 def test_unchanged_pending_does_not_restart(ops, tmp_path):
@@ -138,7 +141,6 @@ def test_notification_failure_does_not_crash(ops, tmp_path, monkeypatch):
     monkeypatch.setattr(ops.requests, "post", boom)
     inbox(tmp_path, LINE + "\n")
     assert ops.main(["wake"]) == 0
-    assert not (tmp_path / ".ops-wake.lock").exists()
 
 
 def test_prompt_and_model_come_from_config_not_inbox(ops, tmp_path):
@@ -148,12 +150,34 @@ def test_prompt_and_model_come_from_config_not_inbox(ops, tmp_path):
     assert call == "--model m1 -p fixed prompt from config"
 
 
-def test_lock_removed_when_agent_missing(ops, tmp_path):
+def test_missing_agent_notifies_with_127(ops, tmp_path):
     inbox(tmp_path, LINE + "\n")
     write_config(tmp_path, tmp_path / "missing-agent")
-    with pytest.raises(FileNotFoundError):
-        ops.main(["wake"])
-    assert not (tmp_path / ".ops-wake.lock").exists()
+    assert ops.main(["wake"]) == 127
+    assert "exit status 127" in ops.sent[0][1]["json"]["text"]
+    fd = os.open(tmp_path / ".ops-wake.lock", os.O_CREAT | os.O_WRONLY)
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    os.close(fd)
+
+
+def test_line_added_during_run_triggers_next_run(ops, tmp_path):
+    inbox(tmp_path, LINE + "\n")
+    agent = tmp_path / "agent.sh"
+    agent.write_text(f'#!/bin/sh\necho x >> "$AGENT_LOG"\n'
+                     f'echo "2026-11-05T10:05:00+00:00 | cron | crit | late" '
+                     f'>> "{tmp_path}/incidents/inbox.md"\n')
+    ops.main(["wake"])
+    agent.write_text('#!/bin/sh\necho y >> "$AGENT_LOG"\n')
+    ops.main(["wake"])
+    assert len(runs(tmp_path)) == 2
+    ops.main(["wake"])
+    assert len(runs(tmp_path)) == 2
+
+
+def test_notify_without_record_keeps_exit_code(ops, tmp_path):
+    (tmp_path / "fleet" / "notify.yaml").write_text("[]\n")
+    inbox(tmp_path, LINE + "\n")
+    assert ops.main(["wake"]) == 0
 
 
 def test_wake_writes_audit_log(ops, tmp_path):
@@ -181,6 +205,71 @@ def test_inbox_add_valid(ops, tmp_path):
 def test_inbox_add_rejects_malformed(ops, tmp_path, args):
     assert ops.main(["inbox", "add", *args]) == 2
     assert not (tmp_path / "incidents" / "inbox.md").exists()
+
+
+def test_short_fingerprint_hides_last4(ops, tmp_path, capsys):
+    (tmp_path / "vault" / "short.env").write_text("TOKEN=abcd1234\n")
+    (tmp_path / "vault" / "short.env").chmod(0o600)
+    assert ops.main(["secret", "fingerprint", "short"]) == 0
+    out = capsys.readouterr().out
+    assert "1234" not in out and "short" in out
+
+
+def test_inbox_unicode_line_separators_cannot_forge_lines(ops, tmp_path):
+    assert ops.main(["inbox", "add", "cron", "warn", "a\x85b\u2028c\u2029d\x1ce"]) == 0
+    text = (tmp_path / "incidents" / "inbox.md").read_text()
+    assert len(ops.pending_lines(tmp_path / "incidents" / "inbox.md")) == 1
+    assert text.endswith("a b c d e\n")
+    (tmp_path / "incidents" / "inbox.md").write_text("one\x85two\u2028three\n")
+    assert ops.pending_lines(tmp_path / "incidents" / "inbox.md") == ["one\x85two\u2028three"]
+
+
+def test_redaction_covers_all_vault_files_and_multiline(ops, tmp_path, capsys):
+    (tmp_path / "vault" / "ssh").mkdir(mode=0o700)
+    (tmp_path / "vault" / "ssh").chmod(0o700)
+    key = tmp_path / "vault" / "ssh" / "id"
+    key.write_text("-----BEGIN KEY-----\nSECRETLINE-one\n-----END KEY-----\n")
+    key.chmod(0o600)
+    multi = tmp_path / "vault" / "multi.env"
+    multi.write_text('PEM="firstpart-xyz\nsecondpart-xyz"\n')
+    multi.chmod(0o600)
+    text = "a SECRETLINE-one b secondpart-xyz c firstpart-xyz"
+    assert "SECRETLINE" not in ops.redact(text)
+    assert "part-xyz" not in ops.redact(text)
+    ops.audit("log SECRETLINE-one", target="secondpart-xyz", ref="firstpart-xyz")
+    (file,) = (tmp_path / "logs" / "audit").glob("*.jsonl")
+    assert "xyz" not in file.read_text() and "SECRETLINE" not in file.read_text()
+
+
+def test_audit_permissions(ops, tmp_path):
+    ops.audit("x")
+    (file,) = (tmp_path / "logs" / "audit").glob("*.jsonl")
+    assert stat.S_IMODE(file.stat().st_mode) == 0o600
+    assert stat.S_IMODE(file.parent.stat().st_mode) == 0o700
+
+
+def test_ssh_argv_has_separator_and_rejects_option_values(ops, tmp_path):
+    block = {"via": "ssh", "key": "k", "user": "u", "host": "h"}
+    server = {"name": "s", "connect": [block]}
+    _, argv = ops.connect_argv(server, None, ["ls", "-la"])
+    assert argv[-4:] == ["--", "h", "ls", "-la"]
+    for field, value in [("host", "-oProxyCommand=x"), ("user", "-x")]:
+        bad = {"name": "s", "connect": [{**block, field: value}]}
+        with pytest.raises(SystemExit):
+            ops.connect_argv(bad, None, [])
+    bad = {"name": "s", "connect": [{"via": "coder", "workspace": "-x"}]}
+    with pytest.raises(SystemExit):
+        ops.connect_argv(bad, None, [])
+
+
+def test_ssh_command_options_pass_through(ops, tmp_path, monkeypatch):
+    (tmp_path / "fleet" / "servers.yaml").write_text(yaml.safe_dump(
+        [{"name": "srv", "connect": [{"via": "ssh", "key": "k", "user": "u", "host": "h"}]}]))
+    seen = []
+    done = ops.subprocess.CompletedProcess([], 0)
+    monkeypatch.setattr(ops.subprocess, "run", lambda argv, **kw: seen.append(argv) or done)
+    assert ops.main(["ssh", "srv", "ls", "-la"]) == 0
+    assert seen[0][-3:] == ["h", "ls", "-la"]
 
 
 def test_fingerprint_does_not_leak_value(ops, capsys):
