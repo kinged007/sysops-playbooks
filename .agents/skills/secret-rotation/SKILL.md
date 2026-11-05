@@ -22,7 +22,7 @@ Rules that apply to the whole run:
 - A provider reports abuse, or a daily or monthly limit was hit unexpectedly.
 - A secret is readable over HTTP (for example `/.env`), in a public repo, in a
   log, or in a transcript.
-- `ops inventory --stale` lists the entry as past its rotation window.
+- `ops secret list --stale` lists the entry as past its rotation window.
 - Not for: SSH host keys, database users that need grant changes, or recovering
   a provider account.
 
@@ -64,6 +64,8 @@ Rules for every step:
 - Every **WRITE** has a **Rollback** line.
 - Every fix is followed by a **Verify** step.
 - Log each action: `ops log "<action>" --target <target> --result ok|fail`.
+- Everything is logged (`AGENTS.md` 1.8): `ops` commands log themselves; log provider API calls with `ops log` right after.
+- Deploy the new value to each `used_by` target with `ops secret insert <entry> --all --dry-run`, then without `--dry-run` (a production **WRITE**).
 
 ### 0. Pre-flight
 

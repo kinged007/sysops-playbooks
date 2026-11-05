@@ -180,7 +180,7 @@ with the token read from the env file). Programmatic notify is deferred
       - host:contabo-02:/srv/acme-web/.env
   ```
 
-- `ops inventory --stale` surfaces entries past their rotation window.
+- `ops secret list --stale` surfaces entries past their rotation window.
 - `ops` refuses to run when `vault/` or key files are group/world-readable.
 - Values are compared by fingerprint (sha256 prefix or last 4 characters),
   never printed, when checking which key a deployment uses.
@@ -390,6 +390,12 @@ who use the pre-commit framework.
   `{"ts","actor","action","target","via","cmd","result","ref"}`. Secret
   values are never included; commands are logged after redaction of
   known vault values.
+- Logging is compulsory: every action on a remote system, provider API,
+  vault, fleet, DNS, deployment, or production data is logged, through an
+  `ops` command or `ops log`. A Claude Code `PostToolUse` (and
+  `PostToolUseFailure`) hook on `Bash` runs `bin/ops log --from-hook`, which
+  appends `{actor: "claude", action: "bash", cmd, result, ref: session_id}`
+  and always exits 0.
 
 ## 13. `ops` CLI spec
 
@@ -399,7 +405,8 @@ files.
 
 ```
 ops init                 scaffold gitignored dirs, install hooks, check perms
-ops inventory [--stale]  render fleet tables; --stale flags rotation debt
+ops fleet list [<kind>] | search <pattern>... | view <kind> <name>
+                         look up fleet records without reading whole files
 ops ssh <server> [--via ssh|coder|docker-context]
                          resolve connect block, connect, audit-log commands
 ops exec <service> <cmd> run skill command with vault env injected (redacted)
@@ -409,6 +416,12 @@ ops inbox add <source> <severity> "<summary>"
                          validated append to incidents/inbox.md
 ops wake [--force]       start the configured agent if the inbox has new pending lines
 ops incident new "<title>" [--from-inbox <line>] | ops incident close <id>
+ops secret list [--stale] | search <pattern>... | view <name>
+                         index lookup; view shows masked snippets only
+ops secret run <entry>[,..] -- <cmd>
+                         sh -c with vault env injected, output redacted
+ops secret insert <entry> [--var K] <target> | --all [--dry-run]
+                         write a value to host:/github:/file: targets
 ops secret check         perms + leak-pattern + placeholder audit
 ops secret fingerprint <name>
                          print sha256 prefix + last 4 of a vault value

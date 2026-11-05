@@ -53,20 +53,39 @@ plan with every production write flagged WRITE, and waits for approval.
 
 ```
 ops init                         scaffold gitignored files, install hooks, check permissions
-ops inventory [--stale]          list fleet records; --stale lists vault entries past rotation
+ops fleet list [<kind>]          kinds with counts, or the record names of one kind
+ops fleet search <pattern>...    match values and key paths in all records (| = OR)
+ops fleet view <kind> <name>     one record as key.path: value lines
 ops ssh <server> [--via V] [cmd] connect with the server's connect block (ssh, coder, docker-context)
-ops exec <service> <cmd>         run a command with the service's vault entries in env (output redacted)
+ops exec <service> <cmd>         run `sh -c <cmd>` with the service's vault entries in env (output redacted)
 ops log "<action>" [--target X] [--result ok|fail]
                                  append an audit log line
+ops log --from-hook              read a Claude Code hook JSON on stdin and log the Bash command
 ops inbox add <source> <severity> "<summary>"
                                  append a validated line to incidents/inbox.md
 ops wake [--force]               start the configured agent if the inbox has new pending lines
 ops incident new "<title>" [--from-inbox <line>]
 ops incident close <id>
+ops secret list [--stale]        vault entries with owner and purpose; --stale: past rotation
+ops secret search <pattern>...   match index metadata (never file contents)
+ops secret view <name>           metadata plus masked snippets, lengths, sha256 prefixes
+ops secret run <entry>[,..] -- '<cmd>'
+                                 run `sh -c <cmd>` with the entries in env (output redacted)
+ops secret insert <entry> [--var K] <target> | --all [--dry-run]
+                                 write a value to host:/github:/file: targets (production WRITE)
 ops secret check                 vault permissions, leak patterns, placeholders
 ops secret fingerprint <name>    sha256 prefix and last 4 characters of a vault value
 ops doctor                       fleet parse, vault index consistency, hook status
 ```
+
+## Audit log
+
+Every action on a remote system, provider API, the vault, the fleet, DNS, a
+deployment, or production data must be in `logs/audit/` (`AGENTS.md` 1.8).
+`ops` commands log automatically; other actions are logged with `ops log`.
+In Claude Code, a `PostToolUse` hook (`.claude/settings.json`) runs
+`bin/ops log --from-hook` and appends every Bash command, redacted, with actor
+`claude`. The hook never blocks or fails a tool call.
 
 ## Unattended incident handling
 
