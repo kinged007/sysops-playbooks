@@ -1,0 +1,41 @@
+#!/bin/sh
+# Safety net: dependency-free scan of staged changes. Always runs.
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+for f in $staged; do
+  case "$f" in
+    fleet/*.example.yaml) ;;
+    fleet/*|vault/*|runs/*|executions/*|ops.config.yaml)
+      echo "pre-commit: blocked path staged: $f" >&2; fail=1 ;;
+    incidents/README.md|incidents/inbox.example.md) ;;
+    incidents/*)
+      echo "pre-commit: blocked path staged: $f" >&2; fail=1 ;;
+  esac
+done
+
+pattern='BEGIN (OPENSSH |RSA |EC |DSA )?(PRIVATE|CERTIFICATE)|tskey-[A-Za-z0-9]'
+if command -v rg >/dev/null 2>&1; then
+  hits=$(git diff --cached -U0 --no-color | rg -n '^\+[^+]' | rg -e "$pattern" || true)
+else
+  hits=$(git diff --cached -U0 --no-color | grep -nE '^\+[^+]' | grep -E "$pattern" || true)
+fi
+if [ -n "$hits" ]; then
+  echo "pre-commit: secret pattern in staged changes (content not shown)" >&2
+  fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "pre-commit: commit blocked" >&2
+  exit 1
+fi
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --config .gitleaks.toml --redact || exit 1
+else
+  echo "pre-commit: gitleaks not installed, skipped (https://github.com/gitleaks/gitleaks#installing)" >&2
+fi
+if ! command -v trufflehog >/dev/null 2>&1; then
+  echo "pre-commit: trufflehog not installed, skipped (https://github.com/trufflesecurity/trufflehog#installation)" >&2
+fi
+exit 0

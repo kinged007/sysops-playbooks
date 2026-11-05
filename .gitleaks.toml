@@ -1,0 +1,26 @@
+title = "sysops-playbooks"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "tailscale-auth-key"
+description = "Tailscale auth key"
+regex = '''tskey-[A-Za-z0-9-]{8,}'''
+keywords = ["tskey-"]
+
+[[rules]]
+id = "anthropic-api-key"
+description = "Anthropic API key"
+regex = '''sk-ant-[A-Za-z0-9_-]{20,}'''
+keywords = ["sk-ant-"]
+
+[allowlist]
+description = "Synthetic placeholders and documentation ranges"
+regexes = [
+  '''<[A-Z][A-Z0-9_]*>''',
+  '''\b(192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}\b''',
+]
+paths = [
+  '''docs/superpowers/.*''',
+]
