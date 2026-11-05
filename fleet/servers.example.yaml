@@ -1,0 +1,25 @@
+- name: acme-vps-01
+  role: vps
+  provider: contabo
+  client: acme
+  connect:
+    - via: ssh
+      host: 203.0.113.10
+      user: ops
+      key: vault/ssh/acme-vps-01
+    - via: coder
+      workspace: acme-vps
+    - via: docker-context
+      context: acme-vps-01
+  sudo: {mode: scoped-nopasswd, binaries: [/usr/bin/tailscale]}
+
+- name: acme-mail-01
+  role: mail
+  provider: contabo
+  client: acme
+  connect:
+    - via: ssh
+      host: 198.51.100.20
+      user: ops
+      key: vault/ssh/acme-mail-01
+  sudo: {mode: none, binaries: []}

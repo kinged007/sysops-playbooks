@@ -1,0 +1,33 @@
+# Plan: <RUN NAME>
+
+| Field | Value |
+|---|---|
+| Client | <client> |
+| Skill | `wordpress-migration` |
+| Run folder | `runs/wordpress-migration/` or `runs/wordpress-migration-<suffix>/` |
+| Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
+| Status | draft → approved → executing → closed |
+
+## Fleet refs (THIS variant only)
+| Fleet record | Role | Purpose |
+|---|---|---|
+| `fleet/servers.yaml`: <server name> | <source/dest> | <what it does in this run> |
+| `fleet/sites.yaml`: <site name> | <site> | <domain, web root, stack> |
+
+## Vault entries (THIS variant only)
+<Vault entry names `<client>-<provider>-<purpose>`; never inline values here>
+Vault entries persist across invocations — rotate them in place.
+
+## Steps
+Numbered steps mirroring `runbook.md`, with **WRITE** flags:
+
+1. <step> (read)
+2. <step> (**WRITE** — describe exactly what changes on which host)
+3. ...
+
+## Risk assessment
+<What could go wrong; what is the blast radius; rollback plan>
+
+## Approval
+- [ ] Operator reviewed plan and set permission mode: <A or B>
+- [ ] Operator approved execution on <date>

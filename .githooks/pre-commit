@@ -1,0 +1,51 @@
+#!/bin/bash
+# Safety net: dependency-free scan of staged changes. Always runs.
+fail=0
+root=$(git rev-parse --show-toplevel)
+PATH="$root/.tools/bin:$PATH"
+
+while IFS= read -r -d '' f; do
+  case "$f" in
+    fleet/*.example.yaml)
+      case "${f#fleet/}" in */*) echo "pre-commit: blocked path staged: $f" >&2; fail=1 ;; esac ;;
+    fleet/*|vault/*|runs/*|executions/*|logs/*|secrets/*|*/secrets/*|ops.config.yaml|\
+.ops-wake.state|.ops-wake.lock|.env|.env.*|*/.env|*/.env.*|*.key|*.pem|*.tfvars|*.tfvars.json|servers/*)
+      case "$f" in
+        .env.example|*/.env.example) ;;
+        *) echo "pre-commit: blocked path staged: $f" >&2; fail=1 ;;
+      esac ;;
+    incidents/README.md|incidents/inbox.example.md) ;;
+    incidents/*)
+      echo "pre-commit: blocked path staged: $f" >&2; fail=1 ;;
+  esac
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+pattern='BEGIN (OPENSSH |RSA |EC |DSA )?(PRIVATE|CERTIFICATE)|BEGIN [A-Z ]*PRIVATE KEY|tskey-[A-Za-z0-9]|AKIA[0-9A-Z]{16}|sk-ant-|ghp_'
+hits=$(git diff --cached -U0 --no-color | grep -E '^\+' | grep -vE '^\+\+\+ ' | grep -E -e "$pattern" || true)
+if [ -n "$hits" ]; then
+  echo "pre-commit: secret pattern in staged changes (content not shown)" >&2
+  fail=1
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo "pre-commit: commit blocked" >&2
+  exit 1
+fi
+
+for tool in gitleaks trufflehog; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "pre-commit: $tool not found; run \`ops tools install\`" >&2
+    exit 1
+  fi
+done
+
+gitleaks protect --staged --config .gitleaks.toml --redact || exit 1
+
+scan_dir=$(mktemp -d)
+trap 'rm -rf "$scan_dir"' EXIT
+git checkout-index -a --prefix="$scan_dir/"
+trufflehog filesystem "$scan_dir" --no-update --fail --no-verification >/dev/null || {
+  echo "pre-commit: trufflehog found a secret in staged content" >&2
+  exit 1
+}
+exit 0

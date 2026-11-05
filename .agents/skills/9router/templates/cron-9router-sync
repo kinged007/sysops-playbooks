@@ -1,0 +1,43 @@
+# 9Router Model Inventory + Sync Cron — Every 3 Days
+# =====================================================
+# Install: sudo cp cron-9router-sync /etc/cron.d/9router-sync
+# Or user crontab: crontab -e  → paste the line below
+# (requires cron daemon running: sudo systemctl enable --now cron)
+
+# Runs every 3 days at 03:30 UTC (adjust time as needed)
+# Model inventory runs first (~15-30 min), then sync runs (~5-15 min)
+# Logs: runs/9router/logs/<timestamp>-model-inventory-cron.log
+#       runs/9router/logs/<timestamp>-9router-sync-cron.log
+
+# System-wide (needs root):
+# 30 3 */3 * * root /home/coder/sysops-playbooks/.agents/skills/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
+# 45 3 */3 * * root /home/coder/sysops-playbooks/.agents/skills/9router/scripts/9router-sync-cron.sh >> /var/log/9router-sync-cron.log 2>&1
+
+# User crontab (no root):
+# 30 3 */3 * * /home/coder/sysops-playbooks/.agents/skills/9router/scripts/model-inventory-cron.sh >> ~/model-inventory-cron.log 2>&1
+# 45 3 */3 * * /home/coder/sysops-playbooks/.agents/skills/9router/scripts/9router-sync-cron.sh >> ~/9router-sync-cron.log 2>&1
+
+# Alternative: systemd timer (recommended for servers)
+# See templates/systemd-9router-sync.{service,timer}
+# Install:
+#   sudo cp templates/systemd-9router-sync.service /etc/systemd/system/
+#   sudo cp templates/systemd-9router-sync.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now 9router-sync.timer
+# Timer runs every 3 days (OnCalendar=*-*-*/3 03:30)
+
+# Environment for cron (user crontab needs these):
+# REPO_ROOT=/home/coder/sysops-playbooks
+# PYTHON_BIN=/home/coder/sysops-playbooks/.venv/bin/python
+# NINEROUTER_URL=https://router.example.org
+# AA_API_KEY=...  (optional, for Artificial Analysis intelligence scores)
+# GOOGLE_API_KEY=...
+# OPENCODE_ZEN_API_KEY=...
+# OPENCODE_GO_API_KEY=...
+# CLOUDFLARE_API_TOKEN=...
+# CLOUDFLARE_ACCOUNT_ID=...
+# OLLAMA_API_KEY=...
+# OPENROUTER_API_KEY=...
+# COMMAND_CODE_API_KEY=...
+
+# Note: The scripts auto-discover the execution variant (runs/9router/ or
+# runs/9router-<suffix>/) and use its config/secrets. No config args needed.

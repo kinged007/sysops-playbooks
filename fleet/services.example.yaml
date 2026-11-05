@@ -1,0 +1,13 @@
+- name: acme-router
+  host: acme-vps-01
+  client: acme
+  compose_path: /srv/acme-router/docker-compose.yml
+  health: http://127.0.0.1:20128/health
+  skill: 9router
+
+- name: acme-mailu
+  host: acme-mail-01
+  client: acme
+  compose_path: /srv/mailu/docker-compose.yml
+  health: https://mail.example.com/health
+  skill: mail

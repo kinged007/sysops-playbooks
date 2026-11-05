@@ -1,0 +1,17 @@
+# Copy to ops.config.yaml (gitignored). `ops init` does this when the file is missing.
+wake:
+  agent_cmd: claude              # any CLI agent; absolute path or found via `path`
+  model: claude-sonnet-5-5       # passed as --model; empty to omit
+  flags: ["-p"]                  # operator adds e.g. --dangerously-skip-permissions
+  prompt: "Process incidents/inbox.md per AGENTS.md and report via notify target."
+  inbox: incidents/inbox.md
+  lock: .ops-wake.lock
+  state: .ops-wake.state         # hash of pending lines after the last run
+  path: /usr/local/bin:/usr/bin:/bin   # PATH passed to the agent (cron has a minimal PATH)
+  notify: operator               # record name in fleet/notify.yaml
+
+inbox:
+  sources: [cron, netdata, uptime, webhook, operator]
+
+vault:
+  rotation_days: 90              # `ops secret list --stale` flags older last_rotated dates

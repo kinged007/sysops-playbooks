@@ -3,14 +3,14 @@ import sys
 import tempfile
 import importlib.util
 
-# Shim: make playbooks/9router/scripts/9router-sync.py importable as
-# playbooks_9router_scripts_9router_sync (handles hyphen and leading digit)
-_MODULE_NAME = "playbooks_9router_scripts_9router_sync"
+# Shim: make .agents/skills/9router/scripts/9router-sync.py importable as
+# skills_9router_scripts_9router_sync (handles hyphen and leading digit)
+_MODULE_NAME = "skills_9router_scripts_9router_sync"
 # Try multiple locations for the scaffold file
 _candidates = [
-    pathlib.Path(__file__).resolve().parents[2] / "playbooks" / "9router" / "scripts" / "9router-sync.py",
-    pathlib.Path("playbooks/9router/scripts/9router-sync.py"),
-    pathlib.Path("D:/Data/git/sysops-playbooks/playbooks/9router/scripts/9router-sync.py"),
+    pathlib.Path(__file__).resolve().parents[2] / ".agents" / "skills" / "9router" / "scripts" / "9router-sync.py",
+    pathlib.Path(".agents/skills/9router/scripts/9router-sync.py"),
+    pathlib.Path("D:/Data/git/sysops-playbooks/.agents/skills/9router/scripts/9router-sync.py"),
 ]
 _TARGET = None
 for _c in _candidates:
@@ -35,7 +35,7 @@ if _TARGET is not None and _TARGET.exists() and _MODULE_NAME not in sys.modules:
 
 
 def test_find_configs_discovers_execution_variant():
-    from playbooks_9router_scripts_9router_sync import find_sync_configs
+    from skills_9router_scripts_9router_sync import find_sync_configs
     # should return list, not crash, when no config exists
     with tempfile.TemporaryDirectory() as td:
         configs = find_sync_configs(search_root=pathlib.Path(td))
@@ -44,7 +44,7 @@ def test_find_configs_discovers_execution_variant():
 
 def test_load_inventory_and_map(tmp_path):
     import json
-    from playbooks_9router_scripts_9router_sync import load_inventory, map_provider
+    from skills_9router_scripts_9router_sync import load_inventory, map_provider
     inv_dir = tmp_path / "model-inventory"
     inv_dir.mkdir()
     data = {"count":2,"models":[
@@ -63,7 +63,7 @@ def test_load_inventory_and_map(tmp_path):
 
 
 def test_global_filter():
-    from playbooks_9router_scripts_9router_sync import apply_global_filter
+    from skills_9router_scripts_9router_sync import apply_global_filter
     models=[
         {"provider":"opencode_zen","model_id":"a","intelligence":60,"cost_per_task":0.12,"free":False},
         {"provider":"google","model_id":"b","intelligence":None,"cost_per_task":0.1,"free":True},
@@ -94,7 +94,7 @@ def test_global_filter():
 
 
 def test_combo_pipeline():
-    from playbooks_9router_scripts_9router_sync import apply_combo_pipeline
+    from skills_9router_scripts_9router_sync import apply_combo_pipeline
     models=[
         {"provider":"oc","model_id":"deepseek-v4-pro","routed":"oc/deepseek-v4-pro","intelligence":53,"cost_per_task":0.26,"free":False},
         {"provider":"oc","model_id":"deepseek-v4-flash","routed":"oc/deepseek-v4-flash","intelligence":51,"cost_per_task":0.11,"free":False},
@@ -122,14 +122,14 @@ def test_combo_pipeline():
 
 
 def test_ninerouter_auth_helpers_exist():
-    from playbooks_9router_scripts_9router_sync import get_ninerouter_creds, http_request, login_and_get_session
+    from skills_9router_scripts_9router_sync import get_ninerouter_creds, http_request, login_and_get_session
     assert callable(get_ninerouter_creds)
     assert callable(http_request)
     assert callable(login_and_get_session)
 
 
 def test_provider_diff():
-    from playbooks_9router_scripts_9router_sync import diff_providers
+    from skills_9router_scripts_9router_sync import diff_providers
     current={"oc":["a","b"], "ocg":["x"]}
     desired={"oc":["a","c"], "ocg":["x"]}
     diff=diff_providers(current, desired)
@@ -139,7 +139,7 @@ def test_provider_diff():
 
 
 def test_combo_diff():
-    from playbooks_9router_scripts_9router_sync import diff_combos
+    from skills_9router_scripts_9router_sync import diff_combos
     current={"free":["a","b"], "coding-low":["x"]}
     desired={"free":["a","c"], "coding-low":["x"]}
     d=diff_combos(current, desired)
@@ -147,7 +147,7 @@ def test_combo_diff():
 
 
 def test_cli_generation(tmp_path):
-    from playbooks_9router_scripts_9router_sync import write_cli_configs
+    from skills_9router_scripts_9router_sync import write_cli_configs
     # mock models list
     models=[{"id":"oc/grok-4.6","owned_by":"oc"}, {"id":"free","owned_by":"combo"}]
     out=tmp_path / "generated"
@@ -157,18 +157,19 @@ def test_cli_generation(tmp_path):
 
 def test_combo_limit_context(tmp_path):
     import json
-    from playbooks_9router_scripts_9router_sync import write_cli_configs
+    from skills_9router_scripts_9router_sync import write_cli_configs
     models=[{"id":"oc/grok-4.6","owned_by":"oc","context_length":1000000}, {"id":"free","owned_by":"combo"}]
     out=tmp_path / "generated"
     write_cli_configs(models, "https://router.example.com", out, "free")
     cfg=json.loads((out / "opencode.json").read_text(encoding="utf-8"))
     ms=cfg["provider"]["9router"]["models"]
     assert ms["free"]["limit"]=={"context":262144,"output":16384}
-    assert ms["oc/grok-4.6"]["limit"]=={"context":1000000,"output":16384}
+    assert ms["oc/grok-4.6"]["limit"]=={"context":262144,"output":16384}
     out2=tmp_path / "generated2"
     write_cli_configs(models, "https://router.example.com", out2, "free", 1048576)
     cfg2=json.loads((out2 / "opencode.json").read_text(encoding="utf-8"))
     assert cfg2["provider"]["9router"]["models"]["free"]["limit"]=={"context":1048576,"output":16384}
+    assert cfg2["provider"]["9router"]["models"]["oc/grok-4.6"]["limit"]=={"context":1000000,"output":16384}
     try:
         import yaml
         h=yaml.safe_load((out / "hermes-config.yaml").read_text(encoding="utf-8"))
@@ -177,7 +178,7 @@ def test_combo_limit_context(tmp_path):
     if h:
         hm=h["providers"]["9router"]["models"]
         assert hm["free"]["context_length"]==262144
-        assert hm["oc/grok-4.6"]["context_length"]==1000000
+        assert hm["oc/grok-4.6"]["context_length"]==262144
     pi=json.loads((out / "pi-models-snippet.json").read_text(encoding="utf-8"))
     pm={m["id"]:m for m in pi["providers"]["9router"]["models"]}
     assert pm["free"]["contextWindow"]==262144
@@ -185,7 +186,7 @@ def test_combo_limit_context(tmp_path):
 
 def test_active_model_first(tmp_path):
     import json
-    from playbooks_9router_scripts_9router_sync import write_cli_configs
+    from skills_9router_scripts_9router_sync import write_cli_configs
     models=[{"id":"a","owned_by":"oc"},{"id":"free","owned_by":"combo"},{"id":"coding-manual","owned_by":"combo"}]
     out=tmp_path / "generated"
     write_cli_configs(models, "https://router.example.com", out, "coding-manual")
@@ -201,8 +202,8 @@ def test_active_model_first(tmp_path):
 
 
 def test_no_unnecessary_writes(monkeypatch):
-    from playbooks_9router_scripts_9router_sync import sync_providers
-    import playbooks_9router_scripts_9router_sync as mod
+    from skills_9router_scripts_9router_sync import sync_providers
+    import skills_9router_scripts_9router_sync as mod
     monkeypatch.setattr(mod, "fetch_current_provider_models", lambda s, u: {"oc": ["a", "b"]})
     calls = []
     monkeypatch.setattr(mod, "http_request", lambda *a, **k: (calls.append(a), (200, {}))[1])
@@ -212,8 +213,8 @@ def test_no_unnecessary_writes(monkeypatch):
 
 
 def test_dry_run_prevents_provider_writes(monkeypatch):
-    from playbooks_9router_scripts_9router_sync import sync_providers
-    import playbooks_9router_scripts_9router_sync as mod
+    from skills_9router_scripts_9router_sync import sync_providers
+    import skills_9router_scripts_9router_sync as mod
     monkeypatch.setattr(mod, "fetch_current_provider_models", lambda s, u: {"oc": ["a"]})
     calls = []
     monkeypatch.setattr(mod, "http_request", lambda *a, **k: (calls.append(a), (200, {}))[1])
@@ -223,8 +224,8 @@ def test_dry_run_prevents_provider_writes(monkeypatch):
 
 
 def test_dry_run_prevents_combo_writes(monkeypatch):
-    from playbooks_9router_scripts_9router_sync import sync_combos
-    import playbooks_9router_scripts_9router_sync as mod
+    from skills_9router_scripts_9router_sync import sync_combos
+    import skills_9router_scripts_9router_sync as mod
     monkeypatch.setattr(mod, "fetch_current_combos", lambda s, u: {"free": ["a"]})
     monkeypatch.setattr(mod, "fetch_combo_ids", lambda s, u: {"free": "id123"})
     calls = []
@@ -235,8 +236,8 @@ def test_dry_run_prevents_combo_writes(monkeypatch):
 
 
 def test_no_unnecessary_combo_writes(monkeypatch):
-    from playbooks_9router_scripts_9router_sync import sync_combos
-    import playbooks_9router_scripts_9router_sync as mod
+    from skills_9router_scripts_9router_sync import sync_combos
+    import skills_9router_scripts_9router_sync as mod
     monkeypatch.setattr(mod, "fetch_current_combos", lambda s, u: {"free": ["a", "b"]})
     monkeypatch.setattr(mod, "fetch_combo_ids", lambda s, u: {"free": "id123"})
     calls = []

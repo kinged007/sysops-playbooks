@@ -1,0 +1,19 @@
+- name: acme-web
+  domain: www.example.com
+  client: acme
+  dns_provider: acme-cloudflare
+  registrar: acme-cloudflare
+  host: acme-vps-01
+  deploy: docker-compose
+  repo: https://git.example.com/acme/web.git
+  health_url: https://www.example.com/healthz
+
+- name: acme-blog
+  domain: blog.example.org
+  client: acme
+  dns_provider: acme-cloudflare
+  registrar: acme-cloudflare
+  host: acme-vps-01
+  deploy: git-pull
+  repo: https://git.example.com/acme/blog.git
+  health_url: https://blog.example.org/

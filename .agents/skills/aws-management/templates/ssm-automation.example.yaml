@@ -1,0 +1,22 @@
+# Minimal SSM Automation document skeleton — placeholders only.
+# Copy to templates/ or the execution's logs/ and fill in real values.
+# Reference: https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html
+---
+schemaVersion: '0.3'
+description: '<ONE-LINE PURPOSE>'
+assumeRole: 'arn:aws:iam::<AWS_ACCOUNT_ID>:role/<AUTOMATION_ROLE_NAME>'
+parameters:
+  InstanceId:
+    type: String
+    description: Target instance
+mainSteps:
+  - name: runCommand
+    action: aws:runCommand
+    inputs:
+      DocumentName: AWS-RunShellScript
+      InstanceIds:
+        - '{{ InstanceId }}'
+      Parameters:
+        commands:
+          - 'echo hello from {{ InstanceId }}'
+    description: Example step — replace with the skill investigation logic
