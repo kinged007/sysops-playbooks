@@ -2,16 +2,16 @@
 
 Snapshot of `.agents/skills/aws-management/SKILL.md` being executed, with
 real values filled in. State lives here and in `logs/` — any agent session can
-resume from these files alone. This folder is persistent per playbook variant
-(`executions/aws-management[/-<suffix>]/`); subsequent invocations append to it,
+resume from these files alone. This folder is persistent per skill variant
+(`runs/aws-management[-<suffix>]/`); subsequent invocations append to it,
 never replace it. `logs/` is append-only — each session adds
 timestamp-prefixed files (e.g. `logs/2026-08-29T143000-01-discover.log`).
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | `aws-management` |
-| Execution folder | `executions/aws-management/` or `executions/aws-management-<suffix>/` |
+| Skill | `aws-management` |
+| Run folder | `runs/aws-management/` or `runs/aws-management-<suffix>/` |
 | Client | <client> |
 | AWS account | `<AWS_ACCOUNT_ID>` / `<ACCOUNT_ALIAS>` |
 | Region | `<AWS_REGION>` |
@@ -67,4 +67,4 @@ Time-stamped escalation attempts (who, when, how, outcome). Not a WRITE to AWS.
 
 - [ ] Runbook complete (all steps done or blocked+explained)
 - [ ] Findings appended to `notes.md` (cumulative history — do not overwrite; date header per session)
-- [ ] Promotion candidates proposed to operator (→ playbook `notes/gotchas.md` or `templates/`)
+- [ ] Promotion candidates proposed to operator (→ skill `references/gotchas.md` or `templates/`)

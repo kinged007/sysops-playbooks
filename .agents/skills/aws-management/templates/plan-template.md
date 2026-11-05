@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Client | <client> |
-| Playbook | `aws-management` |
-| Execution folder | `executions/aws-management/` or `executions/aws-management-<suffix>/` |
+| Skill | `aws-management` |
+| Run folder | `runs/aws-management/` or `runs/aws-management-<suffix>/` |
 | Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
 | Status | draft → approved → executing → closed |
 
@@ -24,17 +24,17 @@
 | Management host | `<workstation / bastion alias or "local">` |
 | Network path | direct egress / NAT / proxy `<PROXY_URL>` / isolated VPC endpoints |
 
-Real values never go in the playbook — only here and in `inventory.md` / `secrets/`.
-Record SSO URLs, ARNs, and proxy URLs in `inventory.md`; keys and tokens only in `secrets/`.
+Real values never go in the skill — only here and in the fleet record / vault.
+Record SSO URLs, ARNs, and proxy URLs in the fleet record; keys and tokens only in the vault.
 
-## Credentials / secrets (THIS variant only)
+## Vault entries (THIS variant only)
 
-Files in `secrets/` of this execution folder; never inline values here.
-Secrets persist in this folder across invocations — update in place when rotating.
+Vault entry names `<client>-<provider>-<purpose>`; never inline values here.
+Vault entries persist across invocations — rotate in place.
 
-- `secrets/aws-credentials.<PROFILE>.env` — `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` if using keys (0600)
-- `~/.aws/sso/cache/` — SSO token cache (outside executions; note expiry in inventory)
-- `secrets/assume-role.<ROLE>.json` — `sts assume-role` output if using cross-account
+- `<client>-aws-<PROFILE>-access-key` — `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` if using keys
+- `~/.aws/sso/cache/` — SSO token cache (outside the vault; note expiry in the fleet record)
+- `<client>-aws-<ROLE>-assume-role` — `sts assume-role` output if using cross-account
 
 ## Task definition
 
