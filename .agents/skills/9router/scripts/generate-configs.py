@@ -33,6 +33,8 @@ import os
 import pathlib
 import sys
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[4]
+
 try:
     import requests  # prefer requests if available
 except ImportError:
@@ -40,14 +42,14 @@ except ImportError:
 
 def load_secrets():
     candidates_url = [
-        pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets/ninerouter-url.txt"),
+        (REPO_ROOT / "runs/9router/secrets/ninerouter-url.txt"),
         pathlib.Path("runs/9router/secrets/ninerouter-url.txt"),
         pathlib.Path("runs/9router/secrets/ninerouter-url.txt"),
     ]
     candidates_key = [
-        pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets/9router-api-key.txt"),
+        (REPO_ROOT / "runs/9router/secrets/9router-api-key.txt"),
         pathlib.Path("runs/9router/secrets/9router-api-key.txt"),
-        pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets/ninerouter-key.txt"),
+        (REPO_ROOT / "runs/9router/secrets/ninerouter-key.txt"),
     ]
     url = None
     key = None
@@ -235,25 +237,12 @@ def main():
     if base_url.endswith("/v1"):
         base_url = base_url[:-3]
 
-    out_dir = pathlib.Path(args.out) if args.out else pathlib.Path(__file__).resolve().parents[1] / "generated" if (pathlib.Path(__file__).resolve().parents[1] / "generated").exists() or True else pathlib.Path("generated")
-    # prefer runs/9router/generated when run from the repo, else ./generated
-    try:
-        # if script is in .agents/skills/9router/scripts, generated should be runs/9router/generated
-        if "playbooks" in str(pathlib.Path(__file__).resolve()):
-            cand = pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/generated")
-            if cand.exists() or True:
-                out_dir = cand if not args.out else pathlib.Path(args.out)
-        else:
-            out_dir = pathlib.Path(args.out) if args.out else pathlib.Path("generated")
-    except:
-        out_dir = pathlib.Path(args.out) if args.out else pathlib.Path("generated")
-    # final fallback
-    if not args.out:
-        # check runs variant
-        if pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router").exists():
-            out_dir = pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/generated")
-        else:
-            out_dir = pathlib.Path("generated")
+    if args.out:
+        out_dir = pathlib.Path(args.out)
+    elif (REPO_ROOT / "runs/9router").exists():
+        out_dir = REPO_ROOT / "runs/9router/generated"
+    else:
+        out_dir = pathlib.Path("generated")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Fetching {base_url}/v1/models ...")

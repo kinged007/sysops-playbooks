@@ -29,8 +29,8 @@ Applies to all levels as secondary sort after `cost` (so cheaper models first, b
 
 ## Updating
 
-- Add providers/models via Dashboard, then `GET /v1/models` → refresh `models.json` here, or run `python .agents/skills/9router/scripts/generate-configs.py` (live fetch) and `python scripts/generate-threshold.py` (with your thresholds 50/40/30) then copy the edited `runs/9router/combos/*.json|*.csv` to here.
-- Or edit `runs/9router/combos/*.csv` order directly, then `python fix-ranks.py` to re-sequence ranks and sync `*.json`.
+- Add providers/models via Dashboard, then `GET /v1/models` and refresh `models.json` here, or run `python .agents/skills/9router/scripts/generate-configs.py` (live fetch).
+- Combo membership and order come from the `combos` section of `runs/9router/9router-sync.config.yaml`; `scripts/9router-sync.py` applies it.
 
 ## Generated configs
 

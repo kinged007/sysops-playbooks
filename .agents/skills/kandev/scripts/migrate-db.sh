@@ -153,7 +153,6 @@ if [[ "$MODE" == "sqlite-to-postgres" ]]; then
   chmod 0600 "$SNAP"
   echo "  also copy $HOME_DIR/data/master.key with 0600 — needed with any dump"
   # pgloader
-  PGURL="pgsql://kandev:${PGPASSWORD:-<set PGPASSWORD or .pgpass>}@${PGHOST:-localhost}:${PGPORT:-5432}/${PGDATABASE:-kandev}"
   echo "==> pgloader sqlite:///$SRC → pgsql://kandev@\${PGHOST}:\${PGPORT}/\${PGDATABASE}"
   # Use $PG* env so pgloader inherits them; do not echo password
   pgloader "sqlite:///$SRC" "pgsql://kandev@${PGHOST:-localhost}:${PGPORT:-5432}/${PGDATABASE:-kandev}" 2>&1 | sed 's/^/  /' || { echo "FAIL: pgloader" >&2; exit 1; }

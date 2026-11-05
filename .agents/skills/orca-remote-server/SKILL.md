@@ -144,7 +144,7 @@ Rules:
   `pairing_address`, `fixed_port?`,
   `tailscale_required? (yes/no + why)`.
 - Any later discovery that the network differs from the recorded answers →
-  **DEVIATION**: stop, re-ask, get re-approval (AGENTS.md §3.4/§3.6).
+  **DEVIATION**: stop, re-ask, get re-approval (AGENTS.md §4.1 step 6).
 
 ### Roles
 

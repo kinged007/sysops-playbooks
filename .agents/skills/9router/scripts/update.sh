@@ -91,7 +91,9 @@ if [[ -z "$NO_BACKUP" ]]; then
   say "==> Step 1/3 — backing up before update (mandatory)"
   SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
   if [[ -f "$SCRIPT_DIR/backup.sh" ]]; then
-    bash "$SCRIPT_DIR/backup.sh" --alias "$ALIAS" --variant "$VARIANT" $([[ -n "$COMPOSE_DIR" ]] && echo "--compose-dir $COMPOSE_DIR" || true)
+    BACKUP_ARGS=(--alias "$ALIAS" --variant "$VARIANT")
+    [[ -n "$COMPOSE_DIR" ]] && BACKUP_ARGS+=(--compose-dir "$COMPOSE_DIR")
+    bash "$SCRIPT_DIR/backup.sh" "${BACKUP_ARGS[@]}"
   else
     say "WARN: backup.sh not found next to update.sh — skipping backup (pass --no-backup to silence)"
   fi

@@ -122,8 +122,8 @@ def show(header, rows):
 # ponytail: single-statement execute only (no multi-statement scripts);
 # upgrade to executescript/split when a run needs it.
 def main():
-    ap = argparse.ArgumentParser(description="Query a database via its execution-folder secrets.")
-    ap.add_argument("--exec", default=None, help="execution folder (reads <exec>/secrets/db.env)")
+    ap = argparse.ArgumentParser(description="Query a database via its run-folder secrets.")
+    ap.add_argument("--exec", default=None, help="run folder (reads <exec>/secrets/db.env)")
     ap.add_argument("--secrets", default=None, help="secrets file path (overrides --exec)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("tables", help="list tables")

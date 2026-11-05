@@ -341,7 +341,7 @@ is on the source). Use **M3** only when the access ladder forces it.
       DNS record `staging.<DOMAIN>` → destination IP, or confirm
       `/etc/hosts` preview is acceptable (preferred for "same domain, HTTPS,
       no cert for staging" simplicity — but note mixed-content/cookies
-      caveats in §6.3).
+      caveats in §5.6).
 - [ ] If Branch B: confirm the destination can be reached from the source on
       the transfer port (or source from destination) and that the **delta
       sync path is pre-tested** (§9.2) before the day.
@@ -922,7 +922,7 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
 - [ ] If **CDN proxied (orange cloud)**: TTL is irrelevant (CDN manages it);
       instead plan to **purge cache** after the cutover and consider
       temporarily switching to DNS-only (grey cloud) during the flip so the
-      edge doesn't serve stale origin. (Trade-off, see §12.)
+      edge doesn't serve stale origin. (Trade-off: the origin IP is exposed while DNS-only.)
 - [ ] Confirm the destination IP is stable and reachable from the wider
       internet (firewall open on 80/443 — T7).
 - [ ] **Pre-test the delta sync** (dry run today): run the exact final-sync
@@ -963,7 +963,7 @@ shortest window possible, because the source is still live until DNS flips.
 #### 9.3 The DNS flip
 
 - [ ] **WRITE** — Change the A/CNAME record to the destination IP (or the
-      appropriate record per §2.5/N1–N3). Rollback: revert record to source
+      appropriate record per §1.5, N1–N3). Rollback: revert record to source
       IP (R2).
 - [ ] **WRITE** — (CDN proxied) purge cache / ensure it re-fetches from the
       new origin.

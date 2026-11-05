@@ -45,6 +45,8 @@ import sys
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[4]
+
 # ---------------------------------------------------------------------------
 # Optional deps
 # ---------------------------------------------------------------------------
@@ -65,7 +67,7 @@ DEFAULT_CONFIG_CANDIDATES = [
     pathlib.Path("model-inventory.config.yaml"),
     pathlib.Path(".agents/skills/9router/scripts/model-inventory.config.yaml"),
     pathlib.Path("runs/9router/model-inventory.config.yaml"),
-    pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/model-inventory.config.yaml"),
+    (REPO_ROOT / "runs/9router/model-inventory.config.yaml"),
     pathlib.Path(".agents/skills/9router/templates/model-inventory.config.example.yaml"),
 ]
 
@@ -144,7 +146,7 @@ def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
         candidates.append(config_path.parent / "secrets" / ".env")
         candidates.append(config_path.parent / "secrets" / "api_keys.env")
     # standard execution layouts
-    for base in [pathlib.Path("runs/9router"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router")]:
+    for base in [pathlib.Path("runs/9router"), (REPO_ROOT / "runs/9router")]:
         candidates.append(base / ".env")
         candidates.append(base / "secrets" / ".env")
         candidates.append(base / "secrets" / "api_keys.env")
@@ -171,7 +173,7 @@ def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
         seen.add(str(r))
         _load_dotenv_file(cand)
     # also load per-key .txt files from secrets/
-    for base in [pathlib.Path("runs/9router/secrets"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets")]:
+    for base in [pathlib.Path("runs/9router/secrets"), (REPO_ROOT / "runs/9router/secrets")]:
         _load_secret_files(base)
     if config_path:
         # config's secrets dir as well
@@ -294,7 +296,7 @@ def find_config(cli_path: Optional[str]) -> Optional[pathlib.Path]:
         except Exception:
             pass
         # Absolute fallback from defaults
-        abs_exec = pathlib.Path("D:/Data/git/sysops-playbooks/runs")
+        abs_exec = (REPO_ROOT / "runs")
         if abs_exec.exists() and abs_exec not in search_roots:
             search_roots.append(abs_exec)
         candidates: List[pathlib.Path] = []

@@ -7,6 +7,8 @@ from __future__ import annotations
 import argparse, csv, json, os, pathlib, re, sys, fnmatch, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[4]
+
 try:
     import yaml
 except ImportError:
@@ -81,7 +83,7 @@ def find_sync_configs(cli_path: Optional[str] = None, search_root: Optional[path
     roots: List[pathlib.Path] = []
     if search_root: roots.append(search_root)
     else:
-        for base in [pathlib.Path("runs"), pathlib.Path("D:/Data/git/sysops-playbooks/runs")]:
+        for base in [pathlib.Path("runs"), (REPO_ROOT / "runs")]:
             if base.exists(): roots.append(base)
         try:
             repo_root = pathlib.Path(__file__).resolve().parents[4]
@@ -112,7 +114,7 @@ def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
     if config_path and config_path.exists():
         candidates.append(config_path.parent / ".env")
         candidates.append(config_path.parent / "secrets" / ".env")
-    for base in [pathlib.Path("runs/9router"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router")]:
+    for base in [pathlib.Path("runs/9router"), (REPO_ROOT / "runs/9router")]:
         candidates.extend([base / ".env", base / "secrets" / ".env", base / "secrets" / "api_keys.env"])
     try:
         for d in pathlib.Path("runs").glob("9router-*"):
@@ -136,7 +138,7 @@ def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
                 if v: os.environ[k]=v
         except Exception as e: print(f"WARN load {cand}: {e}", file=sys.stderr)
     # per-key .txt
-    for base in [pathlib.Path("runs/9router/secrets"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets")]:
+    for base in [pathlib.Path("runs/9router/secrets"), (REPO_ROOT / "runs/9router/secrets")]:
         if not base.exists(): continue
         for p in base.glob("*.txt"):
             key=p.stem.upper().replace("-","_")
@@ -229,14 +231,14 @@ def find_inventory_dir(config_dir: pathlib.Path) -> Optional[pathlib.Path]:
         config_dir / "model-inventory",
         config_dir / "model-inventory-output",
         pathlib.Path("runs/9router/model-inventory"),
-        pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/model-inventory"),
+        (REPO_ROOT / "runs/9router/model-inventory"),
     ]
     for c in candidates:
         if (c / "models.json").exists() or (c / "models.csv").exists():
             return c
     # glob fallback: any model-inventory under runs/*9router*
     try:
-        for root in [pathlib.Path("runs"), pathlib.Path("D:/Data/git/sysops-playbooks/runs")]:
+        for root in [pathlib.Path("runs"), (REPO_ROOT / "runs")]:
             if not root.exists(): continue
             for nine_dir in root.glob("*9router*"):
                 for pat in ("model-inventory/models.json","model-inventory/models.csv"):
@@ -588,7 +590,7 @@ def get_ninerouter_creds(config: Dict[str,Any], config_path: pathlib.Path) -> Tu
     url = sanitize_key(expand_env(ncfg.get("url") or os.environ.get("NINEROUTER_URL") or ""))
     if not url:
         # try secrets file
-        for cand in [config_path.parent / "secrets" / "ninerouter-url.txt", pathlib.Path("runs/9router/secrets/ninerouter-url.txt"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets/ninerouter-url.txt")]:
+        for cand in [config_path.parent / "secrets" / "ninerouter-url.txt", pathlib.Path("runs/9router/secrets/ninerouter-url.txt"), (REPO_ROOT / "runs/9router/secrets/ninerouter-url.txt")]:
             if cand.exists():
                 try: url=sanitize_key(cand.read_text(encoding="utf-8").strip())
                 except: pass

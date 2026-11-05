@@ -12,7 +12,7 @@ password.
 
 ## S1 — The location question is the security decision
 
-Ask where the server lives and how it is reached (§2) because the answer
+Ask where the server lives and how it is reached (the Location/access decision in `SKILL.md`) because the answer
 selects the threat model:
 
 - Shared LAN the clients never leave → LAN path is defensible; Tailscale
