@@ -1,107 +1,116 @@
-# SysOps Playbook Repository
+# SysOps Workspace
 
 [![CI](https://github.com/kinged007/sysops-playbooks/actions/workflows/ci.yml/badge.svg)](https://github.com/kinged007/sysops-playbooks/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](pyproject.toml)
 
-Reusable SysOps runbooks executed by agents under a strict read-only-by-default permission model.
+A DevOps admin workspace for an agent working on servers, sites, and
+deployments. It holds a fleet inventory, a credential vault, procedures
+(skills), an incident inbox, and a CLI (`bin/ops`). Production is read-only
+until the operator allows writes. See `AGENTS.md` for the safety doctrine.
 
-> Agent-operated runbooks for repeatable server work — fleet setup, migrations, service configuration, and hardening — with a safety doctrine that keeps production read-only until the operator explicitly allows writes. See `AGENTS.md` §1 for the full permission model.
+The repo is public. Procedures and tooling are committed with placeholder
+values. Real hosts, credentials, and run state stay local and gitignored.
 
+## Public and private
 
-## What it is
+| Path | Contents | Committed? |
+|---|---|---|
+| `.agents/skills/<name>/` | Procedures: `SKILL.md`, `scripts/`, `templates/`, `references/` | yes |
+| `bin/ops`, `tests/`, `.githooks/`, `.claude/`, `.github/` | CLI, tests, hooks, CI | yes |
+| `fleet/*.example.yaml`, `ops.config.example.yaml`, `incidents/inbox.example.md` | Synthetic examples (RFC 5737 IPs, `example.*` domains) | yes |
+| `fleet/*.yaml` | Real servers, sites, services, providers, notify channels | no |
+| `vault/` | Credentials, ssh keys, and `index.yaml` (names, owners, `used_by`, rotation dates) | no |
+| `runs/` | Planned-work state per skill variant (`executions` is a symlink to it) | no |
+| `incidents/` | Inbox and incident folders | no |
+| `logs/audit/` | Local audit trail | no |
+| `ops.config.yaml` | Local settings for `ops wake` and the vault | no |
 
-This repo stores **procedures, not state**. Each playbook is one subject — e.g. `coder-remote-servers`, `netdata-monitoring`, `9router` — as a canonical, copy-paste executable procedure with placeholder values only, plus templates, scripts, and lessons learned. Nothing committed contains real IPs, hostnames, or credentials. Real values live in a **persistent, gitignored execution folder** (`executions/<playbook>[-<suffix>]/`) that survives across sessions so the agent reuses secrets and history.
-
-Browse **[`playbooks/`](playbooks/)** for available procedures. Seven playbooks are included.
-
-## Install
-
-No install step. Clone and read the playbook you need:
+## Quick start
 
 ```bash
 git clone https://github.com/kinged007/sysops-playbooks
 cd sysops-playbooks
-# Optional: Python tooling for 9router sync checks
 pip install pyyaml requests
+bin/ops init          # creates gitignored files from examples, installs git hooks
 ```
 
-## Usage
+1. Fill `fleet/servers.yaml`, `sites.yaml`, `services.yaml`, `providers.yaml`,
+   and `notify.yaml`, using the `*.example.yaml` files as a guide.
+2. Put credentials in `vault/<client>-<provider>-<purpose>.env` (`chmod 600`)
+   and ssh keys in `vault/ssh/`. List each in `vault/index.yaml`.
+3. Edit `ops.config.yaml` (agent command, model, launch flags, notify target).
+4. Run `bin/ops doctor` to check the fleet files, vault index, and hooks.
 
-1. Pick a playbook in `playbooks/<name>/` and read its `README.md` and `notes/`.
-2. Ask the agent to run it (e.g. "run `netdata-monitoring` on host `<ALIAS>`").
-3. The agent discovers existing `executions/<playbook>*` folders, asks whether to reuse one or create a new variant (`-<suffix>`), presents a plan with every production **WRITE** flagged, and waits for approval.
-4. On approval the operator sets the permission mode: **A** per-write confirm (default) or **B** plan-as-approved.
+Then ask the agent to run a skill, for example "run `netdata-monitoring` on
+`<server>`". The agent finds or creates `runs/<skill>[-<suffix>]/`, proposes a
+plan with every production write flagged WRITE, and waits for approval.
 
-See `AGENTS.md` for the full execution lifecycle (seven gates plus discovery) and committing rules.
-
-### Worked example — agent running a playbook under the permission model
-
-Playbook: `netdata-monitoring`. Target: host alias `node-a` (key in `~/.ssh/config`). Prior run exists at `executions/netdata-monitoring/`.
+## `ops` commands
 
 ```
-Operator:  run netdata-monitoring on node-a
-
-Agent:     Reading playbooks/netdata-monitoring/notes/gotchas.md (G1–G18).
-           Found executions/netdata-monitoring/ — reuse this variant or create a new one?
-Operator:  reuse it
-Agent:     Loaded inventory.md (previous hostname: old-host) + secrets/.
-           Plan (reads free, writes flagged WRITE):
-
-             1. Discover current state                    [reads]
-             2. Hostname decision — ask operator            [WRITE if renaming]
-             3. Exposure check :19999                      [read]
-             4. Harden bearer token + restart netdata     [WRITE]
-             5. Emit mcp/<alias>.mcp.json artifact        [local, no prod write]
-           Permission mode? A (confirm each WRITE) or B (plan-as-approved)
-Operator:  Mode A. Approve steps 1–3 only for now; don't restart yet.
-
-Agent:     [reads] netdata -v / claim / repolist / curl :19999 -> API open (v2.1.3, unclaimed)
-           [WRITE] May I run `sudo hostnamectl set-hostname <NEW_HOSTNAME>` on node-a?
-Operator:  yes, proceed
-Agent:     hostname set; logged to logs/2026-10-15T1200-02-hostname.log (append-only)
-           Discovery done. Writes paused at step 4 per approval — awaiting next go.
-           Findings appended to notes.md; promotion to playbook notes proposed.
+ops init                         scaffold gitignored files, install hooks, check permissions
+ops inventory [--stale]          list fleet records; --stale lists vault entries past rotation
+ops ssh <server> [--via V] [cmd] connect with the server's connect block (ssh, coder, docker-context)
+ops exec <service> <cmd>         run a command with the service's vault entries in env (output redacted)
+ops log "<action>" [--target X] [--result ok|fail]
+                                 append an audit log line
+ops inbox add <source> <severity> "<summary>"
+                                 append a validated line to incidents/inbox.md
+ops wake [--force]               start the configured agent if the inbox has new pending lines
+ops incident new "<title>" [--from-inbox <line>]
+ops incident close <id>
+ops secret check                 vault permissions, leak patterns, placeholders
+ops secret fingerprint <name>    sha256 prefix and last 4 characters of a vault value
+ops doctor                       fleet parse, vault index consistency, hook status
 ```
 
-Key properties visible: prior state reuse (no re-asking for secrets), every production write flagged and confirmed, read/write separation, append-only logs, and the operator in control of scope.
+## Unattended incident handling
 
-## How it is tested
+`ops wake` starts the agent only when the inbox has new pending lines, so
+idle intervals use no tokens. Example cron line:
 
-- Unit tests in `tests/scripts/` validate the sync logic for the `9router` playbook (model inventory, provider mapping, combo pipeline, config generation, dry-run guards).
-- CI runs on every push and pull request to `master`:
+```
+*/5 * * * * cd /path/to/repo && bin/ops wake >> runs/wake.log 2>&1
+```
+
+The agent verifies each inbox line independently, works through the incident
+folder in `incidents/`, and reports through the `notify` record in
+`fleet/notify.yaml`. The autonomy level is set by the `flags` in
+`ops.config.yaml`.
+
+## Skills
+
+| Skill | Purpose |
+|---|---|
+| `9router` | Install, harden, upgrade, back up, and sync a 9Router AI gateway |
+| `aws-management` | AWS CLI setup and gated changes (IAM, SES, SSM) |
+| `coder-remote-servers` | Coder workspaces on remote servers over a tailnet |
+| `kandev` | Deploy and operate the Kandev control plane |
+| `mail-server-config` | Mailu install, repair, migration, and delivery setup |
+| `netdata-monitoring` | Install and harden netdata, claim to Cloud |
+| `orca-remote-server` | Always-on Orca server, directly or in a Coder workspace |
+| `secret-rotation` | Rotate a leaked or stale credential everywhere it is used |
+| `sql-explorer` | Natural-language SQL exploration and export for one database |
+| `wordpress-migration` | Migrate a WordPress site between servers |
+
+Create a new skill by copying `.agents/skills/_template/`. See `AGENTS.md`
+section 6.
+
+## Tests and checks
+
+CI runs on every push and pull request to `master`:
 
 ```bash
-# run locally
-pip install pyyaml requests pytest ruff mypy   # or: pip install -e . (once published)
+pip install pyyaml requests pytest ruff mypy types-PyYAML types-requests
 pytest -q
-ruff check .
-mypy .
+ruff check . bin/ops
+mypy . bin/ops
 ```
 
-The `playbooks/` scripts are legacy helpers excluded from lint/type gates — tracked separately. See `pyproject.toml`.
-
-## Repository layout
-
-```
-playbooks/              ← static, reusable procedures (committed)
-  _playbook-template/      skeleton for authoring new playbooks
-  <name>/                  one folder per subject: README, playbook.md,
-                            plan/runbook templates, templates/, scripts/,
-                            notes/
-executions/             ← persistent per-variant state (GITIGNORED)
-  <playbook>/              default variant
-    plan.md  runbook.md  inventory.md  notes.md  secrets/  logs/
-  <playbook>-<suffix>/     additional variant (e.g. -personal vs -company)
-docs/superpowers/       ← design specs for execution restructuring
-```
-
-`AGENTS.md` is the admin guide: safety doctrine, execution lifecycle, folder discipline, and publishability rules. Agents read it before touching anything.
-
-## Contributing a playbook
-
-Copy `playbooks/_playbook-template/`, fill in `README.md` (what/why/risk/servers + "Agent: read `notes/` BEFORE any run"), `playbook.md` (procedure with `WRITE` flags + rollback), templates and scripts. Promote lessons from `executions/<playbook>/notes.md` into `playbooks/<playbook>/notes/` after the run with operator approval. See `AGENTS.md` §6.
+CI also runs `gitleaks` and `trufflehog`. Skill helper scripts under `.agents/`
+are excluded from the lint and type gates. See `pyproject.toml`.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
