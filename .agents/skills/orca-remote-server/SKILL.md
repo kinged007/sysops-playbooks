@@ -1,17 +1,67 @@
-# Playbook: Orca Remote Server — Procedure
-
-Canonical steps for a run. **Placeholders only** — never real IPs, hostnames,
-usernames, pairing links, or credentials. Real values go in the execution's
-`plan.md` / `inventory.md` / `secrets/`.
-Repo-level rules (folder discipline, secrets, committing): see `AGENTS.md`.
-Upstream docs (read when in doubt): Orca `Remote Orca Servers`,
-`Ways to run Orca`, `SSH worktrees`, `Orca CLI reference`, `Install`,
-`Mobile companion`. Orca servers are **beta** — keep server and client on a
-private path you control.
-
+---
+name: orca-remote-server
+description: Provision an always-on Orca server (desktop app share or headless `orca serve`, directly on a host or inside a Coder workspace) and pair desktop, mobile, and automation clients to it over a private path, preferably a Tailscale tailnet. Use for a new always-on Orca runtime, adding a client, moving a server between networks, or repairing pairing, ACL, or disconnect failures. Not for SSH worktrees where the laptop owns the runtime, per-workspace Cloud VM recipes, or public exposure of the Orca port.
 ---
 
-## 1. System overview
+# Orca Remote Server
+
+> Read `references/` BEFORE any run. It holds security invariants and
+> client-connection pitfalls that may change how you plan. Never skip this.
+> Pairing links grant full runtime access: treat them like passwords.
+
+Risk level: medium. Installs packages and configures a long-lived network
+service holding repos, agent credentials, and session state. A leaked pairing
+link or a publicly forwarded Orca port is a full-runtime-compromise incident
+(see Security invariants).
+
+Orca servers are beta: keep server and client on a private path you control.
+Upstream docs (read when in doubt): Orca `Remote Orca Servers`, `Ways to run
+Orca`, `SSH worktrees`, `Orca CLI reference`, `Install`, `Mobile companion`.
+Repo-level rules (folder discipline, secrets, committing): see `AGENTS.md`.
+
+## When to use
+
+- Setting up a new always-on Orca runtime (old laptop, Mac mini, home server, cloud VPS, team box) so agents survive laptop sleep and disconnect.
+- Adding another client (desktop, mobile, browser/automation) to an existing Orca server.
+- Moving a server between networks (LAN to Tailscale, home to VPS) or switching host mode (desktop app and `orca serve`).
+- Repairing pairing, ACL, or "server disconnected" failures.
+- Not for: SSH worktrees where the laptop owns the runtime (see Orca `Ways to run` / `SSH worktrees` docs), per-workspace Cloud VM recipes (`orca.yaml`), Orca-managed VPS hosting (Orca sells none; you bring the machine), or any public exposure of the Orca port.
+
+Prerequisites:
+
+- One server machine you control (Linux headless/VM, macOS, or Windows) with key-based SSH access (`ssh-copy-id`; the agent never handles passwords).
+- Orca installed on every client; Tailscale account and tailnet when the server is not LAN-only (free Personal: up to 6 users, unlimited devices).
+- Server owner available for interactive steps (desktop clicks, Tailscale approval, `coder`/`claude`/`codex` logins, pairing-link handoff over a private channel).
+- Decision inputs, asked in the location/access decision and never assumed: where the server lives, how clients reach it, desktop-app or `orca serve` host mode, direct-on-host or Coder-workspace install destination.
+
+## Fleet refs needed
+
+Real hosts, IPs, and domains are never written in this file.
+
+- `fleet/servers.yaml`: the Orca server record (ssh alias, tailnet name and IP, OS) and one record per client device in this run (`ops ssh <server>`).
+- `fleet/services.yaml`: service `orca` (port, host mode), if recorded.
+- `fleet/providers.yaml`: Tailscale tailnet, and the Coder deployment for the workspace variant.
+
+## Vault entries needed
+
+Names follow `<client>-<provider>-<purpose>`. Values are never printed or logged.
+
+- `<client>-tailscale-authkey`: reusable pre-auth key for hands-off joins (not ephemeral, no tags, expires in 90 days by default).
+- `<client>-orca-pairing-<device>`: pairing link for one client device. Password-equivalent; one entry per client; delete after use or on revoke.
+- `ssh/<client>-<server>`: ssh key from the server's fleet record.
+
+## Procedure
+
+Rules for every step:
+
+- Reads need no flag. Every step that changes a production system is flagged **WRITE** and needs approval per the run's permission mode.
+- Every destructive **WRITE** (firewall change, unit overwrite, uninstall) is preceded by a **Backup** step.
+- Every **WRITE** has a **Rollback** line.
+- Every fix is followed by a **Verify** step.
+- Commands use placeholders; never write real IPs, hostnames, usernames, pairing links, or credentials in this file. Real values go in the run's `plan.md`, the fleet records, and vault entries.
+- The Orca port is never exposed to the public internet.
+
+### System overview
 
 ```
 Client(s) · Orca UI                    Server · Orca runtime
@@ -19,7 +69,7 @@ Client(s) · Orca UI                    Server · Orca runtime
   phone (Orca Mobile)                    repos + worktrees + terminals
   browser / automation                   agent CLIs + accounts + sessions
          │                                            ▲
-         │  private path ONLY (pick at §2)            │
+         │  private path ONLY (pick at the location/access decision)            │
          └──────── Tailscale tailnet ─────────────────┘
                    trusted LAN / WireGuard /
                    SSH-forward / auth tunnel
@@ -40,11 +90,11 @@ Client(s) · Orca UI                    Server · Orca runtime
     while the foreground process or service runs.
 - Install destination is orthogonal to host mode — **directly on the host**
   (VPS/machine, the default path) or **inside a Coder workspace container**
-  (§6 Phase 4b). Same phases; different network plumbing and lifecycle.
+  (Phase 4b). Same phases; different network plumbing and lifecycle.
 
-### Remote Orca Server vs SSH worktrees (pick correctly)
+#### Remote Orca Server vs SSH worktrees (pick correctly)
 
-| | Remote Orca Server (this playbook) | SSH worktrees (different docs) |
+| | Remote Orca Server (this skill) | SSH worktrees (different docs) |
 |---|---|---|
 | Runtime owner | Server (Orca desktop or `orca serve`) | Laptop Orca |
 | Survives laptop close | Yes — full session state on server | Agents keep running on host; laptop reattaches per-worktree |
@@ -54,7 +104,7 @@ Client(s) · Orca UI                    Server · Orca runtime
 If the operator only wants "run this worktree's agents on a bigger box"
 with the laptop owning the runtime → stop, use SSH worktrees instead.
 
-## 2. Mandatory location/access decision (ASK FIRST — never assume)
+### Location/access decision (ASK FIRST — never assume)
 
 > **Gate.** Before any install work, ask the operator these three questions
 > verbatim (adapt names) and record the answers in `plan.md`. Do not proceed
@@ -69,19 +119,19 @@ with the laptop owning the runtime → stop, use SSH worktrees instead.
 > only, existing WireGuard/VLAN, SSH-forwarding, or an authenticated tunnel?
 > 3. Should the server run as the desktop app (screen-attached machine) or
 > headless `orca serve`? 4. Directly on the host, or inside a Coder
-> workspace container on shared infrastructure (§6 Phase 4b)? If the server
+> workspace container on shared infrastructure (Phase 4b)? If the server
 > is not on a private LAN path the clients share, I strongly recommend
 > Tailscale and will not expose the Orca port to the public internet."
 
-### Decision table (apply, don't improvise)
+#### Decision table (apply, don't improvise)
 
 | Server location | Clients | Required path |
 |---|---|---|
 | Same LAN, clients never leave it | LAN devices only | Trusted LAN is acceptable; Tailscale still recommended (roaming phones, ACLs) |
-| Home server behind NAT / CGNAT | Roaming laptop + phone | **Tailscale REQUIRED** (suggested by this playbook) — NAT traversal + private `100.x.y.z` address |
+| Home server behind NAT / CGNAT | Roaming laptop + phone | **Tailscale REQUIRED** (suggested by this skill) — NAT traversal + private `100.x.y.z` address |
 | Cloud VPS with public IP | Anywhere | **Tailscale REQUIRED** — bind/pair over tailnet only; public forward **forbidden** |
 | Already on WireGuard / trusted VLAN / auth tunnel | Members of that path | That private path is acceptable; Tailscale is the suggested alternative |
-| Inside a Coder workspace (container) | Tailnet clients | **Tailscale REQUIRED**, direct-dial via host publish (§6 Phase 4b). The workspace is not a tailnet node — tunnel/loopback links are rejected by the app, so a published port is mandatory, not optional |
+| Inside a Coder workspace (container) | Tailnet clients | **Tailscale REQUIRED**, direct-dial via host publish (Phase 4b). The workspace is not a tailnet node — tunnel/loopback links are rejected by the app, so a published port is mandatory, not optional |
 | "Just forward the port publicly" | — | **REFUSE.** Offer Tailscale, WireGuard, trusted LAN, SSH-forward, or an authenticated tunnel instead |
 
 Rules:
@@ -96,7 +146,7 @@ Rules:
 - Any later discovery that the network differs from the recorded answers →
   **DEVIATION**: stop, re-ask, get re-approval (AGENTS.md §3.4/§3.6).
 
-## 3. Roles
+### Roles
 
 | Task | Who | Why |
 |---|---|---|
@@ -108,22 +158,22 @@ Rules:
 
 **The agent's golden rule: never ask for (or accept) a password or a pairing
 link in chat/logs.** Pairing links travel user→client over a private channel
-and land in the execution's `secrets/`; passwords never leave the user.
-If a step needs privilege the agent lacks, use scoped NOPASSWD sudoers (§5)
+and land in the vault (entry `<client>-orca-pairing-<device>`); passwords never leave the user.
+If a step needs privilege the agent lacks, use scoped NOPASSWD sudoers (Access & privilege model)
 or hand the user the exact command.
 
-## 4. Prerequisites
+### Prerequisites
 
 Before any SSH work:
 
 1. **SSH alias for the server** — user runs `ssh-copy-id <user>@<host>`;
    agent gets `<alias>` (from `~/.ssh/config`). Record alias + key path in
    `plan.md`. No passwords, keys only.
-2. **Tailscale account + tailnet** (when §2 requires it). Auth method:
+2. **Tailscale account + tailnet** (when the location/access decision requires it). Auth method:
    - **Reusable pre-auth key** (hands-off): Admin → Settings → Keys →
      Generate (Reusable=on, Ephemeral=off, no tags). Agent uses
      `sudo tailscale up --auth-key=<KEY>`. Keys expire (90d default) —
-     store in the execution's `secrets/`, never in chat.
+     store in vault entry `<client>-tailscale-authkey`, never in chat.
    - **Interactive**: each device prints an approval URL the user opens.
 3. **Orca installers reachable** — GitHub Releases (macOS `.dmg` Apple
    Silicon/Intel, Windows `.exe`, Linux AppImage/`.deb`/`.rpm`) or
@@ -131,16 +181,16 @@ Before any SSH work:
    `orca-ide` (avoids the GNOME Orca screen-reader clash) — verify with
    `command -v orca || command -v orca-ide`.
 4. **Client inventory** — which desktops/phones pair to this server, all on
-   the same tailnet/path (§8 matrix depends on it).
-5. **Notes read** — `notes/security.md`, `notes/client-connections.md`,
-   `notes/gotchas.md` (+ `notes/coder-workspace.md` when §2 recorded
+   the same tailnet/path (the client connections matrix depends on it).
+5. **Notes read** — `references/security.md`, `references/client-connections.md`,
+   `references/gotchas.md` (+ `references/coder-workspace.md` when the location/access decision recorded
    `host_type=coder-workspace`).
 6. **Coder path only** (`host_type=coder-workspace`): template with a
-   published Orca port (§6 Phase 4b B1), workspace created + autostop set
+   published Orca port (Phase 4b B1), workspace created + autostop set
    to manual, `coder` CLI authenticated, tailnet grant + host firewall
    slots reserved for the external port.
 
-## 5. Access & privilege model (the sudo problem)
+### Access & privilege model (the sudo problem)
 
 Production hosts often disable root SSH and require a password for every
 `sudo`. The agent works around that without ever seeing a password:
@@ -153,25 +203,23 @@ sudo chmod 0440 /etc/sudoers.d/orca-setup
 sudo visudo -c        # must print "parsed OK"
 ```
 
-- Scoped to exactly the binaries the playbook needs; **removable after the
+- Scoped to exactly the binaries the skill needs; **removable after the
   run** (re-locks everything).
 - Agent check: `sudo -n -l` must show the entries. `sudo -n whoami`
   failing is **expected** — that is the point of scoping.
 - If the agent already has root SSH, no sudoers needed.
 
-## 6. Procedure — Phases 0–8
-
 ### Phase 0 — Repo prep (read)
 
-- [ ] Read `notes/` (mandatory — security invariants may change the plan).
-- [ ] Scan `executions/orca-remote-server*/` for an existing variant; confirm
+- [ ] Read `references/` (mandatory — security invariants may change the plan).
+- [ ] Scan `runs/orca-remote-server*/` for an existing variant; confirm
   reuse vs new `-<suffix>` with the operator (AGENTS.md discovery gate).
-- [ ] Fill `plan.md` §2 answers (location / access path / host mode). Plan
+- [ ] Fill the `plan.md` location/access answers (location / access path / host mode). Plan
   stays draft until approved + permission mode (A/B) recorded.
 
 ### Phase 1 — Tailscale on server (+ clients when required)
 
-Skip only when §2 recorded "shared LAN / existing private path, Tailscale
+Skip only when the location/access decision recorded "shared LAN / existing private path, Tailscale
 explicitly declined" — otherwise **WRITE**:
 
 ```bash
@@ -247,7 +295,7 @@ orca skills update --all
   from the server shell. Run these on the machine that owns the accounts,
   not through a client-only remote session.
 - Clone/place the repos the agents will work in on the server now; note
-  absolute server paths in `inventory.md` (remote selectors prefer
+  absolute server paths in the fleet records (remote selectors prefer
   `path:<absolute-server-path>`).
 - Rollback: `orca account` removals per CLI docs; `orca skills update`
   is additive (no rollback needed beyond noting versions).
@@ -291,6 +339,7 @@ orca serve --pairing-address <SERVER_TAILSCALE_IP_OR_HOSTNAME> --mobile-pairing
   (`templates/orca-serve.service`):
 
 ```bash
+# - [ ] **Backup** (if the unit already exists): sudo cp /etc/systemd/system/orca-serve.service /etc/systemd/system/orca-serve.service.bak-<DATE>
 # - [ ] **WRITE** persist orca serve via systemd on <alias>
 sudo cp orca-serve.service /etc/systemd/system/orca-serve.service  # filled from template
 sudo systemctl daemon-reload
@@ -308,7 +357,7 @@ Use when the server should live in an isolated dev container with Docker
 access (DinD) instead of directly on a host. Same phases; different
 plumbing and lifecycle. Proven against a `docker-devcontainer`-family
 template (experiment copy with the ports block:
-`playbooks/coder-remote-servers/templates/docker-devcontainer-orca`).
+`.agents/skills/coder-remote-servers/templates/docker-devcontainer-orca`).
 
 **B1. Template (once per template).** Workspaces are containers, not
 tailnet nodes — clients cannot dial them directly. Publish the serve port
@@ -404,7 +453,7 @@ Plus tailnet grant `tcp:<EXT-PORT>` to the host node (user console).
 Rollback: `-D` each iptables rule, `ufw route delete ...`, revoke
 the grant.
 
-**B6. Pair + verify (same as Phases 6–7).** Link handoff identical
+**B6. Pair + verify (same as Phases 6-7).** Link handoff identical
 (operator fetches from the workspace shell, pastes into Add Server).
 Rebuild semantics: system layer wipes → reinstall; `$HOME`
 (`~/.config/orca`, skills, projects) persists → grants survive; the
@@ -422,7 +471,7 @@ hardening. Framework allow-lists (e.g. Vite `allowedHosts`) must
 include `<CODER-DOMAIN>`. Terminal `localhost:port` links open
 client-local — Orca honors no `VSCODE_PROXY_URI` equivalent (verified
 absent from the binary); use the `preview()` helper in
-`notes/coder-workspace.md`.
+`references/coder-workspace.md`.
 
 Rollback (whole variant): delete the workspace, `-D` the host iptables
 rules, remove the UFW/grant rules, revoke pairing grants, optionally
@@ -438,6 +487,7 @@ pushed.
    private path:
 
 ```bash
+# - [ ] **Backup** current rules: sudo ufw status verbose > ufw-before-<DATE>.txt; sudo cp -a /etc/ufw /etc/ufw.bak-<DATE>
 # - [ ] **WRITE** firewall on <alias> (example: UFW)
 sudo ufw default deny incoming
 sudo ufw allow in on tailscale0 to any port <PORT> proto tcp   # Tailscale path
@@ -453,14 +503,14 @@ sudo ufw status verbose   # (read) verify
    - From an off-path host, `Test-NetConnection <PUBLIC_IP> -Port <PORT>`
      must fail/timeout.
    - Workspace variant: the same checks apply to `<EXT-PORT>`, plus the
-     §6 Phase 4b B5 chain (DNAT counters, `DOCKER-USER`, MASQUERADE).
+     Phase 4b B5 chain (DNAT counters, `DOCKER-USER`, MASQUERADE).
 4. Rollback: remove the added firewall/grant rules; re-check status output.
 
 ### Phase 6 — Pair clients (per client; link handling is **WRITE**-adjacent)
 
 Pairing links are password-equivalent: private channel only, one link per
-client, revoke-after-use hygiene per §7. The agent never pastes a link into
-chat/logs — it lands in `executions/.../secrets/`.
+client, revoke-after-use hygiene per Security invariants. The agent never pastes a link into
+chat/logs — it lands in the vault.
 
 **Desktop client** (USER clicks, agent verifies):
 
@@ -508,10 +558,9 @@ orca account list
 - [ ] Confirm version parity (no incompatible-protocol warnings) and that
   deleted-on-server projects disappear from clients (no ghost rows) — that
   is expected shared-state behavior, not a bug.
-- [ ] Append to the execution's `notes.md`, update `inventory.md` +
-  `secrets/` pointers. Never commit them (AGENTS.md §7).
+- [ ] Append to the run's `notes.md`, update the fleet records and vault entries. Never commit run files (AGENTS.md §7).
 
-## 7. Security invariants (verify every time)
+### Security invariants (verify every time)
 
 1. **Private path only.** Orca traffic rides Tailscale, WireGuard, trusted
    LAN, SSH-forward, or an authenticated tunnel. Forwarding the Orca port
@@ -525,17 +574,17 @@ orca account list
    address is always a reachable tailnet/LAN/tunnel address. `127.0.0.1`
    works only on the server itself; wildcards mislead clients. The
    desktop app enforces this: loopback links are rejected for remote
-   entries (tunnel shapes must graduate to direct-dial — §6 Phase 4b).
+   entries (tunnel shapes must graduate to direct-dial — Phase 4b).
 5. **One host mode.** Desktop share XOR `orca serve` — never both.
 6. **Credentials live on the server.** Laptop logins don't transfer; agent
    CLIs + `orca account` + skills are server-side facts. Re-verify after
    any server rebuild.
 7. **No secrets in git.** Pairing links/tokens, Tailscale keys, `*.pem`,
-   `*.key` live only in gitignored `executions/` — a tracked secret is an
+   `*.key` live only in the vault or gitignored `runs/` — a tracked secret is an
    incident → unstage, move, rotate (AGENTS.md §7).
 8. **Agent never sees a password.** Keys + pre-auth keys only.
 
-## 8. Client connections — per-setup notes (summary; full matrix in `notes/`)
+### Client connections — per-setup notes (summary; full matrix in `references/client-connections.md`)
 
 | Server setup | Desktop client dials | Mobile client | Notes |
 |---|---|---|---|
@@ -543,14 +592,71 @@ orca account list
 | Tailscale + `orca serve` | Paste printed runtime pairing URL via **Add Server** | Same tailnet → `--mobile-pairing` QR/link | Service must stay running; `--port` fixed only if the firewall/service needs it |
 | LAN-only server | LAN address link/URL via **Add Server** | Same LAN Wi-Fi → Pair | Breaks the moment a client roams — migrate to Tailscale then |
 | SSH-forward / auth tunnel, no tailnet on client | Forward first, then pair per tunnel docs | Not recommended (use Tailscale) | Record the exact forward in `plan.md`; fragile, document it |
-| Coder workspace (`host_type=coder-workspace`) | Paste pairing URL advertising `<HOST-TAILSCALE-IP>:<EXT-PORT>` via **Add Server** | Same tailnet → `--mobile-pairing` link (minted from the workspace) | Workspace is not a tailnet node; host publish + grant required (§6 Phase 4b). Autostop must be manual |
+| Coder workspace (`host_type=coder-workspace`) | Paste pairing URL advertising `<HOST-TAILSCALE-IP>:<EXT-PORT>` via **Add Server** | Same tailnet → `--mobile-pairing` link (minted from the workspace) | Workspace is not a tailnet node; host publish + grant required (Phase 4b). Autostop must be manual |
 
 Behavioral notes (all setups): **Active Server** only when the server
 should be the default; **Hide other-client workspaces** for shared servers;
 server must stay awake/online with Orca running; keep both sides updated;
 server deletions propagate to all clients.
 
-## 9. Troubleshooting
+### Quick runs
+
+#### A. New server (condensed)
+
+- [ ] Location/access answers recorded (location / path / host mode) — Tailscale
+  suggested unless shared private LAN (read)
+- [ ] SSH alias + scoped sudoers (user) — **WRITE**-adjacent setup
+- [ ] **WRITE** Tailscale join + `tailscale ip` recorded + ping both ways
+- [ ] **WRITE** Orca install + version parity + build tools (Linux)
+- [ ] **WRITE** agent CLIs + `orca account add` (user logins) + skills
+- [ ] **WRITE** start runtime (Mode A user clicks / Mode B `orca serve`
+  + optional systemd) with reachable `--pairing-address`
+- [ ] **WRITE** grants + firewall; negative public-reachability check (read)
+- [ ] Pair first client (Phase 6); verify Phase 7; write notes and fleet records
+
+#### B. New client on an existing server
+
+- [ ] Confirm client's path (same tailnet/LAN/tunnel) + Orca updated (read)
+- [ ] Server generates **fresh** link / `--mobile-pairing` URL (user hands
+  over privately) — treat as secret (**WRITE**-adjacent)
+- [ ] Client **Add Server** → Connect; set Active Server / Hide-other
+  workspaces only if wanted
+- [ ] Verify Connected + open a server project; record client in
+  the fleet records; revoke/replace any exposed grant
+
+#### C. Workspace variant (condensed)
+
+- [ ] the location/access decision records `host_type=coder-workspace` + template/workspace/publish mapping (read)
+- [ ] Template pushed with `orca_publish_ip` set (placeholders only in repo) — **WRITE** to Coder
+- [ ] Workspace created, `schedule stop manual`, sized honestly — **WRITE** to Coder
+- [ ] **WRITE** Orca install (Phase 2 flow) + serve with bind/advertise split (B4)
+- [ ] **WRITE** tailnet grant + host path (UFW/DNAT/MASQUERADE/`DOCKER-USER` as needed); negative public check (read)
+- [ ] Pair + verify (Phases 6-7); dev servers on `127.0.0.1`; `preview()` helper installed
+
+## Rollback
+
+Per phase, in reverse order: revoke client grants (Shared Server Access) and
+remove client host entries; remove added firewall and grant rules (`ufw`
+restore from the backup, `iptables -D` for the workspace variant); disable the
+`orca-serve` service and restore the backed-up unit; uninstall Orca via the
+channel it was installed through; `sudo tailscale logout` and delete the node
+in the admin console. The workspace variant additionally deletes the workspace
+and optionally the experiment template. If a rollback leaves unexpected state,
+stop and ask the operator.
+
+## Verify
+
+- [ ] `orca status --json`, `orca host list --json`, and `orca account list` on the server (Phase 7)
+- [ ] Each paired client shows Connected and can open a server project
+- [ ] Server and client Orca versions match; no incompatible-protocol warnings
+- [ ] Negative public check: the Orca port (and the external port in the workspace variant) is unreachable from an off-path host, and the listener is on the tailnet/LAN address only
+- [ ] Every Security invariant holds
+
+## Gotchas
+
+Details in `references/gotchas.md`, `references/security.md`, `references/coder-workspace.md`, and `references/client-connections.md`.
+
+### Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -560,57 +666,25 @@ server deletions propagate to all clients.
 | Server can't find agent CLI | Installed/authed on laptop only | Install + authenticate on the **server**; remote sessions use server `PATH`/home/creds |
 | `orca serve` advertises wrong address | Unreachable `--pairing-address` / loopback / wildcard | Stop; restart with the reachable tailnet/LAN/tunnel address |
 | Add account disabled on remote client | By design (remote runtime scope) | Register via server shell: `orca account add --agent claude\|codex` |
-| Terminals dead on Linux server, files fine | Missing compiler toolchain for relay natives | Install build tools (§6 Phase 2), reconnect |
+| Terminals dead on Linux server, files fine | Missing compiler toolchain for relay natives | Install build tools (Phase 2), reconnect |
 | Two servers fighting on one box | Desktop share + `orca serve` both running | Stop one — exactly one host mode at a time |
-| App rejects link ("points back to this device") | Loopback in a remote-entry link | Direct-dial required: reachable tailnet/LAN/tunnel address (§6 Phase 4b for workspaces) |
-| Workspace serve unreachable, publish registered | `--port` bound the external port in the container (bind ≠ advertise) | Bind the mapped port, advertise host:port: `--port <INT-PORT> --pairing-address <HOST-TAILSCALE-IP>:<EXT-PORT>` (§6 Phase 4b B4) |
-| Workspace publish fails ("cannot assign requested address") | Host IP bound in a nested (dind) netns that lacks it | Bind `0.0.0.0` in the template + DNAT on the host (§6 Phase 4b B1/B5) |
-| Tailnet dials arrive but never complete (DNAT counters rise, TCP fails) | Missing MASQUERADE / FORWARD accept past Docker chains | MASQUERADE the flow + ACCEPT in `DOCKER-USER` (Docker's admin hook, before its chains) (§6 Phase 4b B5) |
+| App rejects link ("points back to this device") | Loopback in a remote-entry link | Direct-dial required: reachable tailnet/LAN/tunnel address (Phase 4b for workspaces) |
+| Workspace serve unreachable, publish registered | `--port` bound the external port in the container (bind ≠ advertise) | Bind the mapped port, advertise host:port: `--port <INT-PORT> --pairing-address <HOST-TAILSCALE-IP>:<EXT-PORT>` (Phase 4b B4) |
+| Workspace publish fails ("cannot assign requested address") | Host IP bound in a nested (dind) netns that lacks it | Bind `0.0.0.0` in the template + DNAT on the host (Phase 4b B1/B5) |
+| Tailnet dials arrive but never complete (DNAT counters rise, TCP fails) | Missing MASQUERADE / FORWARD accept past Docker chains | MASQUERADE the flow + ACCEPT in `DOCKER-USER` (Docker's admin hook, before its chains) (Phase 4b B5) |
 | Orca browser + Coder preview both refuse a dev server | App bound `[::1]`-only; both consumers dial IPv4 loopback | Bind dev servers to `127.0.0.1` explicitly |
-| Terminal localhost links open client-local | Orca honors no `VSCODE_PROXY_URI` equivalent | `preview()` helper (`notes/coder-workspace.md`); dashboard Ports URLs for real browsers |
+| Terminal localhost links open client-local | Orca honors no `VSCODE_PROXY_URI` equivalent | `preview()` helper (`references/coder-workspace.md`); dashboard Ports URLs for real browsers |
 | Workspace went quiet, clients Disconnected | Autostop fired (agents die with the workspace) | `coder schedule stop <WORKSPACE> manual`; restart serve; expect stale terminal handles |
 
-## 10. Quick runs
+## Files
 
-### A. New server (condensed)
-
-- [ ] §2 answers recorded (location / path / host mode) — Tailscale
-  suggested unless shared private LAN (read)
-- [ ] SSH alias + scoped sudoers (user) — **WRITE**-adjacent setup
-- [ ] **WRITE** Tailscale join + `tailscale ip` recorded + ping both ways
-- [ ] **WRITE** Orca install + version parity + build tools (Linux)
-- [ ] **WRITE** agent CLIs + `orca account add` (user logins) + skills
-- [ ] **WRITE** start runtime (Mode A user clicks / Mode B `orca serve`
-  + optional systemd) with reachable `--pairing-address`
-- [ ] **WRITE** grants + firewall; negative public-reachability check (read)
-- [ ] Pair first client (§6 Phase 6); verify §6 Phase 7; write notes/inventory
-
-### B. New client on an existing server
-
-- [ ] Confirm client's path (same tailnet/LAN/tunnel) + Orca updated (read)
-- [ ] Server generates **fresh** link / `--mobile-pairing` URL (user hands
-  over privately) — treat as secret (**WRITE**-adjacent)
-- [ ] Client **Add Server** → Connect; set Active Server / Hide-other
-  workspaces only if wanted
-- [ ] Verify Connected + open a server project; record client in
-  `inventory.md`; revoke/replace any exposed grant
-
-### C. Workspace variant (condensed)
-
-- [ ] §2 records `host_type=coder-workspace` + template/workspace/publish mapping (read)
-- [ ] Template pushed with `orca_publish_ip` set (placeholders only in repo) — **WRITE** to Coder
-- [ ] Workspace created, `schedule stop manual`, sized honestly — **WRITE** to Coder
-- [ ] **WRITE** Orca install (Phase 2 flow) + serve with bind/advertise split (B4)
-- [ ] **WRITE** tailnet grant + host path (UFW/DNAT/MASQUERADE/`DOCKER-USER` as needed); negative public check (read)
-- [ ] Pair + verify (Phases 6–7); dev servers on `127.0.0.1`; `preview()` helper installed
-
----
-
-## Authoring rules
-
-- Steps must be copy-paste executable with placeholders filled.
-- Flag every step that WRITES to a production system with **WRITE** in bold
-  (e.g. `- [ ] **WRITE** install package X on <host>`). Reads need no flag.
-- Add rollback instructions for every write step.
-- After each run, promote lessons into `notes/` (via the operator, never
-  mid-run).
+| Path | Purpose |
+|---|---|
+| `templates/orca-serve.service` | systemd unit for headless `orca serve` (`<PLACEHOLDER>`s for user, address, port) |
+| `templates/tailscale-grants.example.json` | Minimal tailnet grants skeleton (Orca server and clients only) |
+| `templates/plan-template.md`, `templates/runbook-template.md` | Copied to `runs/orca-remote-server[-<suffix>]/` on first run |
+| `scripts/install-orca-server.sh` | Headless-Linux helper: Tailscale and Orca CLI presence check, build tools for the Orca relay |
+| `references/security.md` | Security invariants and location/access decision rationale |
+| `references/coder-workspace.md` | Coder-workspace variant: netns plumbing, bind-vs-advertise, lifecycle, preview helper |
+| `references/client-connections.md` | Per-setup client connection matrix (desktop, mobile, SSH-forward, tunnel) |
+| `references/gotchas.md` | Pitfalls from Orca docs and earlier runs, with fixes |

@@ -1,7 +1,7 @@
 # Coder-workspace hosts — nuances, helpers, hardening list
 
-Companion to `playbook.md` §6 Phase 4b. Read BEFORE any workspace run
-(mandated by §4). Placeholders only — no real IPs, names, or links.
+Companion to `SKILL.md` Phase 4b. Read BEFORE any workspace run
+(mandated by Procedure prerequisites). Placeholders only — no real IPs, names, or links.
 
 ## N1 — A workspace is not a tailnet node
 

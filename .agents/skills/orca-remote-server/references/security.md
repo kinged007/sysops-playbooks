@@ -1,6 +1,6 @@
 # Security notes — Orca Remote Server
 
-Why this playbook is strict. Read BEFORE any run (mandated by README).
+Why this skill is strict. Read BEFORE any run (mandated by SKILL.md).
 
 Upstream stance (Orca docs, `Remote Orca Servers`): servers are **beta** —
 keep server and client on a **private network path you control** (same
@@ -33,7 +33,7 @@ selects the threat model:
 - Generating another link replaces the previous **unused** link; paired
   clients keep theirs until revoked — so a leaked-but-unused link still
   dies on regeneration, a leaked-and-used one needs explicit revocation.
-- Handoff over a private channel only, into `executions/.../secrets/`
+- Handoff over a private channel only, into the vault (entry `<client>-orca-pairing-<device>`)
   (one file per client). Never chat, logs, tickets, or screenshots.
 - Wrong recipient → revoke first, ask questions later, then issue fresh.
 
@@ -44,14 +44,14 @@ selects the threat model:
   reports a confusing failure — always advertise a reachable tailnet / LAN /
   tunnel address.
 - Wildcard / `0.0.0.0` binds on a public box plus a permissive firewall is
-  the incident this playbook exists to prevent. Verify with
+  the incident this skill exists to prevent. Verify with
   `ss -tlnp | grep <PORT>` (must show the private address) and an off-path
   `Test-NetConnection <PUBLIC_IP> -Port <PORT>` that must fail.
 
 ## S4 — One host mode per machine
 
 Desktop share **xor** `orca serve`. Two runtimes on one box fight over
-state and double the pairing-link attack surface. The playbook verifies
+state and double the pairing-link attack surface. The skill verifies
 only the recorded mode is running.
 
 ## S5 — The server owns credentials

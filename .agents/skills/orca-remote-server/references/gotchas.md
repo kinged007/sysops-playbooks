@@ -1,7 +1,7 @@
 # Gotchas — Orca Remote Server
 
 Real pitfalls (from Orca docs + runs). Read BEFORE any run (mandated by
-README). Append new ones after each run via the operator — never mid-run.
+SKILL.md). Append new ones after each run via the operator — never mid-run.
 
 **G1 — `127.0.0.1` / wildcard as the pairing address.**
 Symptom: client can't connect or reaches itself. Cause: loopback works only
@@ -17,7 +17,7 @@ address**.
 **G3 — Protocol-version mismatch after updating one side.**
 Symptom: incompatible-version / perpetual Disconnected. Fix: update Orca on
 **both** server and client, then reconnect. Pin the verified versions in
-`inventory.md`.
+the fleet records.
 
 **G4 — Agent CLI works on the laptop, missing on the server.**
 Remote sessions use the server's `PATH`/home/creds. Fix: install +
@@ -37,7 +37,7 @@ Verify with a disconnect/reconnect cycle, not just a ping.
 **G7 — Pairing link pasted into chat/logs/tickets.**
 Treat as exposure: revoke the grant (**Shared Server Access** → trash),
 generate a fresh link, hand it over privately, record rotation in
-`notes.md`. Keep links in `executions/.../secrets/` only.
+`notes.md`. Keep links in the vault only.
 
 **G8 — LAN-only server followed the client out of the house.**
 Symptom: worked at home, dead on hotel Wi-Fi. Fix: migrate to the Tailscale
@@ -46,7 +46,7 @@ clients via **Edit host** — no re-pair needed for the token).
 
 **G9 — Linux server terminals dead, files fine.**
 Missing compiler toolchain for the relay's native modules. Fix: install
-build tools per OS (§6 Phase 2), then reconnect.
+build tools per OS (Phase 2), then reconnect.
 
 **G10 — Stale terminal handles after a runtime restart.**
 `orca` terminal handles are runtime-scoped. Fix: `orca terminal list --json`

@@ -1,17 +1,17 @@
 # Runbook: <RUN NAME>
 
-Snapshot of `playbooks/orca-remote-server/playbook.md` being executed, with
+Snapshot of `.agents/skills/orca-remote-server/SKILL.md` being executed, with
 real values filled in. State lives here and in `logs/` — any agent session can
-resume from these files alone. This folder is persistent per playbook variant
-(`executions/orca-remote-server[/-<suffix>]/`); subsequent invocations append
+resume from these files alone. This folder is persistent per skill variant
+(`runs/orca-remote-server[-<suffix>]/`); subsequent invocations append
 to it, never replace it. `logs/` is append-only — each session adds
 timestamp-prefixed files (e.g. `logs/2026-08-29T143000-01-discover.log`).
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | `orca-remote-server` |
-| Execution folder | `executions/orca-remote-server/` or `executions/orca-remote-server-<suffix>/` |
+| Skill | `orca-remote-server` |
+| Run folder | `runs/orca-remote-server/` or `runs/orca-remote-server-<suffix>/` |
 | Client | <client> |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
@@ -35,7 +35,7 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 - [ ] **5. Start runtime (desktop share / orca serve + systemd)** (**WRITE**) — status: pending
   - Log: `logs/<timestamp>-05-serve.log`
   - Mode A note: operator confirmation required before running.
-  - Workspace variant: note template/workspace/publish mapping + autostop state here (§6 Phase 4b).
+  - Workspace variant: note template/workspace/publish mapping + autostop state here (Phase 4b).
 - [ ] **6. Grants + firewall + negative public check** (**WRITE**) — status: pending
   - Log: `logs/<timestamp>-06-harden.log`
   - Mode A note: operator confirmation required before running.
@@ -53,4 +53,4 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 
 - [ ] Runbook complete (all steps done or blocked+explained)
 - [ ] Findings appended to `notes.md` (cumulative history — do not overwrite)
-- [ ] Promotion candidates proposed to operator (→ playbook `notes/`)
+- [ ] Promotion candidates proposed to operator (→ skill `references/`)

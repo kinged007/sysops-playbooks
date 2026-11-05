@@ -3,7 +3,7 @@
 # READ-ONLY by default. Pass --install to perform writes (Tailscale install).
 # Usage: bash install-orca-server.sh [--install]
 # Never pass secrets on the command line — pre-auth keys come from the
-# execution's secrets/ file at join time (see playbook Phase 1).
+# vault entry `<client>-tailscale-authkey` at join time (see SKILL.md Phase 1).
 set -euo pipefail
 
 WRITE=0
