@@ -191,7 +191,7 @@ Standard push (shared isolated dind on remote `100.107.165.73`):
 
 ```sh
 coder templates push 24gb-169-58-gvisor-shared-docker \
-  ./playbooks/coder-remote-servers/templates/gvisor-docker \
+  ./.agents/skills/coder-remote-servers/templates/gvisor-docker \
   --variables-file ./secrets/24gb-169-58/gvisor-shared-vars.yaml
 # gvisor-shared-vars.yaml:
 # docker_host: tcp://100.107.165.73:2376
@@ -228,7 +228,7 @@ template push, not per workspace. If you need per-workspace choice, make it a
 
 ### Ports — shared daemon vs Coder proxy (`host.docker.internal` vs `localhost`)
 
-`gvisor-docker` is **DooD** (Docker outside of Docker): `docker run -p 3000:3000` creates a **sibling container on the shared isolated daemon** (`playbooks/coder-remote-servers/templates/workspace-docker.yml:15`), not a child inside the workspace netns. The port is published on the **dind host**, not on workspace `localhost`.
+`gvisor-docker` is **DooD** (Docker outside of Docker): `docker run -p 3000:3000` creates a **sibling container on the shared isolated daemon** (`.agents/skills/coder-remote-servers/templates/workspace-docker.yml:15`), not a child inside the workspace netns. The port is published on the **dind host**, not on workspace `localhost`.
 
 The Coder agent proxies `localhost:PORT` inside the **workspace** (`main.tf:496` `host.docker.internal=host-gateway`, `main.tf:308` `DOCKER_HOST` over TLS). So `curl localhost:3000` inside the workspace fails → Coder auto port-detect (which watches workspace `localhost`) sees nothing, and a `coder_app` with `url = "http://localhost:3000"` will 502 — this is **expected for DooD**, not a gVisor/`runc` limitation.
 
@@ -247,7 +247,7 @@ curl localhost:3000  # via socat
 
 To verify: `docker ps` (on shared daemon) shows `0.0.0.0:3000->3000/tcp`, `ss -tlnp | grep 3000` inside workspace is empty, `docker exec workspace-docker ss -tlnp | grep 3000` shows the listener, `curl host.docker.internal:3000` works from workspace.
 
-`docker-devcontainer` (`playbooks/coder-remote-servers/templates/docker-devcontainer/main.tf:17`) is **DiD** (per-workspace nested `dockerd`, `privileged=true`): `docker run -p 3000:3000` publishes directly on **workspace `localhost`** → Coder `localhost:3000` proxy works without `socat` or `host.docker.internal`. Use `docker-devcontainer` if you need transparent `localhost:PORT` for many services.
+`docker-devcontainer` (`.agents/skills/coder-remote-servers/templates/docker-devcontainer/main.tf:17`) is **DiD** (per-workspace nested `dockerd`, `privileged=true`): `docker run -p 3000:3000` publishes directly on **workspace `localhost`** → Coder `localhost:3000` proxy works without `socat` or `host.docker.internal`. Use `docker-devcontainer` if you need transparent `localhost:PORT` for many services.
 
 ## Prerequisites (shared isolated daemon — standard)
 

@@ -48,7 +48,7 @@ coder templates push "docker-devcontainer-remote-a" ./templates/docker-devcontai
 The three cert variables are marked **sensitive** — Coder stores them encrypted
 and never displays them. No files are mounted into the Coder container.
 
-See the playbook (`playbooks/coder-remote-servers/playbook.md`) and the
+See the skill (`.agents/skills/coder-remote-servers/SKILL.md`) and the
 execution's `inventory.md` for each remote's endpoint + cert staging path.
 
 ## Template-level startup command (`startup_command`)
@@ -141,7 +141,7 @@ curl localhost:3000  # works
 # expose via Coder dashboard: coder_app with url = "http://localhost:3000" or coder port-forward
 ```
 
-Contrast `gvisor-docker` (`playbooks/coder-remote-servers/templates/gvisor-docker/README.md:226`): it is **DooD** to a shared daemon, so `docker run -p` publishes on the **dind host**, not workspace `localhost` → needs `socat TCP-LISTEN:3000,fork TCP:host.docker.internal:3000` or a `coder_app` pointing at `http://host.docker.internal:3000`. Use this `docker-devcontainer` template when you want transparent `localhost:PORT` for many services.
+Contrast `gvisor-docker` (`.agents/skills/coder-remote-servers/templates/gvisor-docker/README.md:226`): it is **DooD** to a shared daemon, so `docker run -p` publishes on the **dind host**, not workspace `localhost` → needs `socat TCP-LISTEN:3000,fork TCP:host.docker.internal:3000` or a `coder_app` pointing at `http://host.docker.internal:3000`. Use this `docker-devcontainer` template when you want transparent `localhost:PORT` for many services.
 
 ## Prerequisites
 

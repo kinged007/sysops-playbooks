@@ -1,17 +1,17 @@
 # Runbook: <RUN NAME>
 
-Snapshot of `playbooks/coder-remote-servers/playbook.md` being executed, with
+Snapshot of `.agents/skills/coder-remote-servers/SKILL.md` being executed, with
 real values filled in. State lives here and in `logs/` — any agent session can
-resume from these files alone. This folder is persistent per playbook variant
-(`executions/coder-remote-servers[/-<suffix>]/`); subsequent invocations append
+resume from these files alone. This folder is persistent per skill variant
+(`runs/coder-remote-servers[-<suffix>]/`); subsequent invocations append
 to it, never replace it. `logs/` is append-only — each session adds
 timestamp-prefixed files (e.g. `logs/2026-08-29T143000-01-discover.log`).
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | `coder-remote-servers` |
-| Execution folder | `executions/coder-remote-servers/` or `executions/coder-remote-servers-<suffix>/` |
+| Skill | `coder-remote-servers` |
+| Run folder | `runs/coder-remote-servers/` or `runs/coder-remote-servers-<suffix>/` |
 | Client | <client> |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
@@ -31,4 +31,4 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 ## Close-out
 - [ ] Runbook complete (all steps done or blocked+explained)
 - [ ] Findings appended to `notes.md` (cumulative history — do not overwrite)
-- [ ] Promotion candidates proposed to operator (→ playbook `notes/`)
+- [ ] Promotion candidates proposed to operator (→ skill `references/`)

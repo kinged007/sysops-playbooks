@@ -1,12 +1,77 @@
-# Playbook: Coder Remote Servers — Procedure
-
-Canonical steps for a run. **Placeholders only** — never real IPs, hostnames,
-usernames, or credentials. Real values go in the execution's `plan.md`.
-Repo-level rules (folder discipline, secrets, committing): see `AGENTS.md`.
-
+---
+name: coder-remote-servers
+description: Provision Coder development workspaces across remote servers from one Coder host over a Tailscale tailnet with mutual TLS on every Docker API connection. Use to onboard a new remote workspace server, push or update the unified Coder template for a local or remote target, set up or repair wildcard app-preview subdomains, or troubleshoot remote-daemon TLS and tailnet ACLs. Not for installing Coder itself or for non-Docker workspace backends.
 ---
 
-## 1. System overview
+# Coder Remote Servers
+
+> Read `references/` BEFORE any run: `gotchas.md` (G1-G12) and
+> `wildcard-subdomains.md` hold lessons from earlier runs and wildcard preview
+> traps that can change how you plan. Never skip this.
+
+Risk level: medium. Touches production Docker daemons (via TLS) and live Coder
+configuration. Binding 2376 to a public interface is an incident.
+
+Provisions Coder development workspaces across multiple remote servers from a
+single Coder host: a private Tailscale tailnet, mutual TLS on every Docker API
+connection (2376 bound to tailnet IPs only), onboarding of new remotes, Coder
+template pushes, and exposing workspace app previews through wildcard
+subdomains.
+
+## When to use
+
+- Onboarding a new remote workspace server into the fleet.
+- Pushing or updating the unified Coder template for a target (local or remote).
+- Setting up or repairing wildcard app subdomains (`.coder.<domain>` previews).
+- TLS and ACL troubleshooting for remote daemons.
+
+Not for: installing Coder itself, or workspace backends other than Docker.
+
+## Fleet refs needed
+
+One Coder host plus one or more remotes, each running a `docker:dind`
+container (or a host dockerd with TLS, see topology in section 1).
+
+- `fleet/services.yaml`: service `coder` (host, URL, health endpoint) and one `workspace-docker` service per remote (compose path, TLS port 2376).
+- `fleet/servers.yaml`: the Coder host record and each remote record (connect via `ops ssh <server>`; Tailscale hostname and IP are stored there).
+- `fleet/providers.yaml`: Tailscale tailnet record; DNS/Cloudflare account record for wildcard certificates.
+- `fleet/sites.yaml`: the Coder domain and wildcard app domain.
+
+Prerequisites:
+
+- Coder host (Dokploy-managed) with the `coder` CLI installed and authenticated.
+- Tailscale account and tailnet (free Personal plan: up to 6 users, unlimited devices).
+- Key-based SSH access to the Coder host and each remote.
+- Management UI (Dokploy or Coolify) on each remote, or direct compose access.
+
+## Vault entries needed
+
+Names follow `<client>-<provider>-<purpose>`. Values are never printed or
+logged.
+
+| Vault entry | Used for |
+|---|---|
+| `<client>-tailscale-preauth-key` | Reusable pre-auth key for `tailscale up` (expires after 90 days by default) |
+| `<client>-cloudflare-dns-token` | `Zone > DNS > Edit` token for the wildcard certificate (section 10); not IP-restricted |
+| `<client>-coder-docker-tls-<remote>` | CA, client certificate, and client key of each remote dind daemon |
+| `ssh/<client>-<server>` | ssh key from each server's fleet record |
+
+> **Default workspace tooling:** all Coder templates (`docker-devcontainer`, `gvisor-docker`, `docker-devcontainer-orca`, `remote-docker-workspace`) install GitHub CLI (`gh`), `uv`, Go, and Rust on every workspace start if missing, like `npm` and `python` (baked into `codercom/enterprise-node:ubuntu`). `gh` tries apt then binary; `uv` via `pipx`/astral installer; Go via tarball to `~/.local/go`; Rust via `rustup` to `~/.cargo`. All fall back to `~/.local/bin`, `~/.cargo/bin`, and `~/.local/go/bin`, so they work without `sudo` (primary for `runsc`/gVisor). Authenticate `gh` with `gh auth login` or with `coder external-auth` (GitHub).
+
+
+
+## Procedure
+
+Rules for every step:
+
+- Reads need no flag. Every step that changes a production system is flagged **WRITE** and needs approval per the run's permission mode (AGENTS.md section 1.3).
+- Every destructive **WRITE** (overwrite, delete, restart with data impact, schema change) is preceded by a **Backup** step.
+- Every **WRITE** has a **Rollback** line.
+- Every fix is followed by a **Verify** step.
+- Placeholders only; real values come from fleet records and vault entries, never from this file.
+- Planned work is tracked from `templates/plan-template.md` and `templates/runbook-template.md` in `runs/coder-remote-servers[-<suffix>]/`; logs there are append-only and timestamp-prefixed.
+
+### 1. System overview
 
 ```
                      Coder Host (Dokploy)
@@ -33,7 +98,7 @@ Repo-level rules (folder discipline, secrets, committing): see `AGENTS.md`.
 - The Docker API is bound **only** to the remote's Tailscale IP — never to a
   public interface. See §7 for why that matters and how to verify it.
 
-### Key design decisions (do not "improve" without re-reading these)
+#### Key design decisions (do not "improve" without re-reading these)
 1. **One unified Coder template** (`templates/docker-devcontainer/`) serves both
    modes: empty `docker_host` → local Unix socket; `docker_host=tcp://<ts-ip>:2376`
    + TLS material → remote. One template, pushed per-target with different vars.
@@ -44,12 +109,12 @@ Repo-level rules (folder discipline, secrets, committing): see `AGENTS.md`.
 4. **Tailscale free Personal tier** covers this (≤6 users, unlimited devices,
    non-commercial only). If use becomes commercial → paid Tailscale or self-host
    Headscale.
-5. **Repo is publishable.** Real IPs/hostnames/usernames live only in gitignored
-   execution folders. See AGENTS.md §7.
+5. **Repo is publishable.** Real IPs/hostnames/usernames live only in fleet records,
+   the vault, and gitignored run folders. See AGENTS.md section 7.
 
-### Remote topology variants — confirm which one applies FIRST
+#### Remote topology variants — confirm which one applies FIRST
 
-This playbook's canonical setup is a **dedicated `docker:dind` container** per
+This skill's canonical setup is a **dedicated `docker:dind` container** per
 remote (the `workspace-docker` container). But some users run Coder against a
 remote's **host Docker daemon directly** (no container). Before starting,
 **ask the user which topology the remote will use** — the difference changes
@@ -74,7 +139,7 @@ TLS verification, template push, end-to-end test, secrets handling — is identi
 > Docker daemon (whole-server)? If the server also hosts other applications,
 > the dind container is the safer choice."
 
-## 2. Roles
+### 2. Roles
 
 Division of labor. An agent can work **independently**, **hybrid**, or just
 **advise** — state which mode you're operating in up front.
@@ -91,18 +156,18 @@ Division of labor. An agent can work **independently**, **hybrid**, or just
 needs privilege the agent doesn't have, solve it with scoped NOPASSWD sudoers
 (§4) or hand the user the exact command to run.
 
-## 3. Prerequisites
+### 3. Prerequisites
 
 Before any SSH work, the agent needs:
 
 1. **Tailscale account + tailnet.** Personal free plan. Decide auth method:
    - **Reusable pre-auth key** (hands-off): Settings → Keys → Generate key →
      Reusable=on, Ephemeral=off, no tags. Agent uses `sudo tailscale up --auth-key=...`.
-     Keys expire (90 days default) — store in the execution's `secrets/`.
+     Keys expire (90 days default) — store in the vault entry `<client>-tailscale-preauth-key`.
    - **Interactive auth URL**: each device prints a URL the user must approve.
 2. **SSH access to the Coder host** — user runs `ssh-copy-id`; agent gets
    `<user>@<host>`. The host may be on the public internet or the tailnet.
-3. **SSH access to each remote** — same, per remote. See AGENTS.md §5 for the
+3. **SSH access to each remote** — same, per remote. See AGENTS.md section 5 for the
    exact user commands to create/install keys so the agent never sees a password.
 4. **Coder CLI, installed AND authenticated (agent side).** The orchestrating
    agent needs the `coder` CLI on the machine it works from (e.g. the user's
@@ -121,10 +186,10 @@ Before any SSH work, the agent needs:
      before running any `coder` command.
    - The CLI talks to Coder over its **HTTP API** — the agent does NOT need
      Docker access on the Coder host for template work.
-5. **Decision: networking mode** — this playbook standardizes on **Tailscale**.
+5. **Decision: networking mode** — this skill standardizes on **Tailscale**.
    Alternative: no VPN (public IP + UFW + TLS) — see "No-VPN alternative" below.
 
-### No-VPN alternative (if you don't want a tailnet)
+#### No-VPN alternative (if you don't want a tailnet)
 - Bind 2376 to the remote's **public IP**: `ports: ["<PUBLIC_IP>:2376:2376"]`.
 - Firewall so **only the Coder host's public IP** can reach it (never allow
   `2376/tcp` to the world):
@@ -138,14 +203,14 @@ Before any SSH work, the agent needs:
 - Everything downstream (cert extraction, template, verification) is identical —
   only `docker_host` and the cert SAN change.
 
-## 4. Access & privilege model (the sudo problem)
+### 4. Access & privilege model (the sudo problem)
 
-### Symptom
+#### Symptom
 Production hosts often have **root SSH disabled** and a user whose `sudo`
 requires a password every time. An agent SSH-ing as that user cannot run any
 privileged command non-interactively.
 
-### Solution: scoped NOPASSWD sudoers (NOT blanket NOPASSWD)
+#### Solution: scoped NOPASSWD sudoers (NOT blanket NOPASSWD)
 Allow exactly the binaries the setup needs, nothing else. User runs these once:
 
 ```bash
@@ -164,19 +229,20 @@ sudo chmod 0440 /etc/sudoers.d/coder-setup-docker
 - On the **Coder host**, the agent does **not** need Docker at all — only
   Tailscale. Template deploys go over Coder's HTTP API, not docker.sock.
 
-### Agent check
+#### Agent check
 `sudo -n -l` must show the scoped entries. Remember: `sudo -n whoami` failing is
 **expected** when NOPASSWD only covers tailscale/docker — that's the point.
 
-## 5. Procedure — Phases 0–8
+### 5. Procedure — Phases 0–8
 
-### Phase 0 — Repo prep
-- Real fleet values live in the execution folder's `inventory.md` + `secrets/`.
-  Fill them in as you discover values (IPs, hostnames, usernames).
-- Verify `.gitignore` covers: `executions/`, `secrets/`, `servers/`, `*.pem`,
-  `*.key`, `.tfvars` — see AGENTS.md §7.
+#### Phase 0 — Repo prep
+- Real fleet values live in `fleet/` records and the vault. Update the fleet
+  records as you discover values (IPs, hostnames, usernames).
+- Verify `.gitignore` covers: `runs/`, `secrets/`, `servers/`, `*.pem`,
+  `*.key`, `.tfvars` — see AGENTS.md section 7.
 
-### Phase 1 — Coder host
+#### Phase 1 — Coder host
+**WRITE** (installs Tailscale and joins the tailnet). Rollback: `sudo tailscale down`, remove the device in the admin console, `sudo apt-get remove tailscale`.
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up --auth-key=<KEY> --hostname=coder-host   # or interactive
@@ -184,7 +250,8 @@ tailscale ip                                               # record host TS IP
 ```
 - Coder host TS IP becomes the ACL source (see §6).
 
-### Phase 2 — Each remote (repeat for B, C, D)
+#### Phase 2 — Each remote (repeat for B, C, D)
+**WRITE** (same as Phase 1, per remote). Rollback: same as Phase 1.
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up --auth-key=<KEY> --hostname=coder-workspace-NN   # NN sequential, never reused
@@ -194,7 +261,7 @@ tailscale ip
   `-02`, … (never reuse a number).
 - Verify host↔remote: `tailscale ping coder-workspace-NN` from the host.
 
-### Phase 3 — Deploy the dind container (USER does the UI part)
+#### Phase 3 — Deploy the dind container (USER does the UI part)
 > **Branch on topology (§1):** the canonical path below deploys a
 > `workspace-docker` dind container. If the remote uses topology **B (host
 > dockerd)**, SKIP the container — instead enable TLS on the host daemon:
@@ -202,6 +269,10 @@ tailscale ip
 > "unix:///var/run/docker.sock"]` + `tlsverify` + cert paths, restart dockerd,
 > and generate the CA/server/client certs manually with the TS IP in the server
 > cert's SAN. Verification (Phase 5) and everything after is identical.
+
+**Backup**: if a `workspace-docker` container or its volumes already exist, record `docker ps -a --filter name=workspace-docker` and `docker volume ls` in the run log first; never delete the volumes.
+
+**WRITE**: deploy the compose. Rollback: `docker compose down` (no `-v`); volumes and certificates stay.
 
 Canonical compose: `templates/workspace-docker.yml`. Agent fills in the remote's
 Tailscale IP, user pastes into Dokploy **or** Coolify and deploys.
@@ -241,7 +312,8 @@ remote's PUBLIC IP on 2376 must fail/timeout. Example (PowerShell):
 (Test-NetConnection <public-ip> -Port 2376 -WarningAction SilentlyContinue).TcpTestSucceeded  # False
 ```
 
-### Phase 4 — Stage certs on the host
+#### Phase 4 — Stage certs on the host
+**WRITE** (creates files on the Coder host). Rollback: `rm -rf /home/<user>/coder-tls/<remote>/`. If the directory already exists, **Backup** it first (`cp -a`).
 - Extract from the dind container (they are per-daemon, regenerated on restart):
   ```bash
   docker exec <container> cat /certs/client/ca.pem > ca.pem   # + cert.pem + key.pem
@@ -251,7 +323,7 @@ remote's PUBLIC IP on 2376 must fail/timeout. Example (PowerShell):
 - The cert values will be pasted into Coder template vars; the staged copy is the
   convenient source.
 
-### Phase 5 — Verify TLS from the host
+#### Phase 5 — Verify TLS from the host
 ```bash
 docker --tlsverify \
   --tlscacert=/home/<user>/coder-tls/<remote>/ca.pem \
@@ -262,18 +334,20 @@ docker --tlsverify \
 Must print server info. **If it fails with "certificate is valid for … not
 <ts-ip>" → the container was started without `DOCKER_TLS_SAN` (G1).**
 
-### Phase 6 — Coder templates
-The unified template lives at `templates/docker-devcontainer/` (this playbook's
-`templates/` folder — full path: `playbooks/coder-remote-servers/templates/docker-devcontainer`).
+#### Phase 6 — Coder templates
+**Backup**: `coder templates pull <template> ./backup-<template>` for each template that exists. **WRITE**: each `coder templates push`. Rollback: `coder templates versions promote` the previous version, or push the pulled backup.
+
+The unified template lives at `templates/docker-devcontainer/` (this skill's
+`templates/` folder — full path: `.agents/skills/coder-remote-servers/templates/docker-devcontainer`).
 It exposes: `docker_host` (empty = local socket), `docker_ca`, `docker_cert`,
 `docker_key` (sensitive).
 
 ```sh
 # local template (empty docker_host → host's unix socket)
-coder templates push dev-workspace ./playbooks/coder-remote-servers/templates/docker-devcontainer
+coder templates push dev-workspace ./.agents/skills/coder-remote-servers/templates/docker-devcontainer
 
 # remote template — variables file is YAML (NOT tfvars), see G6/G7
-coder templates push dev-workspace-remote-a ./playbooks/coder-remote-servers/templates/docker-devcontainer \
+coder templates push dev-workspace-remote-a ./.agents/skills/coder-remote-servers/templates/docker-devcontainer \
   --variables-file /path/to/remote-a-vars.yaml
 ```
 
@@ -281,7 +355,8 @@ coder templates push dev-workspace-remote-a ./playbooks/coder-remote-servers/tem
 §3 prerequisite #4). Sessions expire — if `coder whoami` says "signed out", the
 user runs `coder login <url>` (browser). Do NOT handle their token.
 
-### Phase 7 — Verify end-to-end
+#### Phase 7 — Verify end-to-end
+**WRITE**: creates a test workspace. Rollback: `coder delete test-remote-a --yes`.
 ```sh
 coder create test-remote-a --template dev-workspace-remote-a --yes \
   --parameter repo_url= --parameter new_branch=
@@ -293,12 +368,14 @@ coder ping test-remote-a          # agent should respond
 - Test the **local** template the same way (`dev-workspace`, no params).
 - Delete test workspaces when done.
 
-### Phase 8 — Record
-- Append to the execution's `notes.md` and update the execution's
-  `inventory.md` and `secrets-pointers.md`. These files are the run's private
-  memory — never commit them (AGENTS.md §7).
+#### Phase 8 — Record
+- Append to the run's `notes.md`, update the fleet records, and add new
+  vault entries for new certificates. Run files are the run's private
+  memory — never commit them (AGENTS.md section 7).
 
-## 6. Tailscale ACL / grants (tailnet hardening)
+### 6. Tailscale ACL / grants (tailnet hardening)
+
+**Backup**: copy the current policy JSON from the admin console into the run log. **WRITE**: replacing the policy. Rollback: paste the saved policy back. Verify: `tailscale ping` host to remote and the Phase 5 TLS check still pass.
 
 Apply in the admin console (Access Controls). **Grants syntax**, not legacy ACL
 syntax. `src`/`dst` are device selectors; **ports go in the `ip` field** (G8).
@@ -318,23 +395,23 @@ syntax. `src`/`dst` are device selectors; **ports go in the `ip` field** (G8).
 
 - WireGuard handshake (41641) + control-plane traffic are **auto-allowed** — no rule.
 - Replacing the policy **removes Tailscale's default SSH-to-own-devices**; add an
-  `ssh` block if you rely on `tailscale ssh` (see README §3).
+  `ssh` block if you rely on `tailscale ssh` (see Prerequisites above).
 - Add each new remote: alias+IP in `hosts`, plus a `coder-host → <remote>`
   grant for `tcp:2376`. No hostname wildcards in selectors — list explicitly.
 
-## 7. Security invariants (verify every time)
+### 7. Security invariants (verify every time)
 
 1. **Docker 2376 never on a public interface.** Bind is `"<ts-ip>:2376:2376"`.
    A bare `"2376:2376"` or `0.0.0.0` is a security incident.
 2. **Public reachability test fails** on the remote's public IP:2376.
 3. **`DOCKER_TLS_SAN` always set** to the tailnet IP.
-4. **No secrets in git.** `*.pem`, `*.key`, `.tfvars`, `executions/` are all
-   gitignored. A tracked `*.pem` is an incident → rotate (AGENTS.md §7).
+4. **No secrets in git.** `*.pem`, `*.key`, `.tfvars`, `runs/` are all
+   gitignored. A tracked `*.pem` is an incident → rotate (AGENTS.md section 7).
 5. **`key.pem` staged at `0600`** on the host.
 6. **Agent never sees a password.** Keys and pre-auth keys are the only
    credentials; passwords never leave the user.
 
-## 8. Common questions
+### 8. Common questions
 
 - **Why Tailscale vs Headscale?** Tailscale free Personal covers ≤6 users /
   unlimited devices, non-commercial. Headscale = self-hosted control plane
@@ -348,21 +425,20 @@ syntax. `src`/`dst` are device selectors; **ports go in the `ip` field** (G8).
   (code-server install) are still running; check `coder logs <ws>` before
   worrying.
 
-> **Gotchas:** read `notes/gotchas.md` (G1–G12) before any run — real pitfalls
+> **Gotchas:** read `references/gotchas.md` (G1–G12) before any run — real pitfalls
 > hit on the fleet, each with its fix.
 
----
 
-## 9. Quick run: onboarding a new remote
+### 9. Quick run: onboarding a new remote
 
 Condensed checklist for adding another remote. Fill in `<REMOTE>` (alias),
-`<user>`, and IPs as you go. Log each step in the execution's `notes.md`.
+`<user>`, and IPs as you go. Log each step in the run's `notes.md`.
 
-### 0. Pre-flight
+#### 0. Pre-flight
 - [ ] Tailscale free tier headroom? (unlimited devices, 6 users — fine unless
       fleet grows)
 - [ ] `ssh-copy-id <user>@<public-ip>` done; note alias `<REMOTE>` in the
-      execution's `inventory.md`.
+      fleet record.
 - [ ] Tailscale tailnet exists (host already joined from first onboarding).
 - [ ] **Scoped NOPASSWD sudo for the agent** (root SSH often disabled; agent
       needs passwordless `tailscale` + `docker` — see §4):
@@ -373,7 +449,7 @@ Condensed checklist for adding another remote. Fill in `<REMOTE>` (alias),
       sudo visudo -c
       ```
 
-### 1. Tailscale on the remote
+#### 1. Tailscale on the remote
 - [ ] `curl -fsSL https://tailscale.com/install.sh | sh`
 - [ ] `sudo tailscale up --auth-key=<KEY> --hostname=coder-workspace-NN`
       (name the node at auth time — the host is `coder-host`, remotes are
@@ -384,9 +460,9 @@ Condensed checklist for adding another remote. Fill in `<REMOTE>` (alias),
       **before** testing TLS from the host, or the 2376 TCP check will time out.
       Apply via the admin console **or** the API (POST the full policy with
       `Content-Type: application/hujson`; an empty body resets the policy to
-      allow-all — see notes/gotchas.md G12).
+      allow-all — see references/gotchas.md G12).
 
-### 2. Compose + deploy
+#### 2. Compose + deploy
 - [ ] Copy `templates/workspace-docker.yml`, replace the `2376` bind IP with
       this remote's Tailscale IP.
 - [ ] **Also update `DOCKER_TLS_SAN` to `IP:<tailscale-ip>`** — without it the
@@ -396,27 +472,27 @@ Condensed checklist for adding another remote. Fill in `<REMOTE>` (alias),
       `docker ps --filter name=workspace-docker`.
 - [ ] `docker exec workspace-docker ls /certs/client` → `ca.pem cert.pem key.pem`
 
-### 3. Stage certs on the Coder host
+#### 3. Stage certs on the Coder host
 - [ ] `mkdir -p /home/<user>/coder-tls/<REMOTE>` (user-writable — see G5)
 - [ ] Copy the three files from the remote (docker cp / scp) into that dir.
 - [ ] `chmod 0600 /home/<user>/coder-tls/<REMOTE>/key.pem`
 
-### 4. Verify TLS from host
+#### 4. Verify TLS from host
 - [ ] `docker --tlsverify --tlscacert=/home/<user>/coder-tls/<REMOTE>/ca.pem
       --tlscert=.../cert.pem --tlskey=.../key.pem -H=tcp://<ts-ip>:2376 info`
 
-### 5. Coder template
+#### 5. Coder template
 - [ ] Push the unified template for this remote (Phase 6 above)
 - [ ] In Coder UI set template vars: `docker_host=tcp://<ts-ip>:2376` +
       `docker_ca`/`docker_cert`/`docker_key` = file contents (sensitive).
 
-### 6. Verify
+#### 6. Verify
 - [ ] Create + destroy a test workspace (watch `coder logs --follow`).
-- [ ] Update the execution's `inventory.md` + `notes.md`.
+- [ ] Update the fleet record and the run's `notes.md`.
 
----
+### 10. Wildcard app subdomains
 
-## 10. Wildcard app subdomains
+Every change in this section is a **WRITE** (Coder server config, proxy routing, certificate installation). **Backup** before each: the Coder environment/compose file, the proxy dynamic config, and the existing certificate files. Rollback: restore the saved files and restart the affected service. Verify with section 10.5.
 
 How Coder's **workspace app previews**
 (`https://3000--main--<workspace>--<user>.coder.<domain>`) are exposed through
@@ -425,8 +501,8 @@ This is the knowledge gained when the preview URLs returned Traefik's
 `404 page not found` and an invalid certificate.
 
 > Replace `<domain>` (e.g. `example.com`), `<user>`, `<ORIGIN_PUBLIC_IP>`, and
-> the Coder app name with your real values. Real fleet values stay in the
-> execution folder.
+> the Coder app name with your real values. Real fleet values stay in
+> fleet records and the vault.
 
 **TL;DR — the two things that must both be right:**
 1. **Routing** — Traefik must match `*.coder.<domain>` with a `HostRegexp`
@@ -434,7 +510,7 @@ This is the knowledge gained when the preview URLs returned Traefik's
 2. **TLS** — Traefik must serve a **wildcard** cert for `*.coder.<domain>`,
    issued via **DNS-01** (HTTP-01 cannot issue wildcards).
 
-### 10.1 How the pieces fit together
+#### 10.1 How the pieces fit together
 
 ```
  browser
@@ -451,7 +527,7 @@ This is the knowledge gained when the preview URLs returned Traefik's
                                      workspace app on port 3000
 ```
 
-#### DNS split — intentional, do not "fix" it
+##### DNS split — intentional, do not "fix" it
 - `coder.<domain>` → **Cloudflare** (proxied). Cloudflare terminates TLS with
   its own edge cert, so the dashboard works even though the origin serves
   Traefik's default cert.
@@ -465,7 +541,7 @@ This is the knowledge gained when the preview URLs returned Traefik's
 
 The two hostnames resolving to different targets is correct and required.
 
-### 10.2 Coder side (server config)
+#### 10.2 Coder side (server config)
 
 Set in the Coder deployment env (Dokploy compose for the Coder app):
 
@@ -480,9 +556,9 @@ Coder only *generates* app URLs of the form
 URL is set. If you can see such a URL in the Coder UI, this side is correct.
 Nothing else to do here.
 
-### 10.3 Reverse proxy (Dokploy/Traefik) — routing
+#### 10.3 Reverse proxy (Dokploy/Traefik) — routing
 
-#### The trap
+##### The trap
 Dokploy wraps every domain you enter as `Host(\`<host>\`)`
 (`packages/server/src/utils/docker/domain.ts`). Traefik's `Host()` matcher does
 **exact** hostname comparison only (`pkg/muxer/http/matcher.go`:
@@ -491,7 +567,7 @@ subdomains — the request falls through to Traefik's default cert + `404 page
 not found`. **There is no way to express a working wildcard rule through
 Dokploy's Domains UI.**
 
-#### The fix — a HostRegexp router via compose labels
+##### The fix — a HostRegexp router via compose labels
 1. In the Coder app → **Domains**, delete the `*.coder.<domain>` entry
    (keep `coder.<domain>`).
 2. In the Coder app → **compose editor**, add these labels to the `coder`
@@ -519,9 +595,9 @@ Notes:
 - Keep the router/service names unique and unrelated to Dokploy's generated
   names (e.g. `coder-wildcard-*`) so Dokploy never collides with them.
 
-### 10.4 TLS — the wildcard certificate
+#### 10.4 TLS — the wildcard certificate
 
-#### The trap
+##### The trap
 Dokploy's Traefik `letsencrypt` resolver only has an `httpChallenge`
 (`/etc/dokploy/traefik/traefik.yml`). Let's Encrypt **cannot issue wildcard
 certs over HTTP-01** — wildcards require **DNS-01**. So no wildcard cert ever
@@ -530,7 +606,7 @@ lands in the ACME store, and Dokploy's custom-cert dir
 self-signed `TRAEFIK DEFAULT CERT`. A "Let's Encrypt" setting in the Dokploy
 domain UI validates DNS, it does **not** produce a wildcard cert.
 
-#### The fix — acme.sh + Cloudflare DNS-01 into Dokploy's cert dir
+##### The fix — acme.sh + Cloudflare DNS-01 into Dokploy's cert dir
 Script: `scripts/setup-wildcard-cert.sh` (run as root on the Coder host):
 
 ```bash
@@ -564,7 +640,7 @@ tls:
       keyFile: /etc/dokploy/traefik/dynamic/certificates/wildcard-coder/privkey.key
 ```
 
-#### Token lifecycle / renewal
+##### Token lifecycle / renewal
 - LE certs last 90 days; acme.sh's cron re-issues at ~60 days and re-applies the
   install, so renewal is automatic **as long as the Cloudflare token is still
   valid at renewal time**.
@@ -573,7 +649,7 @@ tls:
   `/root/.acme.sh/*.coder.<domain>/*.coder.<domain>.conf`
   (acme.sh uses its cached `CF_Token` for renewals, not the file).
 
-### 10.5 Verification
+#### 10.5 Verification
 
 From any machine:
 
@@ -591,7 +667,7 @@ ssh <alias> "grep 3000--main--<workspace>--<user> \
   /etc/dokploy/traefik/dynamic/access.log | tail -1"
 ```
 
-#### Troubleshooting table
+##### Troubleshooting table
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -601,12 +677,49 @@ ssh <alias> "grep 3000--main--<workspace>--<user> \
 | acme.sh: token rejected | Token IP-restricted, or zone lacks `DNS:Edit` | Recreate token, no IP restriction, scope `<domain>` |
 | Renewal fails silently | Token expired between renewals | Long-TTL token; update `/home/<user>/.cf-token` + acme.sh cache (§10.4) |
 
----
 
-## Authoring rules
-- Steps must be copy-paste executable with placeholders filled.
-- Flag every step that WRITES to a production system with **WRITE** in bold
-  (e.g. `- [ ] **WRITE** install package X on <host>`). Reads need no flag.
-- Add rollback instructions for every write step.
-- After each run, promote lessons into `notes/` (via the operator, never
-  mid-run).
+## Rollback
+
+Each **WRITE** lists its rollback inline. General order, newest change first:
+
+1. Wildcard routing and certificate (section 10): restore the proxy config and certificate files saved by the **Backup** step.
+2. Coder templates: promote the previous template version (`coder templates versions promote`) or push the pulled backup.
+3. Remote dind container: `docker compose down` without `-v` (volumes and certificates stay); remove volumes only with explicit approval.
+4. Tailscale ACL: restore the policy JSON saved before the change.
+5. Tailscale on a host: `sudo tailscale down` and remove the device in the admin console.
+
+If rollback fails, stop and ask the operator. Never improvise on a production daemon.
+
+## Verify
+
+- [ ] Docker 2376 is bound to the tailnet IP only: `ss -tlnp | grep 2376` on each remote shows `<ts-ip>:2376`, never `0.0.0.0`.
+- [ ] Public reachability test to `<public-ip>:2376` fails.
+- [ ] `docker --tlsverify ... -H=tcp://<ts-ip>:2376 info` prints server info from the Coder host (Phase 5).
+- [ ] `coder ping <test-workspace>` responds and the workspace container is inside the dind daemon (Phase 7).
+- [ ] Section 7 security invariants hold (`key.pem` at `0600`, `DOCKER_TLS_SAN` set, no `*.pem`, `*.key`, or `.tfvars` tracked).
+- [ ] Wildcard previews (section 10.5): the certificate served is the wildcard and the route returns Coder's response.
+
+## Gotchas
+
+Details in `references/gotchas.md` (G1-G12) and `references/wildcard-subdomains.md`.
+
+- `DOCKER_TLS_SAN` must be set at container start, or TLS fails with "certificate is valid for ... not <ts-ip>" (G1).
+- Stage certificates in a user-writable directory, not `/root` (G5).
+- Template variables files are YAML, not tfvars (G6/G7).
+- The Coder CLI session expires; the user runs `coder login <url>` (G9).
+- Traefik `Host()` matches exactly; wildcard routing needs `HostRegexp` (section 10.3).
+
+## Files
+
+| Path | Purpose |
+|---|---|
+| `scripts/setup-wildcard-cert.sh` | acme.sh + Cloudflare DNS-01 wildcard certificate installer |
+| `templates/plan-template.md`, `templates/runbook-template.md` | Plan and runbook for a run in `runs/coder-remote-servers[-<suffix>]/` |
+| `templates/workspace-docker.yml` | Canonical dind compose (bind IP and `DOCKER_TLS_SAN` are placeholders) |
+| `templates/docker-devcontainer/` | Unified Coder template (local and remote via variables) |
+| `templates/docker-devcontainer-orca/` | Variant of the unified template with Orca |
+| `templates/gvisor-docker/` | gVisor-sandboxed workspaces on a shared isolated daemon |
+| `templates/remote-docker-workspace.hcl` | Standalone remote template (code-server only) |
+| `templates/scripts/install-*.sh` | Shared tool installers (`gh`, `uv`, `go`, `rust`) used by all templates |
+| `references/gotchas.md` | G1-G12: pitfalls hit on the fleet, with fixes |
+| `references/wildcard-subdomains.md` | Wildcard preview routing and TLS traps |
