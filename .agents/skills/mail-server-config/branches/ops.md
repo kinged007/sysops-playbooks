@@ -1,9 +1,9 @@
 # Branch: Ops — Lifecycle, Maintenance & Security
 
-> **Loaded by the master playbook (D1 = ops).** Maintenance of a deployed
-> Mailu server (or any Mailu stack this playbook set up). Read-only by
+> **Loaded by the mail-server-config skill (D1 = ops).** Maintenance of a deployed
+> Mailu server (or any Mailu stack this skill set up). Read-only by
 > default; every **WRITE** flagged with rollback. Runs against <MAIL_ALIAS>
-> per the execution's plan.md.
+> per the run's plan.md.
 
 **Goal:** keep the mail server backed up, patched, monitored, and secure —
 and know exactly how to bring it back when something breaks.
@@ -120,4 +120,4 @@ and know exactly how to bring it back when something breaks.
 ## 9. Close-out
 
 - [ ] Findings recorded in `notes.md`; promotion candidates → operator
-      (→ `notes/lessons.md`).
+      (→ `references/lessons.md`).

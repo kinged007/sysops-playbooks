@@ -1,7 +1,7 @@
 # Mailu docker-compose — PostgreSQL backend, as deployed and verified 2026-09-28.
 # Proven against Mailu 2024.06 on Docker 29 (swarm-mode host, plain compose project).
 # Placeholder template: fill every <PLACEHOLDER> from plan.md, keep real secrets in
-# the run's secrets/ folder. Never commit filled-in values.
+# the vault. Never commit filled-in values.
 #
 #   docker compose -p <COMPOSE_PROJECT_NAME> up -d
 #

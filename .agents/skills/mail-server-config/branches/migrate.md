@@ -1,6 +1,6 @@
 # Branch: Migrate — Mailbox Migration into a New Mailu Server
 
-> **Loaded by the master playbook (D1 = migrate). Also load
+> **Loaded by the mail-server-config skill (D1 = migrate). Also load
 > `branches/common.md`.** **Requires:** target Mailu deployed and verified
 > (setup.md §1–3 completed). Source = any server with IMAP access. This is a
 > **WRITE-heavy** branch — every cutover step needs explicit approval.
@@ -18,8 +18,8 @@ operator decommissions the source.
 
 ## 1. Pre-flight
 
-- [ ] Read `notes/lessons.md` (mandatory).
-- [ ] Source stack + access documented in the inventory (D3): IMAP server
+- [ ] Read `references/lessons.md` (mandatory).
+- [ ] Source stack + access documented in the fleet record and plan (D3): IMAP server
       (host/port/SSL), per-account credentials **or** admin access to export
       credentials; source protocol limits (imapsync rate, concurrent
       connections).
@@ -104,7 +104,7 @@ operator decommissions the source.
 - [ ] Rollback during the whole window: MX flip-back + SPF revert + (if
       needed) delta-sync back to source. After decommission, rollback is
       restore-from-backup only (ops.md restore procedure).
-- [ ] Record findings in `notes.md`; propose lessons to `notes/lessons.md`.
+- [ ] Record findings in `notes.md`; propose lessons to `references/lessons.md`.
 
 ---
 

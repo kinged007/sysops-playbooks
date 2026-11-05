@@ -3,22 +3,23 @@
 | Field | Value |
 |---|---|
 | Client | <client> |
-| Playbook | `mail-server-config` |
+| Skill | `mail-server-config` |
 | Branch | <setup \| repair \| migrate \| ops> |
 | Scale | <small \| medium-large \| n/a> (setup branch) |
 | Existing stack | <postfix \| exim \| mailcow \| mailu \| poste.io \| other \| n/a> (repair/migrate) |
-| Execution folder | `executions/mail-server-config/` or `executions/mail-server-config-<suffix>/` |
+| Run folder | `runs/mail-server-config/` or `runs/mail-server-config-<suffix>/` |
 | Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
 | Status | draft → approved → executing → closed |
 
-## Servers involved (THIS variant only)
-| Alias (ssh config) | Role | Purpose | Access key |
-|---|---|---|---|
-| <alias> | <source/mailserver/dest> | <what it does in this run> | `~/.ssh/<key>` |
+## Fleet refs (THIS variant only)
+| Fleet record | Role | Purpose |
+|---|---|---|
+| `fleet/servers.yaml`: <alias> | <source/mailserver/dest> | <what it does in this run> |
+| `fleet/services.yaml`: <service name> | service | <what it does in this run> |
 
-## Credentials / secrets (THIS variant only)
-<Files in `secrets/` of this execution folder; never inline values here>
-Secrets persist in this folder across invocations — update in place when rotating.
+## Vault entries (THIS variant only)
+<Vault entry names `<client>-<provider>-<purpose>`; never inline values here>
+Vault entries persist across invocations — rotate in place.
 
 ## Steps
 Numbered steps mirroring the **active branch file**

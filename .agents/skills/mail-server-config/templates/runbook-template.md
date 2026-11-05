@@ -1,18 +1,18 @@
 # Runbook: <RUN NAME>
 
-Snapshot of the **active branch** (`playbooks/mail-server-config/branches/<branch>.md`)
+Snapshot of the **active branch** (`.agents/skills/mail-server-config/branches/<branch>.md`)
 being executed, with real values filled in. Referenced `common.md` sections
 are reproduced inline in the step logs. State lives here and in `logs/` — any
 agent session can resume from these files alone. This folder is persistent per
-playbook variant (`executions/mail-server-config[/-<suffix>]/`); subsequent
+skill variant (`runs/mail-server-config[-<suffix>]/`); subsequent
 invocations append to it, never replace it. `logs/` is append-only — each
 session adds timestamp-prefixed files.
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | `mail-server-config` |
-| Execution folder | `executions/mail-server-config/` or `executions/mail-server-config-<suffix>/` |
+| Skill | `mail-server-config` |
+| Run folder | `runs/mail-server-config/` or `runs/mail-server-config-<suffix>/` |
 | Branch file(s) | `branches/<branch>.md` (+ `branches/common.md`) |
 | Client | <client> |
 | Started | <date> |
@@ -33,4 +33,4 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 ## Close-out
 - [ ] Runbook complete (all steps done or blocked+explained)
 - [ ] Findings appended to `notes.md` (cumulative history — do not overwrite)
-- [ ] Promotion candidates proposed to operator (→ playbook `notes/`)
+- [ ] Promotion candidates proposed to operator (→ skill `references/`)

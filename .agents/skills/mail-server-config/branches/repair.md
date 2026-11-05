@@ -1,6 +1,6 @@
 # Branch: Repair — Diagnose & Fix an Existing Mail Server
 
-> **Loaded by the master playbook (D1 = diagnose/repair). Also load
+> **Loaded by the mail-server-config skill (D1 = diagnose/repair). Also load
 > `branches/common.md` — every audit below lives there.** **Stack-agnostic:**
 > works on postfix, exim, mailcow, Mailu, poste.io, or any other MTA. This
 > branch is read-only until a fix in §4 is approved — production servers are
@@ -52,6 +52,11 @@ with minimal blast radius, and prove the fix with the common.md battery.
 > the **fix** is a **WRITE** needing approval + rollback, then the
 > **re-verify** hook. If the symptom matches nothing here → **STOP, record
 > the deviation, ask the operator** (AGENTS.md §1.4).
+>
+> **Backup** before every fix that edits or deletes state: save a copy of the
+> config file, the DNS record value, or the affected mail data
+> (`scripts/backup-mailu.sh` for a Mailu stack) and note it in the runbook.
+> The rollback line restores that copy.
 
 ### 4.1 `550 PTR required` / tempfail `450 4.7.1` from major receivers
 
@@ -128,8 +133,8 @@ with minimal blast radius, and prove the fix with the common.md battery.
   exists (dovecot: `doveadm user <USER>`).
 - **Cause:** wrong password (brute force in progress — check ban status),
   or passdb misconfig (Dovecot/Postfix auth mismatch), or account disabled.
-- **Fix (WRITE):** if brute force: reset the account password (run
-  `secrets/`), enable/confirm fail2ban jail (`postfix-sasl`). If passdb
+- **Fix (WRITE):** if brute force: reset the account password (new value stored in the vault),
+  enable/confirm fail2ban jail (`postfix-sasl`). If passdb
   misconfig: align Dovecot/Postfix auth settings per distro docs. Rollback:
   restore previous auth config / re-enable account.
 - **Re-verify:** successful authenticated send via swaks; ban list reviewed.
@@ -205,4 +210,4 @@ with minimal blast radius, and prove the fix with the common.md battery.
 - [ ] Anything matching no catalog row → STOP, record deviation in
       runbook.md, ask the operator. Never improvise on production.
 - [ ] Record findings in `notes.md`; propose lesson promotion to
-      `notes/lessons.md` (operator approves, per AGENTS.md §1.6).
+      `references/lessons.md` (operator approves, per AGENTS.md §1.6).

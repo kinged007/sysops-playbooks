@@ -1,6 +1,6 @@
 # Branch: Setup — Fresh Mail Server Install (Mailu on Docker)
 
-> **Loaded by the master playbook (D1 = fresh install). Also load
+> **Loaded by the mail-server-config skill (D1 = fresh install). Also load
 > `branches/common.md` — verification checkpoints below call it.** Worked
 > example: **Mailu** (all-in-one Docker mail suite: Postfix MTA, Dovecot MDA,
 > rspamd antispam, ClamAV, Roundcube webmail, admin UI, Traefik TLS). DNS
@@ -17,7 +17,7 @@ PostgreSQL backend. Pick the matching compose template.
 
 ## 0. Pre-flight (reads — no changes)
 
-- [ ] Read `notes/lessons.md` — mandatory before any run.
+- [ ] Read `references/lessons.md` — mandatory before any run.
 - [ ] Confirm access + permission mode in `plan.md` (AGENTS.md §1.3).
 - [ ] Hostname check on <MAIL_ALIAS> (all below run via `ssh <MAIL_ALIAS>`):
       `hostname -f` → must be a FQDN like `mail.<DOMAIN>`. A bare hostname
@@ -49,7 +49,7 @@ PostgreSQL backend. Pick the matching compose template.
       `<MAILU_DIR>/mailu.env`. Fill every placeholder from `plan.md`.
       **Secrets** (`SECRET_KEY`, `DB_PASSWORD`, `ADMIN_PASSWORD`,
       `RSPAMD_PASSWORD`) are generated fresh for this run and stored in the
-      execution `secrets/` folder — never inline. Rollback: files are new;
+      vault — never inline. Rollback: files are new;
       nothing is live yet.
       - `DOMAIN=<DOMAIN>`, `HOSTNAMES=mail.<DOMAIN>` (comma-list for extra
         hostnames)
@@ -70,7 +70,7 @@ PostgreSQL backend. Pick the matching compose template.
       `docker compose logs --tail=50` for errors. Rollback: `docker compose
       down` (fresh install, no data loss).
 - [ ] **WRITE** — Create the admin account: the `INITIAL_ADMIN_*` variables
-      in `mailu.env` (from run `secrets/`) provision it automatically at
+      in `mailu.env` (from the vault) provision it automatically at
       first start. Verify it exists in the admin UI. Fallback (any Mailu
       version): `docker exec mailu-admin flask mailu admin <ADMIN_USER>
       <ADMIN_PASSWORD>`. Enable **2FA (TOTP)** on it in the admin UI before
@@ -174,7 +174,7 @@ PostgreSQL backend. Pick the matching compose template.
 - [ ] **WRITE — Baseline backup NOW**: run the ops.md backup procedure
       (`scripts/backup-mailu.sh <MAIL_ALIAS> <BACKUP_DEST>`) so the first
       backup exists before the server is in production.
-- [ ] Credentials summary → execution `secrets/` (never in runbook.md).
+- [ ] Credentials summary → the vault (never in runbook.md).
 - [ ] Record in `notes.md`: versions (Mailu, compose, OS), volume names,
       DNS record table, quota policy, anything unusual.
 - [ ] Handover checklist for the operator: webmail URL, admin URL, backup
@@ -184,4 +184,4 @@ PostgreSQL backend. Pick the matching compose template.
 
 **Authoring rules:** every **WRITE** above has a rollback. Deviations from
 this plan → STOP and ask (AGENTS.md §1.4). After the run, promote findings
-to `notes/lessons.md` via the operator.
+to `references/lessons.md` via the operator.
