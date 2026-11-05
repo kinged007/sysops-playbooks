@@ -151,7 +151,7 @@ For removable Service installs, the plan chooses **one** `<KANDEV_HOME_DIR>` and
 
 **Fix:** In the workspace that will own the task, open **`Settings → Workspaces → <workspace> → Default Agent Profile`** and change it from `Default` to a real installed profile — e.g. `Claude`, `Codex`, `OpenCode`, `Copilot`, or `Pi` (the ones installed via `npm install -g @anthropic-ai/claude-code` etc.). Save. Return to `New Task` — the Docker executor now shows the compatible agents. If you use multiple workspaces, set the Default Agent Profile **per workspace** (it is not global). Verify with a throwaway task: `New Task → Executor: Docker` → agent list populated → `docker ps --filter label=kandev.managed=true` shows the task container.
 
-*Seen 2026-09-01 on `agents.munyard.biz` (v0.92.2) after global installs — global `npm install -g` made agents visible in `Settings → Agents`, but tasks remained blocked until the workspace default was switched.*
+*Seen 2026-09-01 on `agents.example.org` (v0.92.2) after global installs — global `npm install -g` made agents visible in `Settings → Agents`, but tasks remained blocked until the workspace default was switched.*
 
 ---
 
