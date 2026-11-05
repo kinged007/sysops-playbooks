@@ -11,8 +11,8 @@
 #   systemctl list-timers 9router-sync.timer
 #   systemctl status 9router-sync.timer
 #   journalctl -u 9router-sync -f
-#   ls -lh executions/9router/logs/*9router-sync-cron.log
-#   cat executions/9router/combos/free.csv | head -n 10
+#   ls -lh runs/9router/logs/*9router-sync-cron.log
+#   cat runs/9router/combos/free.csv | head -n 10
 #
 # The timer complements model-inventory-cron at 15:00 — inventory fetches first,
 # this 16:00 job syncs to 9Router. Either can run standalone.

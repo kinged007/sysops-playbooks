@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # backup.sh — 9Router SQLite + config backup
-# Produces a timestamped artifact under <BACKUP_DIR> (default: executions/<variant>/backups).
+# Produces a timestamped artifact under <BACKUP_DIR> (default: runs/<variant>/backups).
 # Supports Docker (named volume or bind), npm, and source modes.
 # Never logs secret values.
 #
@@ -44,9 +44,9 @@ if [[ -z "$ALIAS" ]]; then
   exit 2
 fi
 
-# Default backup dir: executions/<variant>/backups (persistent per variant)
+# Default backup dir: runs/<variant>/backups (persistent per variant)
 if [[ -z "$BACKUP_DIR" ]]; then
-  BACKUP_DIR="executions/${VARIANT}/backups"
+  BACKUP_DIR="runs/${VARIANT}/backups"
 fi
 
 TS="$(date +%Y%m%dT%H%M%S)"
@@ -219,4 +219,4 @@ if [[ -f "$DEST/data.sqlite" ]]; then
     say "Integrity: $(sqlite3 "$DEST/data.sqlite" 'PRAGMA integrity_check;' 2>&1 | head -n 5)"
   fi
 fi
-say "Next: record $DEST in the runbook; keep it alongside executions/$VARIANT/secrets/ (both gitignored)."
+say "Next: record $DEST in the runbook; keep it alongside runs/$VARIANT/secrets/ (both gitignored)."

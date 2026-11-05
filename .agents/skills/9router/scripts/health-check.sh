@@ -6,7 +6,7 @@
 #
 # Usage:
 #   NINEROUTER_URL=http://localhost:20128 NINEROUTER_KEY=sk-... ./scripts/health-check.sh
-#   ./scripts/health-check.sh --url http://localhost:20128 --key-file executions/9router/secrets/9router-api-key.txt
+#   ./scripts/health-check.sh --url http://localhost:20128 --key-file runs/9router/secrets/9router-api-key.txt
 #   ./scripts/health-check.sh --url https://9router.example.com [--key-file ...]
 #
 # Exit codes: 0 = healthy, 1 = unhealthy, 2 = usage error

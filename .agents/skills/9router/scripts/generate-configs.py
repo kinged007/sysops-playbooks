@@ -14,15 +14,15 @@ Usage:
   NINEROUTER_URL=http://development-9router-fe01c0-62-171-191-174.sslip.io \
   NINEROUTER_KEY=sk-... python .agents/skills/9router/scripts/generate-configs.py
 
-  python .agents/skills/9router/scripts/generate-configs.py --url http://host --key sk-... --out executions/9router/generated --active-model free
-  python .agents/skills/9router/scripts/generate-configs.py --url http://host:20128 --key-file executions/9router/secrets/9router-api-key.txt
+  python .agents/skills/9router/scripts/generate-configs.py --url http://host --key sk-... --out runs/9router/generated --active-model free
+  python .agents/skills/9router/scripts/generate-configs.py --url http://host:20128 --key-file runs/9router/secrets/9router-api-key.txt
 
 Outputs (gitignored, persistent per-variant):
-  executions/9router/generated/opencode.json         (~/.config/opencode/opencode.json)
-  executions/9router/generated/hermes-config.yaml    (~/.hermes/config.yaml) + hermes.env
-  executions/9router/generated/codex-config.toml     (~/.codex/config.toml)
-  executions/9router/generated/claude-settings.json  (~/.claude/settings.json env block)
-  executions/9router/generated/generic-env.sh
+  runs/9router/generated/opencode.json         (~/.config/opencode/opencode.json)
+  runs/9router/generated/hermes-config.yaml    (~/.hermes/config.yaml) + hermes.env
+  runs/9router/generated/codex-config.toml     (~/.codex/config.toml)
+  runs/9router/generated/claude-settings.json  (~/.claude/settings.json env block)
+  runs/9router/generated/generic-env.sh
 
 All configs are copy-paste ready; baseURL is normalized to .../v1 and apiKey is injected.
 Never logs the key value — use --key-file or env, not shell history.
@@ -40,14 +40,14 @@ except ImportError:
 
 def load_secrets():
     candidates_url = [
-        pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/secrets/ninerouter-url.txt"),
-        pathlib.Path("executions/9router/secrets/ninerouter-url.txt"),
-        pathlib.Path("executions/9router/secrets/ninerouter-url.txt"),
+        pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets/ninerouter-url.txt"),
+        pathlib.Path("runs/9router/secrets/ninerouter-url.txt"),
+        pathlib.Path("runs/9router/secrets/ninerouter-url.txt"),
     ]
     candidates_key = [
-        pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/secrets/9router-api-key.txt"),
-        pathlib.Path("executions/9router/secrets/9router-api-key.txt"),
-        pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/secrets/ninerouter-key.txt"),
+        pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets/9router-api-key.txt"),
+        pathlib.Path("runs/9router/secrets/9router-api-key.txt"),
+        pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets/ninerouter-key.txt"),
     ]
     url = None
     key = None
@@ -236,11 +236,11 @@ def main():
         base_url = base_url[:-3]
 
     out_dir = pathlib.Path(args.out) if args.out else pathlib.Path(__file__).resolve().parents[1] / "generated" if (pathlib.Path(__file__).resolve().parents[1] / "generated").exists() or True else pathlib.Path("generated")
-    # prefer executions/9router/generated when run from playbooks, else ./generated
+    # prefer runs/9router/generated when run from the repo, else ./generated
     try:
-        # if script is in .agents/skills/9router/scripts, generated should be executions/9router/generated
+        # if script is in .agents/skills/9router/scripts, generated should be runs/9router/generated
         if "playbooks" in str(pathlib.Path(__file__).resolve()):
-            cand = pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/generated")
+            cand = pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/generated")
             if cand.exists() or True:
                 out_dir = cand if not args.out else pathlib.Path(args.out)
         else:
@@ -249,9 +249,9 @@ def main():
         out_dir = pathlib.Path(args.out) if args.out else pathlib.Path("generated")
     # final fallback
     if not args.out:
-        # check executions variant
-        if pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router").exists():
-            out_dir = pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/generated")
+        # check runs variant
+        if pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router").exists():
+            out_dir = pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/generated")
         else:
             out_dir = pathlib.Path("generated")
     out_dir.mkdir(parents=True, exist_ok=True)

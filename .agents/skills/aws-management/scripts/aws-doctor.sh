@@ -111,4 +111,4 @@ fi
 
 echo ""
 echo "Done. Fix WARN/FAIL items above, then re-run."
-echo "Next: fill executions/aws-management[-<suffix>]/inventory.md and plan.md per the skill."
+echo "Next: fill runs/aws-management[-<suffix>]/inventory.md and plan.md per the skill."

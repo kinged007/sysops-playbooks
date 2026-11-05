@@ -25,10 +25,10 @@ Usage:
 
 Config:
   See .agents/skills/9router/templates/model-inventory.config.example.yaml
-  Copy it to executions/9router/model-inventory.config.yaml for real keys (gitignored).
+  Copy it to runs/9router/model-inventory.config.yaml for real keys (gitignored).
 
 Automation (cron / systemd timer / GitHub Actions):
-  0 6 * * * /usr/bin/python3 /opt/sysops-playbooks/.agents/skills/9router/scripts/model-inventory.py --config /opt/sysops-playbooks/executions/9router/model-inventory.config.yaml >> /var/log/model-inventory.log 2>&1
+  0 6 * * * /usr/bin/python3 /opt/sysops-playbooks/.agents/skills/9router/scripts/model-inventory.py --config /opt/sysops-playbooks/runs/9router/model-inventory.config.yaml >> /var/log/model-inventory.log 2>&1
 """
 from __future__ import annotations
 
@@ -64,8 +64,8 @@ except ImportError:
 DEFAULT_CONFIG_CANDIDATES = [
     pathlib.Path("model-inventory.config.yaml"),
     pathlib.Path(".agents/skills/9router/scripts/model-inventory.config.yaml"),
-    pathlib.Path("executions/9router/model-inventory.config.yaml"),
-    pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/model-inventory.config.yaml"),
+    pathlib.Path("runs/9router/model-inventory.config.yaml"),
+    pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/model-inventory.config.yaml"),
     pathlib.Path(".agents/skills/9router/templates/model-inventory.config.example.yaml"),
 ]
 
@@ -75,15 +75,15 @@ CF_PRICING: Dict[str, Dict[str, Optional[float]]] = {}
 # ---------------------------------------------------------------------------
 # Secrets / .env auto-load (AGENTS.md §1.5 + execution layout §2)
 # ---------------------------------------------------------------------------
-# Auto-loads keys from executions/<playbook>/secrets/ so the operator can keep
+# Auto-loads keys from runs/<playbook>/secrets/ so the operator can keep
 # API keys out of the shell history. Checked at startup before config expansion.
 # Candidates (first existing wins per-file, but all are merged):
-#   executions/9router/.env
-#   executions/9router/secrets/.env
-#   executions/9router/secrets/api_keys.env
-#   executions/9router-<suffix>/.env and .../secrets/.env (if config lives there)
+#   runs/9router/.env
+#   runs/9router/secrets/.env
+#   runs/9router/secrets/api_keys.env
+#   runs/9router-<suffix>/.env and .../secrets/.env (if config lives there)
 #   .env (repo root / CWD)
-#   Plus per-key files executions/9router/secrets/<KEY>.txt (e.g. AA_API_KEY.txt)
+#   Plus per-key files runs/9router/secrets/<KEY>.txt (e.g. AA_API_KEY.txt)
 DOTENV_CANDIDATES: List[pathlib.Path] = []
 
 def _load_dotenv_file(path: pathlib.Path) -> int:
@@ -135,7 +135,7 @@ def _load_secret_files(secrets_dir: pathlib.Path) -> int:
 
 def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
     candidates: List[pathlib.Path] = []
-    # repo root detection: look for AGENTS.md or playbooks/
+    # repo root detection: look for AGENTS.md or .agents/
     cwd = pathlib.Path.cwd()
     repo_root = cwd
     # if config_path given, its dir and secrets subdir are candidates
@@ -144,14 +144,14 @@ def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
         candidates.append(config_path.parent / "secrets" / ".env")
         candidates.append(config_path.parent / "secrets" / "api_keys.env")
     # standard execution layouts
-    for base in [pathlib.Path("executions/9router"), pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router")]:
+    for base in [pathlib.Path("runs/9router"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router")]:
         candidates.append(base / ".env")
         candidates.append(base / "secrets" / ".env")
         candidates.append(base / "secrets" / "api_keys.env")
         candidates.append(base / ".env.example")  # not loaded, but hint
-    # also suffix variants executions/9router-*
+    # also suffix variants runs/9router-*
     try:
-        for d in pathlib.Path("executions").glob("9router-*"):
+        for d in pathlib.Path("runs").glob("9router-*"):
             candidates.append(d / ".env")
             candidates.append(d / "secrets" / ".env")
     except Exception:
@@ -171,7 +171,7 @@ def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
         seen.add(str(r))
         _load_dotenv_file(cand)
     # also load per-key .txt files from secrets/
-    for base in [pathlib.Path("executions/9router/secrets"), pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/secrets")]:
+    for base in [pathlib.Path("runs/9router/secrets"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets")]:
         _load_secret_files(base)
     if config_path:
         # config's secrets dir as well
@@ -267,7 +267,7 @@ def find_config(cli_path: Optional[str]) -> Optional[pathlib.Path]:
             return p
         print(f"ERR: --config {cli_path} not found", file=sys.stderr)
         sys.exit(2)
-    # 1) Static candidates (fast path) — includes executions/9router/model-inventory.config.yaml
+    # 1) Static candidates (fast path) — includes runs/9router/model-inventory.config.yaml
     for cand in DEFAULT_CONFIG_CANDIDATES:
         # Defer the committed example template until after glob search so execution customizations win
         if cand.name == "model-inventory.config.example.yaml":
@@ -275,26 +275,26 @@ def find_config(cli_path: Optional[str]) -> Optional[pathlib.Path]:
         if cand.exists():
             return cand
     # 2) Glob search: any model-inventory*.yaml under any *9router* execution folder
-    #    Matches executions/9router/model-inventory.config.yaml, executions/9router-*/**/model-inventory*.yaml, etc.
-    #    This satisfies the operator request: search executions for *9router*/**/model-inventory*.yaml
+    #    Matches runs/9router/model-inventory.config.yaml, runs/9router-*/**/model-inventory*.yaml, etc.
+    #    This satisfies the operator request: search runs for *9router*/**/model-inventory*.yaml
     try:
         search_roots: List[pathlib.Path] = []
-        # CWD-relative executions
+        # CWD-relative runs
         try:
-            if pathlib.Path("executions").exists():
-                search_roots.append(pathlib.Path("executions"))
+            if pathlib.Path("runs").exists():
+                search_roots.append(pathlib.Path("runs"))
         except Exception:
             pass
         # Repo-root relative (script at .agents/skills/9router/scripts/model-inventory.py -> repo root = parents[4])
         try:
             repo_root = pathlib.Path(__file__).resolve().parents[4]
-            rr_exec = repo_root / "executions"
+            rr_exec = repo_root / "runs"
             if rr_exec.exists() and rr_exec not in search_roots:
                 search_roots.append(rr_exec)
         except Exception:
             pass
         # Absolute fallback from defaults
-        abs_exec = pathlib.Path("D:/Data/git/sysops-playbooks/executions")
+        abs_exec = pathlib.Path("D:/Data/git/sysops-playbooks/runs")
         if abs_exec.exists() and abs_exec not in search_roots:
             search_roots.append(abs_exec)
         candidates: List[pathlib.Path] = []
@@ -318,7 +318,7 @@ def find_config(cli_path: Optional[str]) -> Optional[pathlib.Path]:
                 except Exception:
                     pass
         if candidates:
-            # Deterministic: shortest path first, then lexical (prefers executions/9router/model-inventory.config.yaml over deeper)
+            # Deterministic: shortest path first, then lexical (prefers runs/9router/model-inventory.config.yaml over deeper)
             candidates = sorted(set(candidates), key=lambda p: (len(str(p)), str(p).lower()))
             return candidates[0]
     except Exception as e:
@@ -1949,7 +1949,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Auto-load .env / secret files from execution layout before any ${} expansion
-    # (so AA_API_KEY etc. in executions/9router/.env or secrets/.env are picked up)
+    # (so AA_API_KEY etc. in runs/9router/.env or secrets/.env are picked up)
     try:
         load_execution_env(pathlib.Path(args.config) if args.config else None)
     except Exception:
@@ -1957,7 +1957,7 @@ def main() -> None:
 
     # Load config
     cfg_path = find_config(args.config)
-    # also load env relative to the discovered config path (e.g. executions/9router-*/.env)
+    # also load env relative to the discovered config path (e.g. runs/9router-*/.env)
     if cfg_path:
         try:
             load_execution_env(cfg_path)
@@ -1977,7 +1977,7 @@ def main() -> None:
     # ponytail: ceiling is per-run inventory files; if overrides need history/audit add override_source+applied_at columns.
     defaults: Dict[str, Any] = {
         "overrides": [],
-        "general": {"output_dir": "executions/9router/model-inventory", "spreadsheet_name": "models.csv", "json_name": "models.json", "added_list_prefix": "added", "save_raw_snapshot": True, "raw_snapshot_name": "raw_snapshot_{{date}}.json", "sort_by": "intelligence", "sort_order": "desc"},
+        "general": {"output_dir": "runs/9router/model-inventory", "spreadsheet_name": "models.csv", "json_name": "models.json", "added_list_prefix": "added", "save_raw_snapshot": True, "raw_snapshot_name": "raw_snapshot_{{date}}.json", "sort_by": "intelligence", "sort_order": "desc"},
         "filters": {"minimum_intelligence": 0, "include_unknown_intelligence": True, "blacklist": [], "whitelist": ["*big-pickle*", "*free*"] if False else ["big-pickle", "*big-pickle*"]},
         "intelligence": {"default_score": None, "artificial_analysis": {"enabled": True, "endpoint": "https://artificialanalysis.ai/api/v2/language/models/free", "api_key": "", "cache_file": "artificial_analysis_cache.json", "cache_ttl_hours": 24, "fallback_local_file": ""}, "patterns": []},
         "vision": {"enabled": True, "endpoint": "https://models.dev/api.json", "cache_file": "vision_cache.json", "cache_ttl_hours": 24},

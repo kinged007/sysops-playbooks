@@ -2,7 +2,7 @@
 # model-inventory-cron.sh — cron wrapper for model-inventory.py (+ optional 9router-sync)
 # Runs the multi-provider inventory fetcher from cron / systemd timer.
 # Safe for unattended execution: no secrets on CLI, locks to avoid overlap,
-# logs to executions/<variant>/logs/ and stdout.
+# logs to runs/<variant>/logs/ and stdout.
 #
 # Usage (manual):
 #   ./.agents/skills/9router/scripts/model-inventory-cron.sh [--config PATH] [--output-dir DIR] [--verbose] [--no-sync] [--dry-run]
@@ -18,9 +18,9 @@
 # What it does:
 #   1. Resolves repo root from its own location (so cron CWD does not matter)
 #   2. Picks python: $PYTHON_BIN → .venv/bin/python → .venv/Scripts/python.exe → python3 → python
-#   3. Runs model-inventory.py (auto-discovers executions/*9router*/model-inventory.config.yaml)
-#   4. If executions/<variant>/9router-sync.config.yaml exists and --no-sync not passed, runs 9router-sync.py
-#   5. Writes a timestamped log to executions/<variant>/logs/<ISO>-model-inventory-cron.log
+#   3. Runs model-inventory.py (auto-discovers runs/*9router*/model-inventory.config.yaml)
+#   4. If runs/<variant>/9router-sync.config.yaml exists and --no-sync not passed, runs 9router-sync.py
+#   5. Writes a timestamped log to runs/<variant>/logs/<ISO>-model-inventory-cron.log
 #
 set -euo pipefail
 
@@ -113,21 +113,21 @@ fi
 
 # --- resolve config (for log dir) ---
 # Let model-inventory.py do its own discovery if CONFIG empty.
-# For logging we need a concrete executions variant dir.
-VARIANT_DIR="${REPO_ROOT}/executions/9router"
+# For logging we need a concrete runs variant dir.
+VARIANT_DIR="${REPO_ROOT}/runs/9router"
 if [[ -n "${CONFIG}" ]]; then
-  # if config is executions/<variant>/*.yaml, variant dir is its parent
+  # if config is runs/<variant>/*.yaml, variant dir is its parent
   CFG_ABS="$(realpath -m "${CONFIG}" 2>/dev/null || readlink -f "${CONFIG}" 2>/dev/null || echo "${CONFIG}")"
-  if [[ "${CFG_ABS}" == *"executions/"* ]]; then
-    # executions/9router/model-inventory.config.yaml -> executions/9router
-    # executions/9router-foo/... -> executions/9router-foo
-    VARIANT_DIR="$(echo "${CFG_ABS}" | sed -E 's#(.*executions/[^/]+)/.*#\1#')"
+  if [[ "${CFG_ABS}" == *"runs/"* ]]; then
+    # runs/9router/model-inventory.config.yaml -> runs/9router
+    # runs/9router-foo/... -> runs/9router-foo
+    VARIANT_DIR="$(echo "${CFG_ABS}" | sed -E 's#(.*runs/[^/]+)/.*#\1#')"
   fi
 else
-  # auto-discovery fallback: pick first executions/*9router*/model-inventory.config.yaml
-  FOUND_CFG="$(find "${REPO_ROOT}/executions" -maxdepth 4 -path "*9router*model-inventory*.yaml" -print -quit 2>/dev/null || true)"
+  # auto-discovery fallback: pick first runs/*9router*/model-inventory.config.yaml
+  FOUND_CFG="$(find "${REPO_ROOT}/runs" -maxdepth 4 -path "*9router*model-inventory*.yaml" -print -quit 2>/dev/null || true)"
   if [[ -n "${FOUND_CFG}" ]]; then
-    VARIANT_DIR="$(echo "${FOUND_CFG}" | sed -E 's#(.*executions/[^/]+)/.*#\1#')"
+    VARIANT_DIR="$(echo "${FOUND_CFG}" | sed -E 's#(.*runs/[^/]+)/.*#\1#')"
     CONFIG="${FOUND_CFG}"
   fi
 fi
@@ -193,10 +193,10 @@ echo "--- model-inventory.py done ---"
 # --- optional: 9router-sync.py if config exists and not --no-sync ---
 if [[ -z "${NO_SYNC}" ]]; then
   SYNC_CFGS=()
-  # discovered via the same glob the sync script uses: executions/*9router*/**/9router-sync*.yaml
+  # discovered via the same glob the sync script uses: runs/*9router*/**/9router-sync*.yaml
   while IFS= read -r -d '' f; do
     SYNC_CFGS+=("$f")
-  done < <(find "${REPO_ROOT}/executions" -type f -name "9router-sync*.yaml" -print0 2>/dev/null || true)
+  done < <(find "${REPO_ROOT}/runs" -type f -name "9router-sync*.yaml" -print0 2>/dev/null || true)
   # also check variant dir explicitly
   if [[ -f "${VARIANT_DIR}/9router-sync.config.yaml" ]]; then
     # ensure deduped
@@ -221,7 +221,7 @@ if [[ -z "${NO_SYNC}" ]]; then
       echo "--- 9router-sync.py done ---"
     fi
   else
-    echo "--- 9router-sync: no executions/*9router*/**/9router-sync*.yaml found (skipping, pass --no-sync to silence) ---"
+    echo "--- 9router-sync: no runs/*9router*/**/9router-sync*.yaml found (skipping, pass --no-sync to silence) ---"
   fi
 else
   echo "--- 9router-sync skipped (--no-sync) ---"

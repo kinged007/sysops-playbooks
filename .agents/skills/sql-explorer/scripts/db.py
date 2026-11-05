@@ -6,10 +6,10 @@
 """db.py: run SQL using a secrets file the agent never needs to read.
 
 Usage (run from repo root):
-  scripts/db.py --exec executions/sql-explorer-<suffix> tables
-  scripts/db.py --exec executions/sql-explorer-<suffix> schema [table]
-  scripts/db.py --exec executions/sql-explorer-<suffix> q "SELECT ..." [--limit N] [--csv out.csv]
-  scripts/db.py --exec executions/sql-explorer-<suffix> exec "UPDATE ..." --yes [--csv out.csv]
+  scripts/db.py --exec runs/sql-explorer-<suffix> tables
+  scripts/db.py --exec runs/sql-explorer-<suffix> schema [table]
+  scripts/db.py --exec runs/sql-explorer-<suffix> q "SELECT ..." [--limit N] [--csv out.csv]
+  scripts/db.py --exec runs/sql-explorer-<suffix> exec "UPDATE ..." --yes [--csv out.csv]
 
 Secrets live in <exec>/secrets/db.env (KEY=VALUE, see templates/db.env.example).
 Values already in the environment win. Nothing secret is ever printed.

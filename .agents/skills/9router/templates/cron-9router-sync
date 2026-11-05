@@ -6,8 +6,8 @@
 
 # Runs every 3 days at 03:30 UTC (adjust time as needed)
 # Model inventory runs first (~15-30 min), then sync runs (~5-15 min)
-# Logs: executions/9router/logs/<timestamp>-model-inventory-cron.log
-#       executions/9router/logs/<timestamp>-9router-sync-cron.log
+# Logs: runs/9router/logs/<timestamp>-model-inventory-cron.log
+#       runs/9router/logs/<timestamp>-9router-sync-cron.log
 
 # System-wide (needs root):
 # 30 3 */3 * * root /home/coder/sysops-playbooks/.agents/skills/9router/scripts/model-inventory-cron.sh >> /var/log/model-inventory-cron.log 2>&1
@@ -39,5 +39,5 @@
 # OPENROUTER_API_KEY=...
 # COMMAND_CODE_API_KEY=...
 
-# Note: The scripts auto-discover the execution variant (executions/9router/ or
-# executions/9router-<suffix>/) and use its config/secrets. No config args needed.
+# Note: The scripts auto-discover the execution variant (runs/9router/ or
+# runs/9router-<suffix>/) and use its config/secrets. No config args needed.

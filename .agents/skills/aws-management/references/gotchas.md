@@ -54,10 +54,10 @@ SES needs both DNS propagation *and* its own verifier.
 
 ## G6 — Cross-variant Cloudflare token: read in place, never copy
 
-`executions/mail-server-config-my-tech-mailserver/secrets/cf-dns-01.ini`
+`runs/mail-server-config-my-tech-mailserver/secrets/cf-dns-01.ini`
 holds the same `my-tech.uk` zone. Per AGENTS.md §1.4 reuse within a variant
 unless explicit cross-variant approval: the SES run records operator-approved
-read-only use of that file (path `executions/mail-server-config-…/secrets/…`),
+read-only use of that file (path `runs/mail-server-config-…/secrets/…`),
 never copies the token, and notes the zone id `f2c28…` only partially.
 
 ## G7 — SES is regional; verify in the same region you send from

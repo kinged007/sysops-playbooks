@@ -373,7 +373,7 @@ Run `scripts/health-check.sh` or manually:
 
 ## Automation: model inventory and 9Router sync
 
-Scripts discover config under `executions/*9router*/` (to be renamed `runs/` at the sysops-v2 cutover).
+Scripts discover config under `runs/*9router*/`.
 
 - `scripts/model-inventory.py` fetches multi-provider inventories (google/opencode/cloudflare/ollama/openrouter/command_code) into `models.csv` with `supports_vision` / `supports_image_generation`.
 - `scripts/9router-sync.py` syncs the inventory to 9Router: global filter, provider-mapped routed ids, diff-guarded `/api/models/custom`, `/api/models/disabled`, `/api/combos`, and regenerates `generated/` CLI configs and `combos/*.json|*.csv`. Config: copy `templates/9router-sync.config.example.yaml` to `<run folder>/9router-sync.config.yaml` (gitignored). Dry run: `python .agents/skills/9router/scripts/9router-sync.py --dry-run --verbose`.

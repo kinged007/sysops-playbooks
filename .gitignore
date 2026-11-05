@@ -6,7 +6,7 @@ incidents/*
 !incidents/inbox.example.md
 vault/
 runs/
-executions/
+executions
 logs/
 ops.config.yaml
 .ops-wake.state

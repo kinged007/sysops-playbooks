@@ -4,7 +4,7 @@
 #
 # Usage:
 #   ./scripts/health-check.sh --url http://127.0.0.1:38429
-#   ./scripts/health-check.sh --url https://kandev.example.com --pat-file executions/kandev/secrets/kandev-pat-admin.txt
+#   ./scripts/health-check.sh --url https://kandev.example.com --pat-file runs/kandev/secrets/kandev-pat-admin.txt
 #   KANDEV_URL=https://kandev.example.com KANDEV_PAT=kandev_pat_... ./scripts/health-check.sh
 #   ./scripts/health-check.sh --url http://127.0.0.1:38429 --home-dir /srv/kandev
 #

@@ -6,8 +6,8 @@
 # What it does (every Monday 16:00):
 #   1. Resolves repo root from its own location (so cron CWD does not matter)
 #   2. Picks python: $PYTHON_BIN → .venv/bin/python → .venv/Scripts/python.exe → python3 → python
-#   3. Runs 9router-sync.py (auto-discovers executions/*9router*/**/9router-sync*.yaml)
-#   4. Logs to executions/<variant>/logs/<ISO>-9router-sync-cron.log (+ stdout for cron mail)
+#   3. Runs 9router-sync.py (auto-discovers runs/*9router*/**/9router-sync*.yaml)
+#   4. Logs to runs/<variant>/logs/<ISO>-9router-sync-cron.log (+ stdout for cron mail)
 #
 # Usage (manual):
 #   ./.agents/skills/9router/scripts/9router-sync-cron.sh [--config PATH] [--verbose] [--dry-run]
@@ -72,16 +72,16 @@ if ! PYTHON="$(pick_python 2>/dev/null)"; then
 fi
 
 # --- resolve variant dir for logging ---
-VARIANT_DIR="${REPO_ROOT}/executions/9router"
+VARIANT_DIR="${REPO_ROOT}/runs/9router"
 if [[ -n "${CONFIG}" ]]; then
   CFG_ABS="$(realpath -m "${CONFIG}" 2>/dev/null || readlink -f "${CONFIG}" 2>/dev/null || echo "${CONFIG}")"
-  if [[ "${CFG_ABS}" == *"executions/"* ]]; then
-    VARIANT_DIR="$(echo "${CFG_ABS}" | sed -E 's#(.*executions/[^/]+)/.*#\1#')"
+  if [[ "${CFG_ABS}" == *"runs/"* ]]; then
+    VARIANT_DIR="$(echo "${CFG_ABS}" | sed -E 's#(.*runs/[^/]+)/.*#\1#')"
   fi
 else
-  FOUND_CFG="$(find "${REPO_ROOT}/executions" -maxdepth 4 -path "*9router*9router-sync*.yaml" -print -quit 2>/dev/null || true)"
+  FOUND_CFG="$(find "${REPO_ROOT}/runs" -maxdepth 4 -path "*9router*9router-sync*.yaml" -print -quit 2>/dev/null || true)"
   if [[ -n "${FOUND_CFG}" ]]; then
-    VARIANT_DIR="$(echo "${FOUND_CFG}" | sed -E 's#(.*executions/[^/]+)/.*#\1#')"
+    VARIANT_DIR="$(echo "${FOUND_CFG}" | sed -E 's#(.*runs/[^/]+)/.*#\1#')"
     CONFIG="${FOUND_CFG}"
   fi
 fi
@@ -98,7 +98,7 @@ echo "=== 9router-sync-cron ${TS} ==="
 echo "repo: ${REPO_ROOT}"
 echo "python: ${PYTHON} ($(${PYTHON} --version 2>&1 | head -n1))"
 echo "variant: ${VARIANT_DIR}"
-echo "config: ${CONFIG:-auto-discover (executions/*9router*/**/9router-sync*.yaml)}"
+echo "config: ${CONFIG:-auto-discover (runs/*9router*/**/9router-sync*.yaml)}"
 echo "logs: ${LOG_FILE}"
 
 # --- lock to avoid overlap with model-inventory-cron (also touches 9Router) ---

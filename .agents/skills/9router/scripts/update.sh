@@ -225,7 +225,7 @@ fi
 # Also run the skill-based health-check.sh if present
 SCRIPT_DIR2="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$SCRIPT_DIR2/health-check.sh" ]]; then
-  say "Run full verification with: NINEROUTER_URL=http://<HOST>:20128 NINEROUTER_KEY=\$(cat executions/$VARIANT/secrets/9router-api-key.txt) $SCRIPT_DIR2/health-check.sh"
+  say "Run full verification with: NINEROUTER_URL=http://<HOST>:20128 NINEROUTER_KEY=\$(cat runs/$VARIANT/secrets/9router-api-key.txt) $SCRIPT_DIR2/health-check.sh"
 fi
 
 say "---"

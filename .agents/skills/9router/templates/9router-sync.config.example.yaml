@@ -1,6 +1,6 @@
 # 9Router Sync Config — example (placeholders only, committed)
-# Copy to executions/9router/9router-sync.config.yaml (gitignored) or any
-# executions/*9router*/**/9router-sync*.yaml  — script auto-discovers via glob.
+# Copy to runs/9router/9router-sync.config.yaml (gitignored) or any
+# runs/*9router*/**/9router-sync*.yaml  — script auto-discovers via glob.
 # All ${VAR} expanded at runtime (see model-inventory.py expand_env).
 
 # Execution discovery: script processes EACH matching config file found.
