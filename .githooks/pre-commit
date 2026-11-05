@@ -1,25 +1,25 @@
-#!/bin/sh
+#!/bin/bash
 # Safety net: dependency-free scan of staged changes. Always runs.
 fail=0
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
 
-for f in $staged; do
+while IFS= read -r -d '' f; do
   case "$f" in
-    fleet/*.example.yaml) ;;
-    fleet/*|vault/*|runs/*|executions/*|ops.config.yaml)
-      echo "pre-commit: blocked path staged: $f" >&2; fail=1 ;;
+    fleet/*.example.yaml)
+      case "${f#fleet/}" in */*) echo "pre-commit: blocked path staged: $f" >&2; fail=1 ;; esac ;;
+    fleet/*|vault/*|runs/*|executions/*|logs/*|secrets/*|*/secrets/*|ops.config.yaml|\
+.ops-wake.state|.ops-wake.lock|.env|.env.*|*/.env|*/.env.*|*.key|*.pem|*.tfvars)
+      case "$f" in
+        .env.example|*/.env.example) ;;
+        *) echo "pre-commit: blocked path staged: $f" >&2; fail=1 ;;
+      esac ;;
     incidents/README.md|incidents/inbox.example.md) ;;
     incidents/*)
       echo "pre-commit: blocked path staged: $f" >&2; fail=1 ;;
   esac
-done
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
 
-pattern='BEGIN (OPENSSH |RSA |EC |DSA )?(PRIVATE|CERTIFICATE)|tskey-[A-Za-z0-9]'
-if command -v rg >/dev/null 2>&1; then
-  hits=$(git diff --cached -U0 --no-color | rg -n '^\+[^+]' | rg -e "$pattern" || true)
-else
-  hits=$(git diff --cached -U0 --no-color | grep -nE '^\+[^+]' | grep -E "$pattern" || true)
-fi
+pattern='BEGIN (OPENSSH |RSA |EC |DSA )?(PRIVATE|CERTIFICATE)|BEGIN [A-Z ]*PRIVATE KEY|tskey-[A-Za-z0-9]|AKIA[0-9A-Z]{16}|sk-ant-|ghp_'
+hits=$(git diff --cached -U0 --no-color | grep -E '^\+' | grep -vE '^\+\+\+ ' | grep -E -e "$pattern" || true)
 if [ -n "$hits" ]; then
   echo "pre-commit: secret pattern in staged changes (content not shown)" >&2
   fail=1
