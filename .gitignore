@@ -45,3 +45,7 @@ Thumbs.db
 
 # uv (repo does not use uv)
 uv.lock
+
+# 9router generated combo orderings and model baselines (local)
+.agents/skills/9router/combos/
+.agents/skills/*/references/baseline*

@@ -281,7 +281,7 @@ All steps can be done in the Dashboard. The API alternative uses the upstream sk
       - Self-hosted (STT `/v1/audio/transcriptions`, TTS `/v1/audio/speech`, Embedding `/v1/embeddings`): set `providerSpecificData.baseUrl`.
       - **Backup** first: section 9.1. Rollback: remove the connection in the Dashboard or restore the DB backup.
 - [ ] For each self-hosted STT/TTS/Embedding connection, validate the `baseUrl` contract (gotcha G7): STT is the full `/v1/audio/transcriptions` URL; TTS is the server root; Embedding is the OpenAI base with `/v1`.
-- [ ] **WRITE**: Dashboard -> Combos -> create combos per the operator's fallback policy (for example `premium-coding`: `cc/claude-opus-4-7` -> `glm/glm-5.1` -> `minimax/MiniMax-M2.7`; `free-forever`: `kr/claude-sonnet-4.5` -> `kr/glm-5` -> `vertex/gemini-3.1-pro-preview`). Combo names are the model IDs clients use. Baseline combo orderings are in `combos/` and `references/baseline-2026-08-30.md`.
+- [ ] **WRITE**: Dashboard -> Combos -> create combos per the operator's fallback policy (for example `premium-coding`: `cc/claude-opus-4-7` -> `glm/glm-5.1` -> `minimax/MiniMax-M2.7`; `free-forever`: `kr/claude-sonnet-4.5` -> `kr/glm-5` -> `vertex/gemini-3.1-pro-preview`). Combo names are the model IDs clients use. Baseline combo orderings are local, untracked files (`combos/`, `references/baseline*`) and are produced by `scripts/9router-sync.py`.
       - Rollback: delete the combo or restore the DB backup.
 - [ ] Verify (reads), list models per kind:
       ```bash
@@ -431,8 +431,6 @@ Full list G1-G12 with fixes in `references/gotchas.md`. Key points:
 |---|---|
 | `references/gotchas.md` | G1-G12 pitfalls with fixes; read before any run |
 | `references/skill.md` | Pointer to the upstream 9Router skill (fetched live, not bundled) |
-| `references/baseline-2026-08-30.md` | Baseline models and combos snapshot |
-| `combos/` | Baseline combo orderings (`*.csv`, `*.json`, `models.*`) and README |
 | `templates/plan-template.md`, `templates/runbook-template.md` | Plan and runbook for planned work |
 | `templates/env.example` | Env file template |
 | `templates/docker-compose.yml`, `templates/docker-compose.headroom.yml` | Compose files; Headroom sidecar wiring |

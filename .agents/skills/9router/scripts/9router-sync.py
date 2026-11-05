@@ -1089,7 +1089,7 @@ def process_one_config(config_path: pathlib.Path, args) -> bool:
         combos_out_dir.mkdir(parents=True, exist_ok=True)
         for combo_name, routed_ids in desired_combos.items():
             members = desired_members.get(combo_name, [])
-            # JSON file — mirrors .agents/skills/9router/combos/*.json structure
+            # JSON file — same structure as the local baseline combos/*.json
             jpath = combos_out_dir / f"{combo_name}.json"
             payload = {
                 "name": combo_name,

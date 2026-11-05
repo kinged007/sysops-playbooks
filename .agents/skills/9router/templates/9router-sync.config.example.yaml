@@ -33,7 +33,7 @@ provider_mapping:
   google: "gemini"
 
 # Combos: each block is applied to the *already globally filtered* set.
-# Allow any number of combos; the 8 defaults match the baseline in .agents/skills/9router/combos/.
+# Allow any number of combos; the defaults match the operator's local baseline (untracked).
 # Note: reasoning/thinking level is configured in 9Router UI, not via sync suffix.
 combos:
   free:
