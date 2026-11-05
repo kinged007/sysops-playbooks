@@ -187,14 +187,14 @@ socket mount does NOT work in a runsc sandbox. Instead:
 
 No secrets appear in scripts or logs — only paths and the endpoint.
 
-Standard push (shared isolated dind on remote `100.107.165.73`):
+Standard push (shared isolated dind on remote `100.64.0.1`):
 
 ```sh
 coder templates push 24gb-169-58-gvisor-shared-docker \
   ./.agents/skills/coder-remote-servers/templates/gvisor-docker \
   --variables-file ./secrets/24gb-169-58/gvisor-shared-vars.yaml
 # gvisor-shared-vars.yaml:
-# docker_host: tcp://100.107.165.73:2376
+# docker_host: tcp://100.64.0.1:2376
 # docker_ca: |
 #   -----BEGIN CERTIFICATE----- ...
 # docker_cert: |

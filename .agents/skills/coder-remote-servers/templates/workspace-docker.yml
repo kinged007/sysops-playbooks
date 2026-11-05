@@ -27,16 +27,16 @@ services:
       # REQUIRED: dind's server cert must include the Tailscale IP in its SAN,
       # otherwise the Coder host's TLS client will reject it.
       # Replace with the target remote's Tailscale IP.
-      DOCKER_TLS_SAN: "IP:100.100.10.20"
+      DOCKER_TLS_SAN: "IP:100.64.0.2"
 
     volumes:
       - workspace-docker-data:/var/lib/docker
       - workspace-docker-certs-ca:/certs/ca
       - workspace-docker-certs-client:/certs/client
 
-    # >> FILL IN: replace 100.100.10.20 with the remote's Tailscale IP <<
+    # >> FILL IN: replace 100.64.0.2 with the remote's Tailscale IP <<
     ports:
-      - "100.100.10.20:2376:2376"
+      - "100.64.0.2:2376:2376"
 
 volumes:
   workspace-docker-data:
