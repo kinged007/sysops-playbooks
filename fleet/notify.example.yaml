@@ -1,0 +1,4 @@
+- name: operator
+  provider: telegram
+  chat_id: "-1000000000000"
+  token: ops-telegram-bot

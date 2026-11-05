@@ -1,0 +1,20 @@
+- name: acme-cloudflare
+  provider: cloudflare
+  client: acme
+  login: api-token
+  vault: acme-cloudflare-dns
+  scope: zone:dns:edit
+
+- name: acme-resend
+  provider: resend
+  client: acme
+  login: api-key
+  vault: acme-resend-send
+  scope: sending_access
+
+- name: acme-aws
+  provider: aws
+  client: acme
+  login: access-key
+  vault: acme-aws-ses
+  scope: ses:SendRawEmail

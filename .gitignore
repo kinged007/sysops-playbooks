@@ -1,37 +1,44 @@
-# ---- Secrets: NEVER commit certificate/key material ----
+# Real operator data: deny all, allow synthetic examples only
+fleet/*
+!fleet/*.example.yaml
+incidents/*
+!incidents/README.md
+!incidents/inbox.example.md
+vault/
+runs/
+executions/
+logs/
+ops.config.yaml
+.ops-wake.state
+.ops-wake.lock
+
+# Secrets and key material
 *.pem
 *.key
 *.crt
 *.csr
-
-# ---- Tailscale pre-auth keys (expiring credentials) ----
 secrets/
-
-# ---- Private fleet operations (real hostnames/IPs) ----
 servers/
-
-# ---- Per-run execution folders (self-contained: plans, secrets, logs) ----
-executions/
-
-# ---- Local editor/agent state ----
-.opencode/
-
-# ---- Coder template variable files (contain certs) ----
-templates/**/.tfvars
-templates/**/*.tfvars.json
-.tfvars
 *.tfvars
-
-# ---- Local scratch ----
-generated/
-*.local
+*.tfvars.json
+.tfvars
 .env
 .env.*
 !.env.example
 
-# ---- OS / editor noise ----
+# Local agent state and scratch
+.opencode/
+generated/
+*.local
+
+# Python / test caches
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / editor noise
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
-__pycache__
