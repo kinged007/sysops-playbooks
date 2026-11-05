@@ -1,8 +1,8 @@
 # Lessons Learned — WordPress Migration
 
 Verified incidents from real runs. Read BEFORE any run. Each entry names the
-playbook section it anchors to. Items marked **(2026-08, 2026-08 first run)**
-were hit live during the first full execution and promoted to the playbook.
+skill section it anchors to. Items marked **(2026-08, 2026-08 first run)**
+were hit live during the first full execution and promoted to the skill.
 
 ## L1 — Charset corruption: always pass `--default-character-set` on dump
 **(2026-08, 2026-08 first run — first import was silently corrupted)**
@@ -13,7 +13,7 @@ spaces `\xC2\xA0`) should be. Cause: source server default
 follows the latin1 default and corrupts multibyte sequences in the dump
 file. The source renders fine — corruption only surfaces on the destination.
 
-Fix (anchors playbook §5.1):
+Fix (anchors SKILL.md §5.1):
 ```bash
 wp db export /tmp/site.sql --add-drop-table --single-transaction --quick \
   --default-character-set=utf8 --hex-blob
@@ -29,7 +29,7 @@ importing. Combine with `--hex-blob` for binary columns (Wordfence
 php-fpm) gets `13: Permission denied` on traversal → HTTP 403 on all
 uploads. In a split-user container setup (nginx→php-fpm), use **755** — PHP
 keeps write access via *ownership*, nginx reads as "others". Only use 750
-when web server and PHP share a group. (Anchors playbook §4.5.)
+when web server and PHP share a group. (Anchors SKILL.md §4.5.)
 
 ## L3 — Exclude `wp-config.php` from EVERY rsync, including `--delete` deltas
 **(2026-08, 2026-08 first run — two incidents at cutover)**
@@ -44,7 +44,7 @@ Rules:
 - Exclude `wp-config.php` from the initial transfer, the stage→volume copy,
   AND the final delta sync — same exclude list everywhere.
 - Never let `--delete` remove it from the destination volume.
-- Record the exclusion in the run's inventory. (Anchors playbook §4.1,
+- Record the exclusion in the run's inventory. (Anchors SKILL.md §4.1,
   risk register #24.)
 
 ## L4 — `wp search-replace --precise --recurse-objects` skips unloaded classes
@@ -55,7 +55,7 @@ Freemius, …) are skipped with only a `Skipping an uninitialized class`
 warning — old strings remain in plugin cache/settings. Not front-end
 content, and correct again once the domain reverts at cutover, so usually
 acceptable. To fix at staging, load the plugin classes first (run the
-replace with that plugin active). (Anchors playbook §5.4.)
+replace with that plugin active). (Anchors SKILL.md §5.4.)
 
 ## L5 — Double-escaped URLs evade search-replace
 **(2026-08, 2026-08 first run — staging)**
@@ -64,7 +64,7 @@ JSON-escaped slashes (`\u005c` forms) in a few `post_content` rows evade
 both URL replaces and `wp search-replace`. Fix per-row with a bare
 `REPLACE(col, 'old', 'new')` **limited to plain-text columns only** — never
 on serialized columns (`postmeta.meta_value`, `options.option_value`).
-(Anchors playbook §5.4.)
+(Anchors SKILL.md §5.4.)
 
 ## L6 — Stale object cache after DB re-import → silent broken behavior
 **(2026-08, 2026-08 first run — my-account login broken after cutover)**
@@ -80,7 +80,7 @@ Rules:
   `wp transient delete --all` after **any** DB import.
 - Verify through HTTP / plain PHP, not wp-cli — wp-cli can still read the
   stale value from the object cache while php-fpm reads correctly.
-  (Anchors playbook §9.4, risk register #25.)
+  (Anchors SKILL.md §9.4, risk register #25.)
 
 ## L7 — Import EXIT=0 but nothing happened — verify with a content probe
 **(2026-08, 2026-08 first run — catch-up import)**
@@ -93,7 +93,7 @@ Always verify the import's *effect*, not just its exit code:
 mysql ... -e 'SELECT COUNT(*) FROM <prefix>options WHERE option_value LIKE "%<marker>%"'
 # expect > 0 pre-replace / 0 post-replace — i.e. exactly what the import should have changed
 ```
-(Anchors playbook §5.3, risk register #26.)
+(Anchors SKILL.md §5.3, risk register #26.)
 
 ## L8 — Custom cert not served: nonexistent certresolver label
 **(2026-08, 2026-08 first run — Traefik/Dokploy cutover prep)**
@@ -107,7 +107,7 @@ instead of the uploaded custom cert. Fix: file-based TLS store in Traefik's
 Generalizable: if a custom cert upload "doesn't take effect", check the
 router's `certresolver` label against the resolvers actually configured in
 the proxy's static config, and prefer a dynamic TLS store for custom certs.
-(Anchors playbook §6.2, §T10.)
+(Anchors SKILL.md §6.2, §T10.)
 
 ## L9 — `www.` subdomain 404 after adding apex router
 **(2026-08, 2026-08 first run — cutover prep)**
@@ -125,19 +125,19 @@ Piping native-command binary output through PowerShell 5.1
 (`ssh A 'tar ...' | ssh B 'tar ...'`) buffers the stream as text lines in
 RAM (observed 5+ GB and climbing). Use `cmd /c`, Git-Bash, WSL, or run the
 whole pipe on one Linux host. Batch large transfers by logical unit.
-(Anchors playbook §4.6.)
+(Anchors SKILL.md §4.6.)
 
 ## L11 — Windows → remote script execution: CRLF and local interpolation
 Run scripts with LF endings (`scp` then `bash /tmp/script.sh`), never piped
 through `ssh ... bash -s` from PowerShell (CRLF breaks bash). PowerShell
 interpolates `$()` in double-quoted ssh commands locally — use single
-quotes or script files. (Anchors playbook §4.6, shared with
+quotes or script files. (Anchors SKILL.md §4.6, shared with
 `coder-remote-servers` notes G11.)
 
 ## L12 — MySQL `--force` re-import is idempotent with `--add-drop-table`
 Partial import failure (one bad table) → re-import with `mysql --force`,
 then verify per-table row counts against source. `--add-drop-table` makes
-the whole dump idempotent, so re-running is always safe. (Anchors playbook
+the whole dump idempotent, so re-running is always safe. (Anchors SKILL.md
 §5.3.)
 
 ## L13 — SERVER_NAME is unreliable after a Docker/nginx migration
@@ -155,5 +155,5 @@ Rules:
   correct in web, CLI, and cron contexts) instead of request headers.
 - Note: with a catch-all vhost, the Host header is the only per-request
   signal — `$host` in nginx, `$_SERVER['HTTP_HOST']` in PHP. (Anchors
-  playbook §6.1/§6.2; mirrors `coder-remote-servers` G11.)
+  SKILL.md §6.1/§6.2; mirrors `coder-remote-servers` G11.)
 

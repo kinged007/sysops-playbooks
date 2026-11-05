@@ -1,53 +1,96 @@
-# Playbook: WordPress Migration — Procedure
+---
+name: wordpress-migration
+description: Migrate a WordPress site (files and database) between servers with verification at every stage, using either a maintenance-window cutover (Branch A) or a DNS cutover with final delta sync (Branch B), with a defined rollback path. Use for server-to-server moves, hosting provider changes, VPS upgrades, and container re-platforming. Not for same-host restores, theme or plugin work, or in-place upgrades; PHP and database versions are pinned like-for-like.
+---
 
-Canonical steps for a run. **Placeholders only** — never real IPs, hostnames,
-usernames, or credentials. Real values go in the execution's `plan.md`.
-Repo-level rules (folder discipline, secrets, committing): see `AGENTS.md`.
+# WordPress Migration
 
-> **For agentic workers:** Execute this playbook linearly. Every phase has a
-> checklist with `- [ ]` items. Do NOT skip Phase 0 (Discovery) — the entire
-> downstream plan is parameterised by its answers. The playbook has **two
-> mutually exclusive execution branches** chosen in Phase 1: **Branch A
-> (Single-Run / Maintenance Page)** or **Branch B (Zero/Near-Zero Downtime /
-> DNS Cutover)**. Never mix them.
+> Read `references/` BEFORE any run. It holds lessons learned from earlier
+> migrations that may change how you plan. Never skip this.
 
-**Goal:** Migrate a WordPress site from a source server to a destination
+Risk level: high. Moves live data between servers; a mistake can destroy the
+source site, corrupt serialized data, or serve stale or corrupt content after
+cutover. A rollback plan is mandatory and must be signed off before work.
+
+**Goal:** migrate a WordPress site from a source server to a destination
 server with minimal risk, clear verification at every stage, and a defined
 rollback path.
 
-**Architecture:** Stateless approach — treat WordPress as *files + database +
-configuration* and move each independently with verifiable checkpoints. Files
-and DB are transferred to the destination **while the source stays live**
-(staging), verified in isolation, then the switch is made via either a short
-maintenance window (Branch A) or a DNS cutover with a final delta sync
-(Branch B).
+**Architecture:** WordPress is treated as files + database + configuration,
+each moved independently with verifiable checkpoints. Files and database are
+transferred to the destination while the source stays live (staging), verified
+in isolation, then the switch is made via a short maintenance window
+(Branch A) or a DNS cutover with a final delta sync (Branch B).
 
-**Tech Stack:** `rsync`/`tar`/`scp`, `mysqldump`/`mysql`, `wp-cli`
+**Tech stack:** `rsync`/`tar`/`scp`, `mysqldump`/`mysql`, `wp-cli`
 (`wp search-replace`, `wp db export`), web server config (nginx/Apache), DNS
-registrar tools, TLS/SSL, verification tools (`curl`, `wp core is-installed`,
+registrar tools, TLS, verification tools (`curl`, `wp core is-installed`,
 `wp db check`).
 
----
+## When to use
 
-## 0. Pre-flight (mandatory, every run)
+- Server-to-server moves, hosting provider changes, VPS upgrades, container re-platforming (bare metal to Docker/Dokploy).
+- Not for: same-host restores, theme or plugin work, or in-place upgrades. The skill migrates like-for-like: PHP and database versions are pinned, never upgraded during a migration.
 
-- [ ] Read `notes/` — lessons from previous runs may change how you plan.
-- [ ] Confirm prerequisites with operator (see README).
+Prerequisites:
+
+- Key-based SSH to source and destination servers (access ladder L3+; L2/L1 fallback via panels/plugins exists but is weaker).
+- Database credentials for both sites (read on source, write on destination).
+- WP-CLI or `mysqldump`/`mysql` on both ends.
+- DNS control for cutover, or at minimum a documented rollback path.
+- The site owner/operator as go/no-go approver.
+
+Two mutually exclusive branches are chosen in Phase 1: **Branch A** (single maintenance window; simplest, safest) and **Branch B** (zero or near-zero downtime via DNS cutover; complex). Never mix them.
+
+## Fleet refs needed
+
+Real hosts, IPs, and domains are never written in this file.
+
+- `fleet/servers.yaml`: source server and destination server records (`ops ssh <server>`).
+- `fleet/sites.yaml`: the site record (domain, web root, stack, PHP and database versions).
+- `fleet/providers.yaml`: DNS provider and CDN accounts, for the cutover.
+
+## Vault entries needed
+
+Names follow `<client>-<provider>-<purpose>`. Values are never printed or logged.
+
+- `<client>-wordpress-source-db`: source database credentials (read).
+- `<client>-wordpress-dest-db`: destination database credentials (write); goes into the destination `wp-config.php`.
+- `<client>-wordpress-admin`: WordPress admin login for verification, if needed.
+- `<client>-<dns-provider>-dns-token`: DNS API token, if the cutover changes records through an API.
+- `ssh/<client>-<server>`: ssh keys from the server fleet records.
+
+## Procedure
+
+Rules for every step:
+
+- Execute linearly. Every phase has a checklist with `- [ ]` items. Do NOT skip Phase 0 (Discovery): the downstream plan is parameterised by its answers.
+- Reads need no flag. Every step that changes a production system is flagged **WRITE** and needs approval per the run's permission mode (AGENTS.md section 1.3).
+- The source server is READ-ONLY for the run, except backups and dumps, each explicitly approved.
+- Every destructive **WRITE** (overwrite, delete, restart with data impact, schema change) is preceded by a **Backup** step (Phase 2, section 3.1, before anything else is touched).
+- Every **WRITE** has a **Rollback** line; Phase 10 is the branch-level rollback.
+- Every fix is followed by a **Verify** step; Phases 6 and 9 hold the full verification checklists.
+- Commands use `<PLACEHOLDER>` tokens; never write real IPs, hostnames, usernames, or credentials in this file. Real values go in the run's `plan.md`, the fleet records, and vault entries.
+
+### 0. Pre-flight (mandatory, every run)
+
+- [ ] Read `references/` — lessons from previous runs may change how you plan.
+- [ ] Confirm prerequisites with the operator (see When to use).
 - [ ] Confirm with operator: source server is READ-ONLY for this run (backup +
       dumps excepted, each explicitly approved).
 - [ ] Confirm with operator which **branch** applies (A or B) — see Phase 1.
 - [ ] Record permission mode per AGENTS.md §1.3 (operator sets it at plan
       approval: A per-write confirm / B plan-as-approved).
 
-## 1. Phase 0 — Discovery: questions to ask before anything
+### 1. Phase 0 — Discovery: questions to ask before anything
 
 > Gather this information **from the site owner/operator** (and by inspecting
-> the servers if credentials are provided). Record answers in the execution's
-> `inventory.md` (Appendix B template). Questions are grouped; ask them in
+> the servers if credentials are provided). Record answers in the run's
+> `site-inventory.md` (Appendix B template) and the fleet records. Questions are grouped; ask them in
 > order. Mark whether each was *answered by operator* or *verified by
 > inspection*.
 
-### 1.1 The critical decision first (ask before anything else)
+#### 1.1 The critical decision first (ask before anything else)
 
 | # | Question | Why it matters |
 |---|----------|----------------|
@@ -57,7 +100,7 @@ registrar tools, TLS/SSL, verification tools (`curl`, `wp core is-installed`,
 | D4 | What is the **acceptable downtime window** (minutes/hours/none), and is there a **preferred maintenance window** (day/time)? | Sets expectations, scheduling, and whether Branch B's more complex path is warranted. |
 | D5 | Who is the **site owner / go-no-go approver**, and who should be notified? | Rollback decisions and cutover sign-off need a human authority. |
 
-### 1.2 Source server — operator questions
+#### 1.2 Source server — operator questions
 
 | # | Question | Why it matters |
 |---|----------|----------------|
@@ -77,7 +120,7 @@ registrar tools, TLS/SSL, verification tools (`curl`, `wp core is-installed`,
 | S14 | Any **.htaccess custom rules** (redirects, security headers, caching) or web-server-level rewrites? | Must be recreated on destination or traffic breaks. |
 | S15 | Any scheduled jobs outside WP (backup scripts, import scripts, webhooks writing to the site)? | Data written between snapshot and cutover = the "delta" problem. |
 
-### 1.3 Destination server — operator questions
+#### 1.3 Destination server — operator questions
 
 | # | Question | Why it matters |
 |---|----------|----------------|
@@ -94,7 +137,7 @@ registrar tools, TLS/SSL, verification tools (`curl`, `wp core is-installed`,
 | T11 | Database service details: how to create DB/user/grants (root SSH, panel, or credentials provided)? | Needed for Phase 4. |
 | T12 | Existing cron/user/system accounts to reuse or create? | Ports S9. |
 
-### 1.4 Access ladder (agent must assess both servers)
+#### 1.4 Access ladder (agent must assess both servers)
 
 > **Preference order.** Use the highest level available on *each* server
 > independently; the method selected in Phase 1 must be compatible with the
@@ -119,7 +162,7 @@ registrar tools, TLS/SSL, verification tools (`curl`, `wp core is-installed`,
 **Rule:** If you have SSH on the source, **use `wp db export` / `mysqldump`
 and `rsync`** — it's the most reliable. Plugins are the fallback for L1.
 
-### 1.5 DNS & domain questions
+#### 1.5 DNS & domain questions
 
 | # | Question | Why it matters |
 |---|----------|----------------|
@@ -131,9 +174,9 @@ and `rsync`** — it's the most reliable. Plugins are the fallback for L1.
 
 ---
 
-## 2. Phase 1 — Decide method, branch, and rollback plan
+### 2. Phase 1 — Decide method, branch, and rollback plan
 
-### 2.1 Choose the transfer method (based on access ladder, §1.4)
+#### 2.1 Choose the transfer method (based on access ladder, §1.4)
 
 | Method | When | Pros | Cons |
 |--------|------|------|------|
@@ -145,7 +188,7 @@ and `rsync`** — it's the most reliable. Plugins are the fallback for L1.
 **Default recommendation:** **M1** whenever SSH is available (it almost always
 is on the source). Use **M3** only when the access ladder forces it.
 
-### 2.2 Choose the branch
+#### 2.2 Choose the branch
 
 - **Branch A (Single-Run / Maintenance Page):** Put the site behind a
   maintenance/upgrade page, do the migration, verify, take the page down.
@@ -169,7 +212,7 @@ is on the source). Use **M3** only when the access ladder forces it.
 > requirements exist. (The "upgrade page" itself is a small artifact — a
 > static `maintenance.html` served by the web server with a 503 — see §8.2.)
 
-### 2.3 Define the rollback plan (before any work starts)
+#### 2.3 Define the rollback plan (before any work starts)
 
 > **A rollback plan is not optional.** At minimum: a verified full backup of
 > source stored **off the source server**, and a documented revert path.
@@ -191,7 +234,7 @@ is on the source). Use **M3** only when the access ladder forces it.
 - Data corruption detected (e.g. `wp db check` reports errors,
   serialized-data corruption, missing tables).
 
-### 2.4 Validate the destination stack with a test page (before committing to the plan)
+#### 2.4 Validate the destination stack with a test page (before committing to the plan)
 
 > **Why:** the method/branch/rollback decisions (§2.1–2.3) are only sound once
 > you know the destination can actually serve **HTTP → PHP → DB**. Do a
@@ -233,9 +276,9 @@ is on the source). Use **M3** only when the access ladder forces it.
 
 ---
 
-## 3. Phase 2 — Pre-migration preparation (source & destination)
+### 3. Phase 2 — Pre-migration preparation (source & destination)
 
-### 3.1 Source preparation
+#### 3.1 Source preparation
 
 - [ ] **Q1-1.4:** Confirm access level and document it in the inventory.
 - [ ] **WRITE** — **Take a full backup** of files and DB, store **off the
@@ -248,8 +291,8 @@ is on the source). Use **M3** only when the access ladder forces it.
         rsync `--dry-run` shows zero differences on a test re-run.
       - DB: `mysql -e "SOURCE backup.sql; SHOW TABLES;"` against a throwaway
         DB, or at least `gzip -t`.
-- [ ] **Record the Site Health Snapshot** (Appendix B) in the execution's
-      `inventory.md`: WP version, PHP, MySQL, active plugins, uploads size,
+- [ ] **Record the Site Health Snapshot** (Appendix B) in the run's
+      `site-inventory.md`: WP version, PHP, MySQL, active plugins, uploads size,
       DB size, cron entries, `.htaccess` contents, `wp-config.php` DB
       creds/salts (do not record secrets — reference them), object-cache
       drop-in presence, list of DB tables.
@@ -268,7 +311,7 @@ is on the source). Use **M3** only when the access ladder forces it.
 - [ ] **Do NOT** change anything else on the source yet. Source stays
       authoritative until cutover.
 
-### 3.2 Destination preparation
+#### 3.2 Destination preparation
 
 - [ ] **WRITE** — **Confirm/install matching software versions (from
       S4/S5/T3/T4) — CRITICAL: match like-for-like.** PHP and MariaDB/MySQL
@@ -305,12 +348,12 @@ is on the source). Use **M3** only when the access ladder forces it.
 
 ---
 
-## 4. Phase 3 — Transfer files
+### 4. Phase 3 — Transfer files
 
 > Transfer happens **while the source is live**. Do not take the source down
 > yet. Both branches do this identically.
 
-### 4.1 What to transfer
+#### 4.1 What to transfer
 
 The WordPress file tree contains, at minimum: `index.php`, `wp-admin/`,
 `wp-includes/`, `wp-content/`, `wp-config.php`, `.htaccess`, and any custom
@@ -328,7 +371,7 @@ Consider excluding (decide per site):
   clobber the destination's working config (verified incident 2026-08).
   Decide per run and record the decision in the inventory.
 
-### 4.2 Method M1 — rsync (L3+/L3+)
+#### 4.2 Method M1 — rsync (L3+/L3+)
 
 ```bash
 # From a jump host or the source (push) — or reverse the direction for pull.
@@ -340,7 +383,7 @@ For a large `uploads/` this is resumable and delta-friendly. Repeat until
 `rsync --dry-run` reports no differences (idempotent — safe to run
 repeatedly).
 
-### 4.3 Method M2 — tar + SCP/SFTP (L2/L3)
+#### 4.3 Method M2 — tar + SCP/SFTP (L2/L3)
 
 ```bash
 cd /var/www && tar czf site.tar.gz site/
@@ -351,7 +394,7 @@ cd /var/www && tar xzf /tmp/site.tar.gz
 
 Large archives risk timeouts; prefer rsync when possible.
 
-### 4.4 Method M3 — migration plugin
+#### 4.4 Method M3 — migration plugin
 
 1. On source: install **Duplicator** (or All-in-One WP Migration /
    UpdraftPlus), run a package/backup **that includes the DB**, download the
@@ -364,7 +407,7 @@ Large archives risk timeouts; prefer rsync when possible.
 4. **WRITE** — Delete the installer files after successful install
    (security). Rollback: none needed — installer is dead code.
 
-### 4.5 After transfer — file-level checks
+#### 4.5 After transfer — file-level checks
 
 - [ ] Verify file count/size parity: `rsync -av --dry-run` empty on re-run
       (M1), or `du -sh` compares.
@@ -390,7 +433,7 @@ Large archives risk timeouts; prefer rsync when possible.
       supports it — nginx needs its equivalent `try_files` rules (Appendix
       A, §A.7).
 
-### 4.6 Transfer efficiency & memory (practical notes — verified 2026-08)
+#### 4.6 Transfer efficiency & memory (practical notes — verified 2026-08)
 
 - **Run streaming pipes natively, not through an object-oriented shell.** On
   Windows PowerShell 5.1, piping one native command's binary output into
@@ -426,9 +469,9 @@ Large archives risk timeouts; prefer rsync when possible.
 
 ---
 
-## 5. Phase 4 — Transfer & transform the database
+### 5. Phase 4 — Transfer & transform the database
 
-### 5.1 Dump the source DB (L3+ or panel)
+#### 5.1 Dump the source DB (L3+ or panel)
 
 **WRITE** — these dump commands write a file on the source and read the
 production DB (SELECT/export only). One operator approval covers the dump
@@ -475,13 +518,13 @@ mysqldump --single-transaction --quick --add-drop-table \
       by hex-comparing a known multibyte sample against the source before
       importing. Combine with `--hex-blob` for binary columns in one pass.
 
-### 5.2 Transfer the dump
+#### 5.2 Transfer the dump
 
 Same channel as files (rsync / scp / SFTP / plugin). For very large DBs,
 prefer transferring the `.sql.gz` and importing from the compressed stream
 (§5.3).
 
-### 5.3 Import into destination DB
+#### 5.3 Import into destination DB
 
 **WRITE** — this replaces the destination DB contents. Confirmation required
 per AGENTS.md database rule.
@@ -508,7 +551,7 @@ wp db import /tmp/site.sql
       `SHOW VARIABLES LIKE 'collation_database';`. UTF-8/`utf8mb4` is the
       WP standard.
 
-### 5.4 Serialization-safe URL search-replace
+#### 5.4 Serialization-safe URL search-replace
 
 > **Never use raw `sed` on a WP database.** Serialized PHP strings (in
 > `wp_options`, `wp_postmeta`, widget settings, some plugin settings) store
@@ -604,7 +647,7 @@ Rollback: R3 (re-import the pre-transform dump). Notes:
   `wp option update siteurl https://<NEW>` is the clean way (Appendix A,
   §A.4).
 
-### 5.5 Preview strategy decision (also see Phase 6)
+#### 5.5 Preview strategy decision (also see Phase 6)
 
 | Scenario | Search-replace for preview? | Preview method |
 |----------|------------------------------|----------------|
@@ -612,7 +655,7 @@ Rollback: R3 (re-import the pre-transform dump). Notes:
 | Same domain + public `staging.<DOMAIN>` | Yes: real → `staging.<DOMAIN>` | Access `https://staging.<DOMAIN>` |
 | New domain | Yes: old → new | Access `https://<NEW>` directly (point it at dest before DNS swap, or use hosts) |
 
-### 5.6 HTTPS & cookies during preview
+#### 5.6 HTTPS & cookies during preview
 
 - Preview over HTTPS requires a valid cert for the hostname you're using.
   Options: (a) issue a real cert for `staging.<DOMAIN>` / the new domain now
@@ -629,16 +672,16 @@ Rollback: R3 (re-import the pre-transform dump). Notes:
 
 ---
 
-## 6. Phase 5 — Configure wp-config.php & web server
+### 6. Phase 5 — Configure wp-config.php & web server
 
-### 6.1 wp-config.php on the destination
+#### 6.1 wp-config.php on the destination
 
 - [ ] **WRITE** — Edit `wp-config.php` (or use a fresh WP's sample config)
       to point at the **destination** DB:
   ```php
   define( 'DB_NAME', '<DEST_DB_NAME>' );
   define( 'DB_USER', '<DEST_DB_USER>' );
-  define( 'DB_PASSWORD', '<DEST_DB_PASS>' );   // from this run's secrets/, never inline
+  define( 'DB_PASSWORD', '<DEST_DB_PASS>' );   // from this run's vault entry, never inline
   define( 'DB_HOST', '<DEST_DB_HOST>' );   // or DB socket/host per destination
   ```
   Rollback: keep a copy of the transferred config; revert = restore it.
@@ -666,7 +709,7 @@ Rollback: R3 (re-import the pre-transform dump). Notes:
       ensure the cache backend config (redis host/port) is updated for the
       destination and the cache is flushed (§9.4).
 
-### 6.2 Web server virtual host
+#### 6.2 Web server virtual host
 
 - [ ] **WRITE** — Point the vhost at the transferred web root. Rollback:
       restore previous vhost file.
@@ -690,14 +733,14 @@ Rollback: R3 (re-import the pre-transform dump). Notes:
 
 ---
 
-## 7. Phase 6 — Staging, preview & testing on destination
+### 7. Phase 6 — Staging, preview & testing on destination
 
 > **The destination is now a full, live-looking clone of the site, reachable
 > via its staging hostname or `/etc/hosts`, while the source continues
 > serving production.** This is the verification gate. **Do not proceed to
 > cutover until the whole checklist below passes.**
 
-### 7.1 Bring it up
+#### 7.1 Bring it up
 
 - [ ] **WRITE** — Confirm DB import done (§5.3), files in place (§4.5),
       wp-config set (§6.1), vhost reloaded (`nginx -t && systemctl reload
@@ -709,7 +752,7 @@ Rollback: R3 (re-import the pre-transform dump). Notes:
       PHP error log immediately** (top cause: missing PHP extension, wrong
       file perms, DB creds, or search-replace corrupted data).
 
-### 7.2 Automated smoke checks (run these commands; record all output)
+#### 7.2 Automated smoke checks (run these commands; record all output)
 
 ```bash
 # HTTP layer
@@ -728,7 +771,7 @@ wp theme list --status=active --field=name
 tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
 ```
 
-### 7.3 Manual / browser verification checklist (go/no-go gates)
+#### 7.3 Manual / browser verification checklist (go/no-go gates)
 
 > Mark each PASS/FAIL. Any FAIL blocks cutover until fixed and re-checked.
 
@@ -758,7 +801,7 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
 - [ ] Any custom integration (webhooks, third-party APIs): check their
       configured URLs match the new domain or are still correct.
 
-### 7.4 Fix loop
+#### 7.4 Fix loop
 
 - Any FAIL: fix → re-run the full checklist → re-confirm. Common fixes:
   permissions (§4.5), PHP extensions (`php -m` vs source), DB creds,
@@ -769,13 +812,13 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
 
 ---
 
-## 8. Phase 7 — Cutover: Branch A (Single-Run / Maintenance Page)
+### 8. Phase 7 — Cutover: Branch A (Single-Run / Maintenance Page)
 
 > Choose this if D1 = single run-through. Downtime = duration of this phase.
 > **Requires: all Phase 6 checks passed** (or at least the critical ones; do
 > NOT skip the front-page/admin/login/media checks).
 
-### 8.1 Pre-flight (5 min)
+#### 8.1 Pre-flight (5 min)
 
 - [ ] Confirm maintenance-window approval (D4).
 - [ ] **Notify** (D5) — announce maintenance window.
@@ -783,7 +826,7 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
       passing Phase 6 checks.
 - [ ] Have the rollback plan (R1) + backup location ready and confirmed.
 
-### 8.2 Enable the maintenance/upgrade page
+#### 8.2 Enable the maintenance/upgrade page
 
 **WRITE** — Two independent mechanisms (do both; belt and braces):
 
@@ -808,7 +851,7 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
 > Rollback: remove the maintenance artifacts in reverse order — source
 > resumes serving.
 
-### 8.3 Freeze writes & take the final snapshot
+#### 8.3 Freeze writes & take the final snapshot
 
 - [ ] **WRITE** — Stop write-sources (or accept they're blocked by the
       maintenance page). If you used the static page at the web-server
@@ -818,7 +861,7 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
 - [ ] **WRITE** — **Final file sync** of `wp-content/uploads` (and any
       changed files) from source → dest (rsync delta, §4.2).
 
-### 8.4 Import final data to destination
+#### 8.4 Import final data to destination
 
 - [ ] **WRITE** — Import the final dump into the destination DB (§5.3).
       Rollback: R3.
@@ -831,7 +874,7 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
       media, one key flow) on the destination using the **real domain via
       `/etc/hosts`** (so you test exactly what users will see).
 
-### 8.5 Flip the traffic
+#### 8.5 Flip the traffic
 
 - [ ] **WRITE** — **Same domain, same IP pool / same server class:** if the
       destination IP is what DNS already points at (e.g. you control the
@@ -856,14 +899,14 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
 - [ ] Confirm real-domain requests now hit the destination (see §10.1 for
       how to verify which server answered).
 
-### 8.6 Branch A completion
+#### 8.6 Branch A completion
 
 - [ ] Full post-cutover verification (§10). Then proceed to §10.3
       decommissioning. **Branch A is done once Phase 9 passes.**
 
 ---
 
-## 9. Phase 8 — Cutover: Branch B (Zero/Near-Zero Downtime, DNS Cutover)
+### 9. Phase 8 — Cutover: Branch B (Zero/Near-Zero Downtime, DNS Cutover)
 
 > Choose this if D1 = zero/minimal downtime. The site remains live on the
 > source throughout staging. Downtime is only the propagation/re-sync
@@ -871,7 +914,7 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
 > TTL pre-lowered; delta-sync path pre-tested; source SSH (or DB access)
 > for the final dump.**
 
-### 9.1 Pre-cutover DNS preparation (24–48h before)
+#### 9.1 Pre-cutover DNS preparation (24–48h before)
 
 - [ ] **WRITE** — **Lower TTL** on the domain's A/CNAME record to `300`
       (5 min) or less at the DNS provider (N3). Verify with `dig <DOMAIN>`
@@ -887,7 +930,7 @@ tail -n 50 wp-content/debug.log 2>/dev/null; tail -n 50 /var/log/php*.log
       complete within the budgeted window (see §9.2). This de-risks the
       actual day.
 
-### 9.2 At cutover — final delta sync (the "deltas")
+#### 9.2 At cutover — final delta sync (the "deltas")
 
 The goal: make the destination match the source as of time T, in the
 shortest window possible, because the source is still live until DNS flips.
@@ -917,7 +960,7 @@ shortest window possible, because the source is still live until DNS flips.
    pending (same rules as §5.4/§8.4). Rollback: R3.
 4. **WRITE** — Flush caches (§9.4).
 
-### 9.3 The DNS flip
+#### 9.3 The DNS flip
 
 - [ ] **WRITE** — Change the A/CNAME record to the destination IP (or the
       appropriate record per §2.5/N1–N3). Rollback: revert record to source
@@ -927,7 +970,7 @@ shortest window possible, because the source is still live until DNS flips.
 - [ ] Start the clock on propagation; expect up to the old-TTL period + a
       few minutes, usually much faster at TTL=300.
 
-### 9.4 Re-sync during propagation (the "re-migrate the database" step)
+#### 9.4 Re-sync during propagation (the "re-migrate the database" step)
 
 Because traffic still hits the source while DNS propagates (recursors with
 old cached TTL, users with open connections), the source may receive writes
@@ -971,7 +1014,7 @@ after the cutover dump. To not lose them:
 - [ ] **WRITE** — Flush object cache & transients on the destination
       **after** the catch-up import.
 
-### 9.5 Verify live, then remove the staging surface
+#### 9.5 Verify live, then remove the staging surface
 
 - [ ] Once propagation is (mostly) complete, run **Phase 9 post-cutover
       verification** (§10) against the real domain.
@@ -982,9 +1025,9 @@ after the cutover dump. To not lose them:
 
 ---
 
-## 10. Phase 9 — Post-cutover verification & decommissioning
+### 10. Phase 9 — Post-cutover verification & decommissioning
 
-### 10.1 Verify traffic actually hits the destination
+#### 10.1 Verify traffic actually hits the destination
 
 ```bash
 # Local DNS: what does the record resolve to now?
@@ -998,7 +1041,7 @@ curl -sS -o /dev/null -w "%{http_code} %{remote_ip}\n" https://<DOMAIN>/
 echo | openssl s_client -connect <DOMAIN>:443 -servername <DOMAIN> 2>/dev/null | openssl x509 -noout -issuer
 ```
 
-### 10.2 Full post-cutover checklist
+#### 10.2 Full post-cutover checklist
 
 - [ ] `curl` front page returns **200** and correct content from the
       destination IP.
@@ -1025,7 +1068,7 @@ echo | openssl s_client -connect <DOMAIN>:443 -servername <DOMAIN> 2>/dev/null |
 - [ ] Verify no `.maintenance` file left on the destination (Branch A) —
       remove if present.
 
-### 10.3 Keep the source warm (the safety net)
+#### 10.3 Keep the source warm (the safety net)
 
 - [ ] Do **not** decommission the source yet. Keep it running, reachable,
       and able to serve (the simplest, strongest rollback is "point DNS
@@ -1045,18 +1088,18 @@ echo | openssl s_client -connect <DOMAIN>:443 -servername <DOMAIN> 2>/dev/null |
 
 ---
 
-## 11. Phase 10 — Rollback
+### 11. Phase 10 — Rollback
 
 > Rollback is a *planned capability*, triggered by the rules in §2.3.
 > Execution differs by branch.
 
-### 11.1 Rollback before cutover (both branches)
+#### 11.1 Rollback before cutover (both branches)
 
 - The source was never touched (still live). **Rollback = do nothing /
   cancel.** Destroy/repurpose the destination staging copy. Zero user
   impact.
 
-### 11.2 Rollback during/after Branch A cutover
+#### 11.2 Rollback during/after Branch A cutover
 
 1. Put the maintenance page back up (§8.2) to stop users seeing a broken
    site.
@@ -1067,7 +1110,7 @@ echo | openssl s_client -connect <DOMAIN>:443 -servername <DOMAIN> 2>/dev/null |
 4. Preserve the failed destination (files + dump) for diagnosis; record
    what failed and why.
 
-### 11.3 Rollback after Branch B cutover (DNS flip-back)
+#### 11.3 Rollback after Branch B cutover (DNS flip-back)
 
 1. **Stop the bleeding:** set DNS back to the source IP (TTL already low →
    fast).
@@ -1080,19 +1123,162 @@ echo | openssl s_client -connect <DOMAIN>:443 -servername <DOMAIN> 2>/dev/null |
    investigation; remove from the public path.
 4. Re-plan and retry after diagnosis.
 
-### 11.4 Rollback via backup restore (R1, worst case)
+#### 11.4 Rollback via backup restore (R1, worst case)
 
 - Restore the source from the off-box backup (files + DB) exactly as
   verified in §3.1.
 - Restore DNS to source IP.
 - Everything else follows the above.
 
+### Appendix A — Copy-paste command kit
+
+> All commands assume Linux servers and bash. Windows/jump-host variants
+> noted where relevant.
+
+#### A.1 Site/file backup (off-box)
+```bash
+# Source: create tarball
+tar czf site-backup-$(date +%F).tar.gz -C /var/www site/
+# or rsync a mirror to an off-box location
+rsync -avz --partial /var/www/site/ backup-host:/backups/site/
+```
+
+#### A.2 DB dump (consistent)
+```bash
+# WP-CLI (preferred — reads wp-config)
+cd /var/www/site && wp db export site-$(date +%F).sql --add-drop-table --single-transaction --quick
+gzip site-$(date +%F).sql
+# Raw mysqldump
+mysqldump --single-transaction --quick --add-drop-table -h HOST -u USER -p DB > site-$(date +%F).sql && gzip site-$(date +%F).sql
+```
+
+#### A.3 DB import (dest)
+```bash
+gzip -dc site-2026-07-01.sql.gz | mysql -h DEST_HOST -u DEST_USER -p DEST_DB
+# or via WP-CLI from the dest site dir:
+wp db import site-2026-07-01.sql
+```
+
+#### A.4 URL change / search-replace (dest, serialization-safe)
+```bash
+wp search-replace 'example.com' 'newexample.com' --all-tables-with-prefix --precise --recurse-objects --skip-columns=guid --dry-run
+wp search-replace 'example.com' 'newexample.com' --all-tables-with-prefix --precise --recurse-objects --skip-columns=guid
+wp search-replace 'https://example.com' 'https://newexample.com' --all-tables-with-prefix --precise --recurse-objects --skip-columns=guid
+wp option update home 'https://newexample.com'
+wp option update siteurl 'https://newexample.com'
+wp transient delete --all
+```
+
+#### A.5 Permissions (dest)
+```bash
+chown -R www-data:www-data /var/www/site-dest/     # match dest web user
+find /var/www/site-dest -type d -exec chmod 755 {} \;
+find /var/www/site-dest -type f -exec chmod 644 {} \;
+chmod 755 /var/www/site-dest/wp-content/uploads
+```
+
+#### A.6 Salt shuffle (dest)
+```bash
+wp config shuffle-salts
+# or paste fresh keys from https://api.wordpress.org/secret-key/1.1/salt/
+```
+
+#### A.7 nginx WordPress config essentials
+```nginx
+server {
+  listen 443 ssl http2;
+  server_name example.com www.example.com;
+  root /var/www/site-dest;
+  index index.php index.html;
+  # TLS certs here (T10)
+
+  location / {
+    try_files $uri $uri/ /index.php?$args;
+  }
+  location ~ \.php$ {
+    include fastcgi_params;
+    fastcgi_pass unix:/run/php/php8.2-fpm.sock;   # match dest PHP version
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+  }
+  location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
+    expires 7d; access_log off;
+  }
+}
+```
+(Apache: `.htaccess` copied from source + `AllowOverride All` in the vhost.)
+
+#### A.8 Verification commands
+```bash
+wp core is-installed
+wp core version
+wp db check
+wp db size
+wp plugin list --status=active
+wp theme list --status=active
+wp cron event run --all
+wp transient delete --all
+wp db query "SELECT option_value FROM wp_options WHERE option_name IN ('home','siteurl')"
+dig +short example.com
+curl -sS -o /dev/null -w "%{http_code} %{remote_ip}\n" https://example.com/
+```
+
 ---
 
-## 12. Master risk, caveat & drawback register
+### Appendix B — Site health snapshot template
+
+> Fill this in during Phase 0. Store in the run's `site-inventory.md` (do
+> not paste secrets — reference the vault entry name).
+
+| Field | Value | Source (operator/inspection) |
+|-------|-------|------------------------------|
+| Migration branch (A/B) | | D1 |
+| Rollback plan (R1–R4) | | §2.3 |
+| Domain(s) | | D3/N1 |
+| Source hosting / dest hosting | | S1/T1 |
+| Source SSH level / dest SSH level | | §1.4 |
+| WP version / Multisite? | | S6 |
+| PHP version (source/dest) | | S4/T3 |
+| MySQL/MariaDB (source/dest) | | S5/T4 |
+| Web server (source/dest) | | S3/T3 |
+| Active plugins | | S7 |
+| Active theme / custom theme | | S7 |
+| Object cache (type/config) | | S8/T9 |
+| Cron (WP/system; crontab entries) | | S9 |
+| CDN (provider/proxied?) | | S10/N4 |
+| Mail (server/records/SPF/DKIM) | | S11/N5 |
+| SSL (type/issuer/wildcard) | | S12/T10 |
+| Total site size / uploads size | | S13 |
+| DB size / table count | | S13 |
+| `.htaccess` / custom rules | | S14 |
+| Non-WP scheduled jobs/writers | | S15 |
+| DNS provider / TTL / records | | N1–N3 |
+| Staging preview method | | T8 / §5.5 |
+| Delta-write pattern chosen (B) | | §9.4 |
+| Maintenance window / downtime budget | | D4 |
+| Approver / contacts | | D5 |
+| Final DB dump file + checksum | | Phase 7/8 |
+
+## Rollback
+
+Defined before any work starts (Phase 1, section 2.3) and applied per the
+Phase 10 sections above: rollback before cutover (both branches), during or
+after a Branch A cutover, after a Branch B cutover (DNS flip-back), and the
+backup-restore worst case (R1). The source stays untouched and warm until the
+operator signs off decommissioning. If a rollback does not return the site to
+the recorded state, stop and ask the operator.
+
+## Verify
+
+- [ ] Phase 6 smoke checks and the manual go/no-go checklist pass on the destination before cutover
+- [ ] Phase 9 post-cutover checklist passes: traffic reaches the destination, no `.maintenance` file left behind, permalinks, uploads, forms, and caches work
+- [ ] Source remains warm and unchanged until sign-off
+
+## Gotchas
+
+Run-verified incidents are in `references/lessons.md` (charset corruption on dump, `uploads` permissions with split nginx/PHP users, serialization-safe search-replace, and others). The master risk register:
 
 > Ordered by likelihood × impact. Mitigations are concrete actions in
-> earlier phases. See also `notes/` for run-verified incidents.
+> earlier phases. See also `references/` for run-verified incidents.
 
 | # | Risk / Caveat | Likelihood | Impact | Detection | Mitigation |
 |---|---------------|-----------|--------|-----------|------------|
@@ -1126,7 +1312,7 @@ echo | openssl s_client -connect <DOMAIN>:443 -servername <DOMAIN> 2>/dev/null |
 | 25 | **Stale object cache after DB re-import serves pre-import option values** (file object cache holds an `alloptions` snapshot taken mid-rebuild) | Med | High (silent broken behavior — e.g. login loops, plugin installer re-runs) | `get_option()` returns wrong value while DB looks right; wp-cli and php-fpm disagree | After ANY DB import, purge the object cache (`rm -rf wp-content/cache/*` + `wp transient delete --all`) and verify through HTTP, not just wp-cli (§9.4, verified incident 2026-08) |
 | 26 | **Import reports EXIT=0 but silently did nothing** (transient pipe/exec issue) | Low | High (you cut over on stale data) | Table counts unchanged; content probes find old data | Always verify import effect with a content probe (`SELECT COUNT(*)` on a known table / grep a marker string), not just exit code (§5.3, verified incident 2026-08) |
 
-### Inherent drawbacks of each approach (be honest with the operator)
+#### Inherent drawbacks of each approach (be honest with the operator)
 
 - **Branch A:** guarantees a maintenance window; the window scales with
   DB/file size; any human error during the window = real downtime. Best for
@@ -1142,148 +1328,14 @@ echo | openssl s_client -connect <DOMAIN>:443 -servername <DOMAIN> 2>/dev/null |
 - **"Zero downtime" is a goal, not a promise.** Realistically:
   seconds-to-minutes. Set expectations accordingly (D4).
 
----
+## Files
 
-## Appendix A — Copy-paste command kit
+| Path | Purpose |
+|---|---|
+| `references/lessons.md` | Lessons learned from past migrations (verified incidents, gotchas) |
+| `templates/` | Compose files, wp-config scaffolds, nginx/vhost templates |
+| `templates/plan-template.md`, `templates/runbook-template.md` | Copied to `runs/wordpress-migration[-<suffix>]/` on first run |
+| `scripts/` | Backup, transfer, and restore scripts |
 
-> All commands assume Linux servers and bash. Windows/jump-host variants
-> noted where relevant.
-
-### A.1 Site/file backup (off-box)
-```bash
-# Source: create tarball
-tar czf site-backup-$(date +%F).tar.gz -C /var/www site/
-# or rsync a mirror to an off-box location
-rsync -avz --partial /var/www/site/ backup-host:/backups/site/
-```
-
-### A.2 DB dump (consistent)
-```bash
-# WP-CLI (preferred — reads wp-config)
-cd /var/www/site && wp db export site-$(date +%F).sql --add-drop-table --single-transaction --quick
-gzip site-$(date +%F).sql
-# Raw mysqldump
-mysqldump --single-transaction --quick --add-drop-table -h HOST -u USER -p DB > site-$(date +%F).sql && gzip site-$(date +%F).sql
-```
-
-### A.3 DB import (dest)
-```bash
-gzip -dc site-2026-07-01.sql.gz | mysql -h DEST_HOST -u DEST_USER -p DEST_DB
-# or via WP-CLI from the dest site dir:
-wp db import site-2026-07-01.sql
-```
-
-### A.4 URL change / search-replace (dest, serialization-safe)
-```bash
-wp search-replace 'example.com' 'newexample.com' --all-tables-with-prefix --precise --recurse-objects --skip-columns=guid --dry-run
-wp search-replace 'example.com' 'newexample.com' --all-tables-with-prefix --precise --recurse-objects --skip-columns=guid
-wp search-replace 'https://example.com' 'https://newexample.com' --all-tables-with-prefix --precise --recurse-objects --skip-columns=guid
-wp option update home 'https://newexample.com'
-wp option update siteurl 'https://newexample.com'
-wp transient delete --all
-```
-
-### A.5 Permissions (dest)
-```bash
-chown -R www-data:www-data /var/www/site-dest/     # match dest web user
-find /var/www/site-dest -type d -exec chmod 755 {} \;
-find /var/www/site-dest -type f -exec chmod 644 {} \;
-chmod 755 /var/www/site-dest/wp-content/uploads
-```
-
-### A.6 Salt shuffle (dest)
-```bash
-wp config shuffle-salts
-# or paste fresh keys from https://api.wordpress.org/secret-key/1.1/salt/
-```
-
-### A.7 nginx WordPress config essentials
-```nginx
-server {
-  listen 443 ssl http2;
-  server_name example.com www.example.com;
-  root /var/www/site-dest;
-  index index.php index.html;
-  # TLS certs here (T10)
-
-  location / {
-    try_files $uri $uri/ /index.php?$args;
-  }
-  location ~ \.php$ {
-    include fastcgi_params;
-    fastcgi_pass unix:/run/php/php8.2-fpm.sock;   # match dest PHP version
-    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-  }
-  location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2?)$ {
-    expires 7d; access_log off;
-  }
-}
-```
-(Apache: `.htaccess` copied from source + `AllowOverride All` in the vhost.)
-
-### A.8 Verification commands
-```bash
-wp core is-installed
-wp core version
-wp db check
-wp db size
-wp plugin list --status=active
-wp theme list --status=active
-wp cron event run --all
-wp transient delete --all
-wp db query "SELECT option_value FROM wp_options WHERE option_name IN ('home','siteurl')"
-dig +short example.com
-curl -sS -o /dev/null -w "%{http_code} %{remote_ip}\n" https://example.com/
-```
-
----
-
-## Appendix B — Site health snapshot template
-
-> Fill this in during Phase 0. Store in the execution's `inventory.md` (do
-> not paste secrets — reference "see secrets/" of the execution).
-
-| Field | Value | Source (operator/inspection) |
-|-------|-------|------------------------------|
-| Migration branch (A/B) | | D1 |
-| Rollback plan (R1–R4) | | §2.3 |
-| Domain(s) | | D3/N1 |
-| Source hosting / dest hosting | | S1/T1 |
-| Source SSH level / dest SSH level | | §1.4 |
-| WP version / Multisite? | | S6 |
-| PHP version (source/dest) | | S4/T3 |
-| MySQL/MariaDB (source/dest) | | S5/T4 |
-| Web server (source/dest) | | S3/T3 |
-| Active plugins | | S7 |
-| Active theme / custom theme | | S7 |
-| Object cache (type/config) | | S8/T9 |
-| Cron (WP/system; crontab entries) | | S9 |
-| CDN (provider/proxied?) | | S10/N4 |
-| Mail (server/records/SPF/DKIM) | | S11/N5 |
-| SSL (type/issuer/wildcard) | | S12/T10 |
-| Total site size / uploads size | | S13 |
-| DB size / table count | | S13 |
-| `.htaccess` / custom rules | | S14 |
-| Non-WP scheduled jobs/writers | | S15 |
-| DNS provider / TTL / records | | N1–N3 |
-| Staging preview method | | T8 / §5.5 |
-| Delta-write pattern chosen (B) | | §9.4 |
-| Maintenance window / downtime budget | | D4 |
-| Approver / contacts | | D5 |
-| Final DB dump file + checksum | | Phase 7/8 |
-
----
-
-## Authoring rules (this playbook)
-
-- Steps are copy-paste executable with `<PLACEHOLDER>` tokens.
-- Every step that WRITES to a production system is flagged **WRITE** in
-  bold. Reads need no flag.
-- Rollback instructions accompany every write step; Phase 10 is the
-  branch-level rollback.
-- Run findings go to the run's `notes.md`; promotion into `notes/` (and
-  rarely this file) happens after the run, with operator approval. Never
-  edit this file mid-run.
-
-*End of playbook. After Phase 0–2 are answered, the plan becomes a filled
-runbook. Run phases in order; never skip verification.*
+Run findings go to the run's `notes.md`; promotion into `references/` happens
+after the run, with operator approval. Never edit this skill mid-run.

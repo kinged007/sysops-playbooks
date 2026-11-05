@@ -1,17 +1,17 @@
 # Runbook: <RUN NAME>
 
-Snapshot of `playbooks/wordpress-migration/playbook.md` being executed, with
+Snapshot of `.agents/skills/wordpress-migration/SKILL.md` being executed, with
 real values filled in. State lives here and in `logs/` — any agent session can
-resume from these files alone. This folder is persistent per playbook variant
-(`executions/wordpress-migration[/-<suffix>]/`); subsequent invocations append
+resume from these files alone. This folder is persistent per skill variant
+(`runs/wordpress-migration[-<suffix>]/`); subsequent invocations append
 to it, never replace it. `logs/` is append-only — each session adds
 timestamp-prefixed files.
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | `wordpress-migration` |
-| Execution folder | `executions/wordpress-migration/` or `executions/wordpress-migration-<suffix>/` |
+| Skill | `wordpress-migration` |
+| Run folder | `runs/wordpress-migration/` or `runs/wordpress-migration-<suffix>/` |
 | Client | <client> |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
@@ -31,4 +31,4 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 ## Close-out
 - [ ] Runbook complete (all steps done or blocked+explained)
 - [ ] Findings appended to `notes.md` (cumulative history — do not overwrite)
-- [ ] Promotion candidates proposed to operator (→ playbook `notes/`)
+- [ ] Promotion candidates proposed to operator (→ skill `references/`)
