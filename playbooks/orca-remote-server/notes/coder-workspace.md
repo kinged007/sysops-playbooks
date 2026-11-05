@@ -133,3 +133,25 @@ your shell first (kill by pid, or start fresh when nothing runs).
    (Orca + CLIs + docker wants real RAM/CPU).
 6. Mobile-link minting from the workspace (`--mobile-pairing` restart;
    verify desktop grant survives).
+
+## N10 — `dpkg -i` cannot install an Electron .deb in a headless image
+
+`orca-ide` is an Electron app. Its deb depends on a GUI stack (libnss3, libnspr4,
+libxss1, libxtst6, libnotify4, xdg-utils, libatspi2.0-0, libsecret-1-0, gir1.2-atspi-2.0,
+at-spi2-core, xdotool, xclip, xvfb) plus Electron runtime libs (libasound2t64, libgbm1,
+libatk-bridge2.0-0t64, libcups2t64, libdrm2, libxkbcommon0, libpango-1.0-0, libcairo2,
+libxcomposite1, libxdamage1, libxfixes3, libxrandr2).
+
+A self-heal written as `sudo dpkg -i orca-ide_*.deb` fails in a headless image — `dpkg -i`
+never resolves dependencies. It prints `dependency problems - leaving unconfigured`,
+returns non-zero, and any `|| fallback` then tries to start a binary that was never
+installed. The failure is silent from the outside: the port stops listening, nothing
+crashes.
+
+Use `sudo apt-get install -y ./orca-ide_*.deb` (apt resolves deps). If a previous `dpkg -i`
+already left it half-installed, `apt-get install` refuses with `E: Unmet dependencies` —
+run `sudo apt-get -f install -y` first, then add whatever `<binary> --version` still
+reports missing. Put the stack in the **image**; the self-heal is the last resort.
+
+Symptom chain worth memorising: nothing listening on the serve port → `ECONNRESET` from
+the fronting proxy (N4) → reads like the network, is actually a missing binary.

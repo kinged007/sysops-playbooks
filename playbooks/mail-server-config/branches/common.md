@@ -36,6 +36,11 @@ IP (`ip4:<SERVER_IP>`) or `mx`; ends with `-all` (recommended) or `~all`.
 **Fail/`permerror`:** record syntax, >10 DNS lookups, duplicate `v=spf1`
 records, or a mechanism that isn't `ip4`/`ip6`/`include`/`mx`/`a`/`exists`.
 
+**What it does:** SPF tells receiving mail servers which servers may send mail
+for the domain. Mail that claims to come from the domain but was sent from
+anywhere else fails the check, so the receiving server treats it as forged
+instead of delivering it as genuine.
+
 ### 1.3 DKIM
 
 ```bash
@@ -55,8 +60,16 @@ dig +short TXT _dmarc.<DOMAIN>
 ```
 
 **Pass:** `v=DMARC1; p=quarantine` (minimum) or `p=reject` (recommended after
-stable), `rua=mailto:<POSTMASTER>` present for aggregate reports. Missing
-DMARC is not a delivery blocker but leaves you blind to spoofing.
+stable), `rua=mailto:<POSTMASTER>` present for aggregate reports. Missing DMARC
+does not block delivery, but it also means forged mail using the domain's
+addresses is neither reported nor rejected.
+
+**What it does:** SPF and DMARC help prove that emails claiming to come from
+the domain are authorised. Without them, someone can impersonate the domain's
+mail addresses, much like forging a company's letterhead, and a receiving
+server has no way to tell the forged message from a genuine one. With them,
+receiving servers detect and reject fraudulent mail, and `rua` receives a
+report of every attempt.
 
 ### 1.5 PTR (reverse DNS)
 
