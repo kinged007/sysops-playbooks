@@ -55,28 +55,28 @@ SES needs both DNS propagation *and* its own verifier.
 ## G6 — Cross-variant Cloudflare token: read in place, never copy
 
 `runs/mail-server-config-my-tech-mailserver/secrets/cf-dns-01.ini`
-holds the same `my-tech.uk` zone. Per AGENTS.md §1.4 reuse within a variant
+holds the same `example.com` zone. Per AGENTS.md §1.4 reuse within a variant
 unless explicit cross-variant approval: the SES run records operator-approved
 read-only use of that file (path `runs/mail-server-config-…/secrets/…`),
 never copies the token, and notes the zone id `f2c28…` only partially.
 
 ## G7 — SES is regional; verify in the same region you send from
 
-`my-tech.uk` was verified only in `eu-west-1` (where the token was created).
+`example.com` was verified only in `eu-west-1` (where the token was created).
 Verification in `us-east-1` etc. shows `VerificationAttributes: {}`.
 Always pair `--region eu-west-1` on every `verify-*`, `get-*`, and `send-email`
 call, and store the region in `inventory.md` + `~/.aws/config`.
 
 ## G8 — Stale identity cleanup needs `ses:DeleteIdentity`
 
-Deleting `digitalsorcery.io` after it was replaced required `ses:DeleteIdentity`
+Deleting `example.net` after it was replaced required `ses:DeleteIdentity`
 (classic) + `ses:DeleteEmailIdentity` (v2). Without those, `AccessDenied`.
 Delete only *after* the new domain shows
 `VerificationStatus Success` / `SendingEnabled true` / `DkimVerificationStatus Success`.
 
 ## G9 — Domain no longer owned must be removed from inventory
 
-`digitalsorcery.io` stayed in `inventory.md` / `list-identities` as `FAILED`
+`example.net` stayed in `inventory.md` / `list-identities` as `FAILED`
 long after it was unowned. The SES run now removes it from both and records
 the replacement in notes; keep `inventory.md`'s Domain field current.
 
@@ -87,9 +87,9 @@ management. Applications that only *send* should use a different IAM user
 (e.g. `ses-sender`) with only `ses:SendEmail` / `ses:SendRawEmail` scoped to
 the domain resource — never reuse the management keys.
 
-## G11 — Custom MAIL FROM (bounce.my-tech.uk) needs two DNS + one SES call
+## G11 — Custom MAIL FROM (bounce.example.com) needs two DNS + one SES call
 
-SPF alignment strict requires `bounce.my-tech.uk` MX →
+SPF alignment strict requires `bounce.example.com` MX →
 `feedback-smtp.eu-west-1.amazonses.com` + TXT
 `v=spf1 include:amazonses.com -all`, then
 `aws ses set-identity-mail-from-domain --identity <DOMAIN>

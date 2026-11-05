@@ -8,7 +8,7 @@
         "ses:SendEmail",
         "ses:SendRawEmail"
       ],
-      "Resource": "arn:aws:ses:eu-west-1:773112485466:identity/my-tech.uk"
+      "Resource": "arn:aws:ses:eu-west-1:123456789012:identity/example.com"
     }
   ]
 }
