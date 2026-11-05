@@ -37,6 +37,8 @@ def commit_check(repo, rel, content="hello\n"):
     "a.key",
     "b.pem",
     "c.tfvars",
+    "d.tfvars.json",
+    "servers/web.yaml",
     "secrets/x",
 ])
 def test_blocked_paths(repo, rel):
