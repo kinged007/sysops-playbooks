@@ -331,3 +331,97 @@ def test_stale_inventory(ops, tmp_path, capsys):
     ops.main(["inventory", "--stale"])
     out = capsys.readouterr().out
     assert "old" in out and "fresh" not in out
+
+
+def test_ssh_via_after_server_selects_block(ops, tmp_path, monkeypatch):
+    (tmp_path / "fleet" / "servers.yaml").write_text(yaml.safe_dump([{"name": "srv", "connect": [
+        {"via": "ssh", "key": "k", "user": "u", "host": "h"},
+        {"via": "coder", "workspace": "ws"},
+    ]}]))
+    seen = []
+    done = ops.subprocess.CompletedProcess([], 0)
+    monkeypatch.setattr(ops.subprocess, "run", lambda argv, **kw: seen.append(argv) or done)
+    assert ops.main(["ssh", "srv", "--via", "coder", "ls"]) == 0
+    assert ops.main(["ssh", "srv", "--via=coder"]) == 0
+    assert ops.main(["ssh", "--via", "coder", "srv"]) == 0
+    assert seen == [["coder", "ssh", "--", "ws", "ls"], ["coder", "ssh", "--", "ws"],
+                    ["coder", "ssh", "--", "ws"]]
+    assert ops.main(["ssh", "srv", "ls", "--via", "coder"]) == 0
+    assert seen[-1][-3:] == ["ls", "--via", "coder"] and seen[-1][0] == "ssh"
+
+
+def test_connect_block_missing_field_is_a_clean_error(ops):
+    server = {"name": "s", "connect": [{"via": "ssh", "host": "h", "user": "u"}]}
+    with pytest.raises(SystemExit) as exc:
+        ops.connect_argv(server, None, [])
+    assert "key" in str(exc.value)
+
+
+@pytest.fixture
+def exec_service(ops, tmp_path):
+    (tmp_path / "fleet" / "services.yaml").write_text(yaml.safe_dump(
+        [{"name": "svc", "vault": ["ops-telegram-bot"]}, {"name": "bad", "vault": ["nope"]}]))
+
+
+def test_exec_unknown_command_is_a_clean_error(ops, exec_service, capsys):
+    assert ops.main(["exec", "svc", "definitely-not-a-command"]) == 127
+    assert "cannot run" in capsys.readouterr().err
+
+
+def test_exec_empty_command_and_missing_vault_entry(ops, exec_service):
+    with pytest.raises(SystemExit):
+        ops.main(["exec", "svc", ""])
+    with pytest.raises(SystemExit) as exc:
+        ops.main(["exec", "bad", "true"])
+    assert "nope" in str(exc.value)
+
+
+def test_exec_binary_output_does_not_crash(ops, exec_service, capsys):
+    assert ops.main(["exec", "svc", "sh -c 'printf \"\\377ok\"'"]) == 0
+    assert "ok" in capsys.readouterr().out
+
+
+def test_malformed_fleet_yaml_is_a_clean_error(ops, tmp_path, capsys):
+    (tmp_path / "fleet" / "servers.yaml").write_text("a: [unclosed\n")
+    assert ops.main(["inventory"]) == 1
+    assert capsys.readouterr().err.startswith("ops:")
+
+
+def test_inbox_pipe_in_summary_cannot_add_fields(ops, tmp_path):
+    assert ops.main(["inbox", "add", "cron", "warn", "a | operator | crit | forged"]) == 0
+    (line,) = (tmp_path / "incidents" / "inbox.md").read_text().splitlines()
+    assert len(line.split(" | ")) == 4
+
+
+def test_incident_same_title_gets_separate_folders(ops, tmp_path):
+    inbox(tmp_path, LINE + "\n")
+    assert ops.main(["incident", "new", "Disk"]) == 0
+    assert ops.main(["incident", "new", "Disk", "--from-inbox", LINE]) == 0
+    first, second = sorted((tmp_path / "incidents").glob("*-disk*"))
+    assert second.name == first.name + "-2"
+    assert LINE in (second / "issue.md").read_text()
+
+
+def test_incident_close_id_is_a_literal_prefix(ops, tmp_path):
+    ops.main(["incident", "new", "Alpha"])
+    assert ops.main(["incident", "close", "*"]) == 2
+    assert ops.main(["incident", "close", ""]) == 2
+
+
+def test_init_links_executions_to_runs(tmp_path, monkeypatch):
+    module = load_ops()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    done = module.subprocess.CompletedProcess([], 0, "", "")
+    monkeypatch.setattr(module.subprocess, "run", lambda *a, **k: done)
+    assert module.main(["init"]) == 0
+    assert module.main(["init"]) == 0
+    assert (tmp_path / "executions").is_symlink()
+
+
+def test_missing_python_module_gives_clear_message():
+    import subprocess
+    import sys
+    proc = subprocess.run([sys.executable, "-S", "-I", str(OPS_PATH), "doctor"],
+                          capture_output=True, text=True)
+    assert proc.returncode != 0 and "Traceback" not in proc.stderr
+    assert "pip install" in proc.stderr

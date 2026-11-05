@@ -14,8 +14,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-import requests
-import yaml
+try:
+    import requests
+    import yaml
+except ImportError as exc:
+    sys.exit(f"ops: missing Python module '{exc.name}'; install with: pip install pyyaml requests")
 
 ROOT = Path(__file__).resolve().parent.parent
 FLEET_FILES = ["servers", "sites", "services", "providers", "notify"]
@@ -188,6 +191,8 @@ def cmd_init(args) -> int:
         inbox.touch()
     (ROOT / "logs" / "audit").mkdir(parents=True, exist_ok=True)
     (ROOT / "runs").mkdir(exist_ok=True)
+    if not os.path.lexists(ROOT / "executions"):
+        (ROOT / "executions").symlink_to("runs")
     hooks = subprocess.run(["git", "config", HOOKS_PATH_KEY, ".githooks"], cwd=ROOT,
                            capture_output=True, text=True)
     if hooks.returncode != 0:
@@ -240,7 +245,12 @@ def connect_argv(server: dict, via: str | None, extra: list[str]) -> tuple[str, 
     block = next((b for b in blocks if via is None or b.get("via") == via), None)
     if block is None:
         raise SystemExit(f"ops: server '{server['name']}' has no connect block for via={via}")
-    kind = block["via"]
+    kind = block.get("via")
+    required = {"ssh": ("host", "user", "key"), "coder": ("workspace",),
+                "docker-context": ("context",)}
+    missing = [f for f in required.get(kind, ()) if not block.get(f)]
+    if missing:
+        raise SystemExit(f"ops: server '{server['name']}': {kind} block lacks {', '.join(missing)}")
     for field in ("host", "user", "workspace", "context"):
         if str(block.get(field, "")).startswith("-"):
             raise SystemExit(f"ops: server '{server['name']}': invalid {field} value")
@@ -266,8 +276,19 @@ def cmd_exec(args) -> int:
     service = find_record("services", args.service)
     env = dict(os.environ)
     for entry in service.get("vault") or []:
+        if not (ROOT / "vault" / f"{entry}.env").exists():
+            raise SystemExit(f"ops: no vault entry '{entry}'")
         env.update(parse_env_file(ROOT / "vault" / f"{entry}.env"))
-    proc = subprocess.run(shlex.split(args.cmd), cwd=ROOT, env=env, capture_output=True, text=True)
+    argv = shlex.split(args.cmd)
+    if not argv:
+        raise SystemExit("ops: empty command")
+    try:
+        proc = subprocess.run(argv, cwd=ROOT, env=env, capture_output=True, text=True,
+                              errors="replace")
+    except OSError as exc:
+        audit("exec", target=args.service, cmd=args.cmd, result="fail")
+        print(f"ops: cannot run '{argv[0]}': {exc.strerror}", file=sys.stderr)
+        return 127
     sys.stdout.write(redact(proc.stdout))
     sys.stderr.write(redact(proc.stderr))
     audit("exec", target=args.service, cmd=args.cmd,
@@ -285,7 +306,7 @@ def format_inbox_line(source: str, severity: str, summary: str, sources: list[st
         raise ValueError(f"source must be one of {', '.join(sources)}")
     if severity not in SEVERITIES:
         raise ValueError(f"severity must be one of {', '.join(SEVERITIES)}")
-    summary = CONTROL.sub(" ", summary).strip()[:200]
+    summary = CONTROL.sub(" ", summary.replace("|", "/")).strip()[:200]
     if not summary:
         raise ValueError("summary is empty")
     return f"{now().isoformat()} | {source} | {severity} | {summary}"
@@ -400,8 +421,13 @@ def cmd_incident_new(args) -> int:
         source_line = matches[0]
         lines.remove(source_line)
         inbox.write_text("".join(ln + "\n" for ln in lines))
-    folder = ROOT / "incidents" / f"{now():%Y-%m-%d}-{slugify(args.title)}"
-    folder.mkdir(parents=True, exist_ok=True)
+    base = f"{now():%Y-%m-%d}-{slugify(args.title)}"
+    folder = ROOT / "incidents" / base
+    n = 1
+    while folder.exists():
+        n += 1
+        folder = ROOT / "incidents" / f"{base}-{n}"
+    folder.mkdir(parents=True)
     templates = {
         "issue.md": f"# {args.title}\n\nSource: {source_line or 'operator'}\n\n"
                     "## Symptom\n\n## Independent verification\n",
@@ -411,15 +437,15 @@ def cmd_incident_new(args) -> int:
                          "What check would have caught this, and does it now run fleet-wide?\n",
     }
     for name, content in templates.items():
-        if not (folder / name).exists():
-            (folder / name).write_text(content)
+        (folder / name).write_text(content)
     audit("incident new", target=folder.name, ref=source_line)
     print(folder.name)
     return 0
 
 
 def cmd_incident_close(args) -> int:
-    found = [p for p in (ROOT / "incidents").glob(f"{args.id}*") if p.is_dir()]
+    found = [p for p in (ROOT / "incidents").iterdir()
+             if p.is_dir() and args.id and p.name.startswith(args.id)]
     if len(found) != 1:
         print(f"ops: expected one incident matching '{args.id}', found {len(found)}",
               file=sys.stderr)
@@ -535,8 +561,18 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def hoist_via(argv: list[str]) -> list[str]:
+    """argparse.REMAINDER would pass `--via X` after the server name to the remote command."""
+    if len(argv) > 2 and argv[0] == "ssh" and not argv[1].startswith("-"):
+        if argv[2] == "--via" and len(argv) > 3:
+            return ["ssh", *argv[2:4], argv[1], *argv[4:]]
+        if argv[2].startswith("--via="):
+            return ["ssh", argv[2], argv[1], *argv[3:]]
+    return argv
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    args = build_parser().parse_args(hoist_via(sys.argv[1:] if argv is None else argv))
     if args.command not in ("init", "doctor"):
         problems = perm_problems()
         if problems:
@@ -546,7 +582,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
     try:
         return args.func(args)
-    except ValueError as exc:
+    except (ValueError, OSError, yaml.YAMLError) as exc:
         print(f"ops: {exc}", file=sys.stderr)
         return 1
 
