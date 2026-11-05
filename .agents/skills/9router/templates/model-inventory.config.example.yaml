@@ -136,14 +136,14 @@ endpoints:
   ollama_cloud: "https://ollama.com/api/tags"
   ollama_cloud_fallback: "https://api.ollama.ai/v1/models"
   openrouter: "https://openrouter.ai/api/v1/models"
-  # CommandCode upstream. Never router.munyard.biz (the router is where collected
+  # CommandCode upstream. Never router.example.org (the router is where collected
   # models get stored, not a collection source).
   command_code: "https://api.commandcode.ai/provider/v1/models"
 
 # Per-provider toggles and options
 # command_code IS an inventory source (upstream CommandCode provider). The script
 # copies raw ids verbatim and never adds prefixes itself (see fetch_command_code).
-# router.munyard.biz must NEVER appear as endpoints.command_code.
+# router.example.org must NEVER appear as endpoints.command_code.
 providers:
   enabled:
     - "google"

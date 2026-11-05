@@ -11,7 +11,7 @@ problem: run this on any host (including remote servers) to refresh
 opencode/hermes/codex/claude configs from the live gateway.
 
 Usage:
-  NINEROUTER_URL=http://development-9router-fe01c0-62-171-191-174.sslip.io \
+  NINEROUTER_URL=http://dev-9router.example.com \
   NINEROUTER_KEY=sk-... python .agents/skills/9router/scripts/generate-configs.py
 
   python .agents/skills/9router/scripts/generate-configs.py --url http://host --key sk-... --out runs/9router/generated --active-model free

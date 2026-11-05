@@ -1212,12 +1212,12 @@ def fetch_openrouter(cfg: Dict[str, Any], timeout: int = 20) -> List[Dict[str, A
 
 
 def fetch_command_code(cfg: Dict[str, Any], timeout: int = 20) -> List[Dict[str, Any]]:
-    # CommandCode is an upstream provider, NOT router.munyard.biz (the router is
+    # CommandCode is an upstream provider, NOT router.example.org (the router is
     # where collected models get stored, never a collection source). No default
     # URL on purpose: operator must set endpoints.command_code explicitly.
     endpoint = (cfg.get("endpoints", {}) or {}).get("command_code") or ""
     if not endpoint:
-        print("  command_code: SKIP — endpoints.command_code not set (refusing to fall back to router.munyard.biz)")
+        print("  command_code: SKIP — endpoints.command_code not set (refusing to fall back to router.example.org)")
         return []
     keys = cfg.get("api_keys", {}) or {}
     # CommandCode keys only — never fall back to router (NINEROUTER/9ROUTER) keys.

@@ -121,7 +121,7 @@ cli:
 
 # 9Router connection (per-variant; env expansion supported)
 ninerouter:
-  url: "${NINEROUTER_URL}"               # or literal https://router.munyard.biz
+  url: "${NINEROUTER_URL}"               # or literal https://router.example.org
   api_key_file: "secrets/9router-api-key.txt"  # for /v1/models
   dashboard_password_file: "secrets/dashboard-password.txt"  # for /api/* JWT
   # Alternatively set NINEROUTER_URL / NINEROUTER_KEY env directly

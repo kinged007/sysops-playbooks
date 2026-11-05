@@ -28,7 +28,7 @@
 # Environment for cron (user crontab needs these):
 # REPO_ROOT=/home/coder/sysops-playbooks
 # PYTHON_BIN=/home/coder/sysops-playbooks/.venv/bin/python
-# NINEROUTER_URL=https://router.munyard.biz
+# NINEROUTER_URL=https://router.example.org
 # AA_API_KEY=...  (optional, for Artificial Analysis intelligence scores)
 # GOOGLE_API_KEY=...
 # OPENCODE_ZEN_API_KEY=...
