@@ -27,6 +27,7 @@ servers/
 !.env.example
 
 # Local agent state and scratch
+.tools/
 .opencode/
 generated/
 *.local

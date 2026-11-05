@@ -276,7 +276,10 @@ ops secret check         # vault permissions, leak patterns, placeholders
 ```
 
 `.githooks/pre-commit` blocks staged private paths and secret patterns, and runs
-`gitleaks` and `trufflehog` when installed. Never bypass it (`--no-verify`,
+`gitleaks` and `trufflehog` on staged content. Both scanners are required and pinned
+(gitleaks 8.18.4, trufflehog 3.82.13, matching `.pre-commit-config.yaml` and CI).
+`ops init` and `ops tools install` download them into `.tools/bin/` after a sha256
+check; the hook blocks commits while either is missing, and `ops doctor` reports it. Never bypass it (`--no-verify`,
 changing `core.hooksPath`); the Claude guard hook blocks both. Any hit is an
 incident: unstage, move the file out of the repo, rotate the credential if it was
 ever committed.

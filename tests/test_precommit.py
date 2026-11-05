@@ -14,7 +14,21 @@ def repo(tmp_path):
 
     git("init", "-q")
     shutil.copy(HOOK, tmp_path / "hook")
+    for tool in ("gitleaks", "trufflehog"):
+        stub(tmp_path, tool)
     return tmp_path
+
+
+def stub(repo, tool, exit_code=0):
+    path = repo / ".tools" / "bin" / tool
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"#!/bin/sh\nexit {exit_code}\n")
+    path.chmod(0o755)
+
+
+def run_hook(repo, env=None):
+    return subprocess.run(["bash", str(repo / "hook")], cwd=repo, capture_output=True,
+                          text=True, env=env)
 
 
 def commit_check(repo, rel, content="hello\n"):
@@ -22,8 +36,7 @@ def commit_check(repo, rel, content="hello\n"):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
     subprocess.run(["git", "add", "-f", "--", rel], cwd=repo, check=True)
-    return subprocess.run(["bash", str(repo / "hook")], cwd=repo, capture_output=True,
-                          text=True).returncode
+    return run_hook(repo).returncode
 
 
 @pytest.mark.parametrize("rel", [
@@ -64,3 +77,20 @@ def test_secret_content_blocked(repo, content):
 
 def test_clean_file_allowed(repo):
     assert commit_check(repo, "notes.txt", "nothing here\n") == 0
+
+
+@pytest.mark.parametrize("tool", ["gitleaks", "trufflehog"])
+def test_missing_scanner_blocks(repo, tool):
+    (repo / ".tools" / "bin" / tool).unlink()
+    (repo / "notes.txt").write_text("nothing here\n")
+    subprocess.run(["git", "add", "notes.txt"], cwd=repo, check=True)
+    env = {"PATH": "/usr/bin:/bin"}
+    result = run_hook(repo, env)
+    assert result.returncode == 1
+    assert "ops tools install" in result.stderr
+
+
+@pytest.mark.parametrize("tool", ["gitleaks", "trufflehog"])
+def test_scanner_finding_blocks(repo, tool):
+    stub(repo, tool, exit_code=1)
+    assert commit_check(repo, "notes.txt", "nothing here\n") == 1

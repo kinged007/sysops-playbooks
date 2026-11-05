@@ -1,6 +1,8 @@
 #!/bin/bash
 # Safety net: dependency-free scan of staged changes. Always runs.
 fail=0
+root=$(git rev-parse --show-toplevel)
+PATH="$root/.tools/bin:$PATH"
 
 while IFS= read -r -d '' f; do
   case "$f" in
@@ -30,12 +32,20 @@ if [ "$fail" -ne 0 ]; then
   exit 1
 fi
 
-if command -v gitleaks >/dev/null 2>&1; then
-  gitleaks protect --staged --config .gitleaks.toml --redact || exit 1
-else
-  echo "pre-commit: gitleaks not installed, skipped (https://github.com/gitleaks/gitleaks#installing)" >&2
-fi
-if ! command -v trufflehog >/dev/null 2>&1; then
-  echo "pre-commit: trufflehog not installed, skipped (https://github.com/trufflesecurity/trufflehog#installation)" >&2
-fi
+for tool in gitleaks trufflehog; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "pre-commit: $tool not found; run \`ops tools install\`" >&2
+    exit 1
+  fi
+done
+
+gitleaks protect --staged --config .gitleaks.toml --redact || exit 1
+
+scan_dir=$(mktemp -d)
+trap 'rm -rf "$scan_dir"' EXIT
+git checkout-index -a --prefix="$scan_dir/"
+trufflehog filesystem "$scan_dir" --no-update --fail --no-verification >/dev/null || {
+  echo "pre-commit: trufflehog found a secret in staged content" >&2
+  exit 1
+}
 exit 0

@@ -5,6 +5,7 @@ import fcntl
 import hashlib
 import json
 import os
+import platform
 import re
 import shlex
 import shutil
@@ -12,7 +13,11 @@ import signal
 import stat
 import subprocess
 import sys
+import tarfile
+import tempfile
+import urllib.request
 from pathlib import Path
+from typing import Any
 
 try:
     import requests
@@ -32,6 +37,31 @@ LEAK = re.compile(
 PLACEHOLDER = re.compile(r"^(<.*>|CHANGE_?ME|TODO|)$", re.I)
 HOOKS_PATH_KEY = "core.hooksPath"
 MIN_SECRET_LINE = 6
+# Versions must match .pre-commit-config.yaml and .github/workflows/ci.yml.
+TOOLS: dict[str, dict[str, Any]] = {
+    "gitleaks": {
+        "version": "8.18.4",
+        "url": "https://github.com/gitleaks/gitleaks/releases/download/v{v}/gitleaks_{v}_{os}_{arch}.tar.gz",
+        "arch": {"amd64": "x64", "arm64": "arm64"},
+        "sha256": {
+            ("linux", "amd64"): "ba6dbb656933921c775ee5a2d1c13a91046e7952e9d919f9bac4cec61d628e7d",
+            ("linux", "arm64"): "bf5f7f466ebfade1296c8bd32cf7d3f592c2aa78836aa9980ffbe2cadca7a861",
+            ("darwin", "amd64"): "1a69e5666b13cd374889cbcb1939ed1573b63b551251283d5d2329a53cf58e2f",
+            ("darwin", "arm64"): "a480d8593acd8215b22402cf0f3f88b01dcd3610c63b5391db640f7767e62104",
+        },
+    },
+    "trufflehog": {
+        "version": "3.82.13",
+        "url": "https://github.com/trufflesecurity/trufflehog/releases/download/v{v}/trufflehog_{v}_{os}_{arch}.tar.gz",
+        "arch": {"amd64": "amd64", "arm64": "arm64"},
+        "sha256": {
+            ("linux", "amd64"): "ef33d3df50362e810855b6b0e055ab98096dbbf9c866470e08664a474436d2d2",
+            ("linux", "arm64"): "4acb4d9411be16e389293067d87452b3ad6ea35df3f1ecfe57bc83428931eb1d",
+            ("darwin", "amd64"): "b8452364f713d3d4c2cde1b073af2dd0b0418ecaaa9c3b06971dc47b31086659",
+            ("darwin", "arm64"): "4f8b7340fa32df625ca928ee56069c4db827e139cbce71ee2522bc6786a7183c",
+        },
+    },
+}
 
 DEFAULTS: dict[str, dict] = {
     "wake": {
@@ -166,6 +196,82 @@ def pending_hash(lines: list[str]) -> str:
     return hashlib.sha256("\n".join(lines).encode()).hexdigest()
 
 
+def tools_bin() -> Path:
+    return ROOT / ".tools" / "bin"
+
+
+def host_platform() -> tuple[str, str]:
+    arch = {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}
+    return sys.platform.removesuffix("2"), arch.get(platform.machine().lower(), platform.machine())
+
+
+def tool_installed(name: str) -> bool:
+    binary = tools_bin() / name
+    if not binary.is_file():
+        return False
+    try:
+        out = subprocess.run([str(binary), "--version" if name == "trufflehog" else "version"],
+                             capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return out.returncode == 0 and TOOLS[name]["version"] in out.stdout + out.stderr
+
+
+def download(url: str, dest: Path) -> None:
+    with urllib.request.urlopen(url, timeout=120) as resp, dest.open("wb") as fh:
+        shutil.copyfileobj(resp, fh)
+
+
+def install_tool(name: str, system: str, arch: str) -> None:
+    spec = TOOLS[name]
+    expected = spec["sha256"].get((system, arch))
+    if expected is None:
+        raise RuntimeError(f"{name}: no pinned release for {system}/{arch}")
+    url = spec["url"].format(v=spec["version"], os=system, arch=spec["arch"][arch])
+    tools_bin().mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=tools_bin().parent) as tmp:
+        archive = Path(tmp) / "archive.tar.gz"
+        download(url, archive)
+        actual = hashlib.sha256(archive.read_bytes()).hexdigest()
+        if actual != expected:
+            archive.unlink()
+            raise RuntimeError(f"{name}: sha256 mismatch for {url}")
+        with tarfile.open(archive) as tar:
+            member = tar.getmember(name)
+            if not member.isfile():
+                raise RuntimeError(f"{name}: unexpected archive content")
+            src = tar.extractfile(member)
+            assert src is not None
+            staged = Path(tmp) / name
+            with staged.open("wb") as out:
+                shutil.copyfileobj(src, out)
+        staged.chmod(0o755)
+        staged.replace(tools_bin() / name)
+
+
+def install_tools() -> int:
+    system, arch = host_platform()
+    failed = 0
+    for name in TOOLS:
+        if tool_installed(name):
+            print(f"{name} {TOOLS[name]['version']} already installed")
+            continue
+        try:
+            install_tool(name, system, arch)
+        except Exception as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            failed = 1
+            continue
+        print(f"installed {name} {TOOLS[name]['version']} to {tools_bin().relative_to(ROOT)}")
+    return failed
+
+
+def cmd_tools_install(args) -> int:
+    code = install_tools()
+    audit("tools install", result="ok" if code == 0 else "fail")
+    return code
+
+
 def cmd_init(args) -> int:
     (ROOT / "fleet").mkdir(exist_ok=True)
     for name in FLEET_FILES:
@@ -199,6 +305,9 @@ def cmd_init(args) -> int:
                            capture_output=True, text=True)
     if hooks.returncode != 0:
         print(f"warning: could not set git hooks path: {hooks.stderr.strip()}")
+    if install_tools() != 0:
+        print("warning: scanner install failed; the pre-commit hook blocks commits "
+              "until `ops tools install` succeeds")
     for problem in perm_problems():
         print(f"warning: {problem}")
     audit("init")
@@ -799,6 +908,8 @@ def cmd_doctor(args) -> int:
         problems.append("git hooks: hooks path is not .githooks (run ops init)")
     elif not (ROOT / ".githooks" / "pre-commit").exists():
         problems.append("git hooks: .githooks/pre-commit missing")
+    problems += [f"tools: {n} missing from .tools/bin (run ops tools install)"
+                 for n in TOOLS if not (tools_bin() / n).is_file()]
     for problem in problems:
         print(problem)
     print("ok" if not problems else f"{len(problems)} problem(s)")
@@ -877,6 +988,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = sec.add_parser("fingerprint")
     p.add_argument("name")
     p.set_defaults(func=cmd_secret_fingerprint)
+    tools = sub.add_parser("tools").add_subparsers(dest="sub", required=True)
+    tools.add_parser("install").set_defaults(func=cmd_tools_install)
     sub.add_parser("doctor").set_defaults(func=cmd_doctor)
     return parser
 

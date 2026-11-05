@@ -130,7 +130,10 @@ ruff check .
 mypy .
 ```
 
-CI also runs `gitleaks` and `trufflehog`. Skill helper scripts under `.agents/`
+CI also runs `gitleaks` and `trufflehog`. The pre-commit hook requires both. They
+are pinned (gitleaks 8.18.4, trufflehog 3.82.13), installed by `ops init` or
+`ops tools install` into `.tools/bin/` (gitignored) after a sha256 check, and the
+hook blocks commits while either is missing. Skill helper scripts under `.agents/`
 are excluded from the lint and type gates. See `pyproject.toml`.
 
 ## License

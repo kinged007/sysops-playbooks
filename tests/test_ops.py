@@ -28,6 +28,7 @@ def load_ops():
 def ops(tmp_path, monkeypatch):
     module = load_ops()
     monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "install_tools", lambda: 0)
     (tmp_path / "incidents").mkdir()
     (tmp_path / "fleet").mkdir()
     vault = tmp_path / "vault"
@@ -457,6 +458,9 @@ def doctor_ready(ops, tmp_path, monkeypatch):
         (tmp_path / "fleet" / f"{name}.yaml").write_text("[]\n")
     (tmp_path / ".githooks").mkdir()
     (tmp_path / ".githooks" / "pre-commit").write_text("")
+    (tmp_path / ".tools" / "bin").mkdir(parents=True)
+    for name in ops.TOOLS:
+        (tmp_path / ".tools" / "bin" / name).write_text("")
     monkeypatch.setattr(ops.subprocess, "run", lambda *a, **k: ops.subprocess.CompletedProcess(
         a, 0, stdout=".githooks\n", stderr=""))
     (tmp_path / "vault" / "ops-telegram-bot.env").unlink()
@@ -700,3 +704,69 @@ def test_log_from_hook_records_bash_and_never_fails(ops, tmp_path, monkeypatch, 
     assert [(e["actor"], e["action"], e["result"], e["ref"]) for e in lines] == [
         ("claude", "bash", "ok", "s1"), ("claude", "bash", "fail", "s1")]
     assert SECRET not in json.dumps(lines)
+
+
+@pytest.fixture
+def tools_ops(tmp_path, monkeypatch):
+    module = load_ops()
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    return module
+
+
+def fake_tool_archive(tmp_path, name, content=b"#!/bin/sh\necho 1.0\n"):
+    import tarfile
+    src = tmp_path / name
+    src.write_bytes(content)
+    archive = tmp_path / f"{name}.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        tar.add(src, arcname=name)
+    return archive
+
+
+def test_tools_install_checksum_mismatch(tools_ops, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(tools_ops, "host_platform", lambda: ("linux", "amd64"))
+    archive = fake_tool_archive(tmp_path, "gitleaks")
+    monkeypatch.setattr(tools_ops, "download", lambda _, d: d.write_bytes(archive.read_bytes()))
+    assert tools_ops.install_tools() == 1
+    assert "sha256 mismatch" in capsys.readouterr().err
+    assert not (tmp_path / ".tools" / "bin" / "gitleaks").exists()
+
+
+def test_tools_install_extracts_binary(tools_ops, tmp_path, monkeypatch):
+    import hashlib
+    monkeypatch.setattr(tools_ops, "host_platform", lambda: ("linux", "amd64"))
+    archive = fake_tool_archive(tmp_path, "gitleaks")
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    monkeypatch.setitem(tools_ops.TOOLS["gitleaks"]["sha256"], ("linux", "amd64"), digest)
+    monkeypatch.setattr(tools_ops, "download", lambda _, d: d.write_bytes(archive.read_bytes()))
+    tools_ops.install_tool("gitleaks", "linux", "amd64")
+    binary = tmp_path / ".tools" / "bin" / "gitleaks"
+    assert binary.read_bytes() == b"#!/bin/sh\necho 1.0\n"
+    assert binary.stat().st_mode & 0o777 == 0o755
+
+
+def test_tools_install_skips_installed(tools_ops, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(tools_ops, "tool_installed", lambda name: True)
+
+    def no_download(*args):
+        raise AssertionError("network used")
+
+    monkeypatch.setattr(tools_ops, "download", no_download)
+    assert tools_ops.install_tools() == 0
+    assert "already installed" in capsys.readouterr().out
+
+
+def test_tool_installed_checks_version(tools_ops, tmp_path, monkeypatch):
+    binary = tmp_path / ".tools" / "bin" / "gitleaks"
+    binary.parent.mkdir(parents=True)
+    binary.write_text("#!/bin/sh\necho 8.18.4\n")
+    binary.chmod(0o755)
+    assert tools_ops.tool_installed("gitleaks")
+    binary.write_text("#!/bin/sh\necho 8.0.0\n")
+    assert not tools_ops.tool_installed("gitleaks")
+
+
+def test_doctor_flags_missing_tools(ops, doctor_ready, capsys):
+    (doctor_ready / ".tools" / "bin" / "gitleaks").unlink()
+    assert ops.main(["doctor"]) == 1
+    assert "gitleaks missing from .tools/bin" in capsys.readouterr().out
