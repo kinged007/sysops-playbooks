@@ -895,7 +895,15 @@ def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv == ["log", "--from-hook"]:
         return log_from_hook()
-    args = build_parser().parse_args(hoist_via(argv))
+    parser = build_parser()
+    args, extra = parser.parse_known_args(hoist_via(argv))
+    if extra:
+        # Python 3.11 argparse does not match an optional positional after options.
+        is_insert = getattr(args, "func", None) is cmd_secret_insert
+        if is_insert and args.target is None and len(extra) == 1:
+            args.target = extra[0]
+        else:
+            parser.error(f"unrecognized arguments: {' '.join(extra)}")
     if args.command not in ("init", "doctor"):
         problems = perm_problems()
         if problems:
