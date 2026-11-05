@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | Client | <client> |
-| Playbook | `sql-explorer` |
-| Execution folder | `executions/sql-explorer-<suffix>/` (suffix identifies the database, e.g. `acme`) |
+| Skill | `sql-explorer` |
+| Run folder | `runs/sql-explorer-<suffix>/` (suffix identifies the database, e.g. `acme`) |
 | Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
 | Status | draft → approved → executing → closed |
 
@@ -13,9 +13,9 @@
 |---|---|
 | Suffix | <suffix> |
 | DB_TYPE | <postgres \| mysql \| sqlite> |
-| Secrets | `secrets/db.env` (copied from playbook `templates/db.env.example`, filled by operator) |
+| Vault entry | `<client>-<db>-db-env` (DB_* values, built from skill `templates/db.env.example`; filled by operator) |
 
-Secrets persist in this folder across invocations — update in place when rotating.
+The vault entry persists across invocations — rotate it in place.
 
 ## Question / goal
 <What the operator wants to know or export>

@@ -1,17 +1,17 @@
 # Runbook: <RUN NAME>
 
-Snapshot of `playbooks/sql-explorer/playbook.md` being executed, with real values
+Snapshot of `.agents/skills/sql-explorer/SKILL.md` procedure being executed, with real values
 filled in. State lives here and in `logs/` — any agent session can resume from
 these files alone. This folder is persistent per database
-(`executions/sql-explorer-<suffix>/`); subsequent invocations append to it,
+(`runs/sql-explorer-<suffix>/`); subsequent invocations append to it,
 never replace it. `logs/` is append-only — each session adds timestamp-prefixed
 files (e.g. `logs/2026-08-29T143000-01-discover.log`).
 
 | Field | Value |
 |---|---|
 | Run | <run name> |
-| Playbook | `sql-explorer` |
-| Execution folder | `executions/sql-explorer-<suffix>/` |
+| Skill | `sql-explorer` |
+| Run folder | `runs/sql-explorer-<suffix>/` |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
 
@@ -34,4 +34,4 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 ## Close-out
 - [ ] Runbook complete (all steps done or blocked+explained)
 - [ ] Findings appended to `notes.md` (cumulative history — do not overwrite)
-- [ ] Promotion candidates proposed to operator (→ playbook `notes/`)
+- [ ] Promotion candidates proposed to operator (→ skill `references/`)
