@@ -1,6 +1,6 @@
 # Spec: sysops-v2 restructure — fleet-first admin workspace
 
-Status: draft for review (branch `sysops-v2`, not implemented)
+Status: implemented on branch `sysops-v2`
 Date: 2026-11-05
 
 ## 1. Goal
@@ -452,7 +452,7 @@ is the manual escape hatch.
 6. Update README (public/private map, cron example for `ops wake`),
    close-out review PR.
 
-## 16. Open decisions for reviewer
+## 16. Decisions
 
-1. Rename `executions/` → `runs/` now, or keep the name? (Keep = zero
-   churn; rename = clearer lane split with `incidents/`.)
+1. `executions/` is renamed to `runs/`, which gives a clear lane split with
+   `incidents/`. An `executions` symlink to `runs/` stays for compatibility.
