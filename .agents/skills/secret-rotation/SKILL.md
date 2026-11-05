@@ -134,7 +134,7 @@ For each `github:` entry:
 - [ ] Find why the file was served (web root includes the project root, missing `deny`, bad static mount).
 - [ ] **WRITE**: fix it in the app repository through a pull request. Never push to the default branch.
 - [ ] After merge, redeploy through the site's normal deploy path.
-- [ ] Verify the original symptom: the URL no longer returns the file without the block rule in place for the check (or with the rule confirmed independent), and the provider shows no further abuse.
+- [ ] Verify the original symptom after the redeploy: fetch the exposed URL and expect 403 or 404 from the app itself (check with the block rule from step 6 disabled for the test, or against the origin directly). Check that the provider shows no further abuse.
 
 ### 8. Convert into a fleet-wide check
 
@@ -144,7 +144,18 @@ For each `github:` entry:
 
 ### 9. Report and close
 
-- [ ] Send the report through the notify target: what leaked, when, what was rotated, what was blocked, follow-ups.
+- [ ] Write the report to a local file outside the repo's tracked paths (for example `incidents/<id>/report.txt`): what leaked, when, what was rotated, what was blocked, follow-ups. No secret values.
+- [ ] Look up the notify record in `fleet/notify.yaml` (default `operator`): `provider`, `chat_id`, and `token` (a vault entry name). Read the token from `vault/<token>.env` inside a subshell and pass it to `curl` through stdin config, so it appears in no command line, no `set -x` trace, and no output. Telegram example:
+
+  ```sh
+  (. vault/ops-telegram-bot.env
+   printf 'url = "https://api.telegram.org/bot%s/sendMessage"\n' "$TELEGRAM_BOT_TOKEN" |
+   curl -s -o /dev/null -w '%{http_code}\n' -K - \
+     --data-urlencode "chat_id=-1000000000000" \
+     --data-urlencode "text@incidents/<id>/report.txt")
+  ```
+
+  Use the variable name defined in the env file. Other providers: call their send API the same way. Expect HTTP 200; on any other status, say so in `resolution.md` and tell the operator in the session.
 - [ ] Write `resolution.md`, then `ops incident close <id>`.
 
 ## Rollback
