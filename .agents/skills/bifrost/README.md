@@ -1,7 +1,7 @@
-# Playbook: Bifrost AI Gateway
+# Skill: Bifrost AI Gateway
 
-> **Agent: read `notes/` BEFORE any run.** `notes/gotchas.md` holds pitfalls
-> that change how you plan; `notes/sources.md` is the documentation index —
+> **Agent: read references/` BEFORE any run.** references/gotchas.md` holds pitfalls
+> that change how you plan; references/sources.md` is the documentation index —
 > consult it live instead of guessing API shapes. Never skip this.
 
 ## What it does
@@ -77,7 +77,7 @@ in the execution's `inventory.md` and `secrets/`, never here.
 
 | Path | Purpose |
 |---|---|
-| `playbook.md` | Canonical procedure (placeholders only; **WRITE**-flagged) |
+| `SKILL.md` | Canonical procedure (placeholders only; **WRITE**-flagged) |
 | `plan-template.md` | Copied to `executions/bifrost/plan.md` on first run (or `executions/bifrost-<suffix>/plan.md`) |
 | `runbook-template.md` | Copied to `executions/bifrost/runbook.md` on first run |
 | `templates/docker-compose.yml` | Pinned-image compose with `./data:/app/data`, healthcheck |
@@ -85,10 +85,10 @@ in the execution's `inventory.md` and `secrets/`, never here.
 | `templates/nginx-bifrost.conf` | Nginx reverse-proxy vhost (TLS, streaming-safe) |
 | `scripts/health-check.sh` | `/health` + `/v1/models` + chat-completion smoke probe |
 | `scripts/backup.sh` | SQLite `/app/data` backup helper (stop-or-quiesce safe) |
-| `notes/sources.md` | Documentation index — live URLs for every topic |
-| `notes/gotchas.md` | G1–G8 pitfalls — **read before any run** |
+| references/sources.md` | Documentation index — live URLs for every topic |
+| references/gotchas.md` | G1–G8 pitfalls — **read before any run** |
 
-> Execution folders are **persistent per playbook variant**. The first run
+> Execution folders are **persistent per skill variant**. The first run
 > creates `executions/bifrost/` (or `executions/bifrost-<suffix>/` when the
 > operator supplies a suffix like `prod`/`staging`/`personal`). All
 > subsequent invocations for the same variant **reuse and append to the same
