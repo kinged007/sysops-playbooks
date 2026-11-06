@@ -1,0 +1,28 @@
+services:
+  bifrost:
+    image: maximhq/bifrost:<TAG>
+    container_name: bifrost
+    ports:
+      - "<PORT>:8080"
+    volumes:
+      - <HOST_DATA_DIR>:/app/data
+    environment:
+      - APP_PORT=8080
+      - APP_HOST=0.0.0.0
+      - LOG_LEVEL=info
+      - LOG_STYLE=json
+      # Go runtime tuning (uncomment for your workload):
+      # - GOGC=200
+      # - GOMEMLIMIT=3600MiB
+    env_file:
+      - <HOST_ENV_PATH> # 0600 file holding BIFROST_ENCRYPTION_KEY, BIFROST_SETUP_TOKEN, provider keys
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
