@@ -30,4 +30,4 @@ Status values: `pending` / `in-progress` / `done` / `blocked`.
 ## Close-out
 - [ ] Runbook complete (all steps done or blocked+explained)
 - [ ] Findings appended to `notes.md` (cumulative history — do not overwrite)
-- [ ] Promotion candidates proposed to operator (→ playbook `notes/`)
+- [ ] Promotion candidates proposed to operator (→ skill `references/`)

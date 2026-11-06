@@ -1,4 +1,9 @@
-# Playbook: Bifrost AI Gateway — Procedure
+---
+name: bifrost
+description: Deploy, configure, harden, and operate a Bifrost AI gateway (OpenAI-compatible LLM/MCP gateway) on Docker, Dokploy, or Kubernetes. Use for fresh installs, provider and virtual-key setup, domain/TLS, backup/restore, pinned upgrades, source builds, and health checks. Not for creating upstream provider accounts or Enterprise SSO/guardrail design.
+---
+
+# Skill: Bifrost AI Gateway — Procedure
 
 Canonical steps for a run. **Placeholders only** — never real IPs, hostnames,
 usernames, or credentials. Real values go in the execution's `plan.md`,
@@ -14,7 +19,7 @@ timestamp-prefixed files.
 
 > **Docs-first rule:** Bifrost docs move fast and versions matter (snippets
 > differ between v1.4/v1.5/v2.x). Before any config, verify, or API step,
-> consult `notes/sources.md` and fetch the live page (never improvise schema).
+> consult references/sources.md` and fetch the live page (never improvise schema).
 > Pin the Bifrost version in `plan.md` and check changelogs before upgrades:
 > `https://docs.getbifrost.ai/changelogs/`.
 
@@ -22,8 +27,8 @@ timestamp-prefixed files.
 
 ## 0. Pre-flight (mandatory, every run)
 
-- [ ] Read `notes/gotchas.md` (G1–G8 may change how you plan) and
-  `notes/sources.md` (docs index for this run's topics)
+- [ ] Read references/gotchas.md` (G1–G8 may change how you plan) and
+  references/sources.md` (docs index for this run's topics)
 - [ ] Confirm prerequisites (README): SSH alias `<ALIAS>`, tooling for the
   chosen mode, free port `<PORT>` (default `8080`), domain/TLS choice if
   exposed, operator-available secrets
@@ -73,7 +78,7 @@ Ask explicitly; never assume.
   localhost-only?"
 - [ ] ASK: "Config mode — DB-backed Web UI (default, `config.json` seeds DB)
   or file-only GitOps (`config_store.enabled:false`, restart to apply)?"
-  (see `notes/sources.md` → config-json)
+  (see references/sources.md` → config-json)
 - [ ] ASK: "Backing stores — SQLite (default, persist `/app/data`) or
   Postgres v16+ UTF8 (`config_store`/`logs_store`)? Vector store for semantic
   cache (redis/weaviate/qdrant/pinecone)?"
@@ -169,7 +174,7 @@ Ask explicitly; never assume.
     --set bifrost.encryptionKeySecret.key=encryption-key
   ```
   (`image.tag` is required — the chart will not start without it. See
-  `notes/sources.md` → helm values/storage for Postgres, providers,
+  references/sources.md` → helm values/storage for Postgres, providers,
   governance, plugins.)
   - Rollback: `helm uninstall bifrost` (+ delete PVC only with operator
     approval — **destroys data**).
@@ -190,7 +195,7 @@ Ask explicitly; never assume.
 
 All values with secrets use `env.` references (never plaintext keys):
 `"value": "env.OPENAI_API_KEY"` → env var `OPENAI_API_KEY`. See
-`notes/sources.md` → config-json/providers.
+references/sources.md` → config-json/providers.
 
 - [ ] Decide config mode (from section 2) and apply:
   - DB-backed (default): `config.json` seeds the SQLite/Postgres config
@@ -260,7 +265,7 @@ All values with secrets use `env.` references (never plaintext keys):
 
 Enforcement requires `enforce_auth_on_inference: true`. Keys (`sk-bf-*`)
 are accepted via `Authorization: Bearer`, `x-bf-vk`, `x-api-key`,
-`x-goog-api-key`, `api-key`. See `notes/sources.md` → governance.
+`x-goog-api-key`, `api-key`. See references/sources.md` → governance.
 
 - [ ] **Backup**: DB backup (section 9.1) before changing keys/budgets.
 - [ ] **WRITE**: create virtual key (UI or API):
@@ -397,7 +402,7 @@ are accepted via `Authorization: Bearer`, `x-bf-vk`, `x-api-key`,
 - [ ] Leak check: `git status` shows no `executions/`, `secrets/`, `*.pem`,
   `*.key`, `.tfvars`, `.env`; no secret values in plan/runbook/logs.
 - [ ] Findings → execution `notes.md`; propose promotion into playbook
-  `notes/` (operator approves, never mid-run).
+  references/` (operator approves, never mid-run).
 - [ ] Mark runbook steps `done` or `blocked` with a reason; close the run.
 
 ---
