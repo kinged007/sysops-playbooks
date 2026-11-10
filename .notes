@@ -1,0 +1,4 @@
+# Fetch birfost available models
+
+KEY=$(python3 -c "import json;print(json.load(open('/home/coder/.pi/agent/auth.json'))['bifrost']['key'])")
+curl -s -m 20 https://routers.munyard.biz/v1/models -H "x-bf-vk: $KEY" | python3 -c "import json,sys; [print(m['id']) for m in json.load(sys.stdin)['data']]"

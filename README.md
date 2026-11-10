@@ -21,7 +21,7 @@ values. Real hosts, credentials, and run state stay local and gitignored.
 | `fleet/*.example.yaml`, `ops.config.example.yaml`, `incidents/inbox.example.md` | Synthetic examples (RFC 5737 IPs, `example.*` domains) | yes |
 | `fleet/*.yaml` | Real servers, sites, services, providers, notify channels | no |
 | `vault/` | Credentials, ssh keys, and `index.yaml` (names, owners, `used_by`, rotation dates) | no |
-| `runs/` | Planned-work state per skill variant (`executions` is a symlink to it) | no |
+| `runs/` | Planned-work state per skill variant | no |
 | `incidents/` | Inbox and incident folders | no |
 | `logs/audit/` | Local audit trail | no |
 | `ops.config.yaml` | Local settings for `ops wake` and the vault | no |

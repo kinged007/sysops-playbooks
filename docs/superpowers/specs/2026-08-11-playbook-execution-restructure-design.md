@@ -27,7 +27,7 @@ are strictly obedient.
 
 - `playbooks/` — committed, static, the only tracked operational content.
   Never modified during a run.
-- `executions/` — gitignored, one self-contained folder per run. All real
+- `runs/` — gitignored, one self-contained folder per run. All real
   values, credentials, logs, plans, and runbooks live inside it.
 - No shared vault, no shared inventory, no cross-run references.
 
@@ -37,7 +37,7 @@ are strictly obedient.
 coder-workspaces/
 ├── AGENTS.md                  ← general sysops admin guide + doctrine (rewritten)
 ├── README.md                  ← public overview: what this repo is, how runs work
-├── .gitignore                 ← extended: executions/, keep existing secret patterns
+├── .gitignore                 ← extended: runs/, keep existing secret patterns
 ├── .gitattributes             ← unchanged (LF enforcement stays)
 │
 ├── playbooks/                 ← COMMITTED. Static. Never modified during a run.
@@ -46,7 +46,7 @@ coder-workspaces/
 │   ├── wordpress-migration/   ← scaffolded empty
 │   └── mail-server-config/    ← scaffolded empty
 │
-├── executions/                ← GITIGNORED. One folder per run.
+├── runs/                ← GITIGNORED. One folder per run.
 │   └── <YYYY-MM-DD>-<client>-<playbook>-<short-tag>/
 │       ├── plan.md            ← per-run plan: real hosts, IPs, steps, approval
 │       ├── runbook.md         ← copy of playbook with real values + checkboxes
@@ -64,7 +64,7 @@ Key rules:
 - `playbooks/` is the only tracked state; editing it during a run is
   forbidden — corrections go to the run's `notes.md` first, then (with
   approval, after the run) get promoted into the playbook.
-- `executions/` is fully gitignored; nothing inside can ever be committed.
+- `runs/` is fully gitignored; nothing inside can ever be committed.
 - Naming is date-first so runs sort chronologically and the client+playbook
   is unambiguous at a glance.
 - No shared vault, no shared inventory — every run is self-contained.
@@ -78,8 +78,8 @@ playbooks/<name>/
 ├── README.md              ← what it does, when to use, prerequisites, risk level
 │                            + a mandatory line: "Agent: read notes/ BEFORE any run"
 ├── playbook.md            ← canonical step-by-step procedure (placeholders only)
-├── plan-template.md       ← skeleton copied into executions/<run>/plan.md
-├── runbook-template.md    ← skeleton copied into executions/<run>/runbook.md
+├── plan-template.md       ← skeleton copied into runs/<run>/plan.md
+├── runbook-template.md    ← skeleton copied into runs/<run>/runbook.md
 ├── scripts/               ← scripts the playbook uses
 ├── templates/             ← ALL templates: compose files, project scaffolds,
 │                            config templates, Coder templates — one home
@@ -115,7 +115,7 @@ Rules:
 Every run follows the same seven gates, enforced by AGENTS.md:
 
 ```
-1. BOOTSTRAP    operator creates executions/<YYYY-MM-DD>-<client>-<playbook>-<tag>/
+1. BOOTSTRAP    operator creates runs/<YYYY-MM-DD>-<client>-<playbook>-<tag>/
 2. PREP         agent copies plan-template.md + runbook-template.md from the
                 playbook, fills in real hosts/IPs/credentials in plan.md
 3. NOTE-READ    agent reads playbook notes/ (mandatory) + playbook.md; agent
@@ -209,13 +209,13 @@ approval.
 | `templates/docker-devcontainer/` + `templates/remote-docker-workspace.hcl` | `playbooks/coder-remote-servers/templates/` |
 | `scripts/setup-wildcard-cert.sh` | `playbooks/coder-remote-servers/scripts/` |
 | `docs/runbooks/onboarding-a-new-remote.md` + `wildcard-app-subdomains.md` | become content of `playbooks/coder-remote-servers/playbook.md` / `notes/` |
-| `docs/plans/2026-08-07-remote-docker-onboarding.md` | **archived** to `executions/2026-08-07-coder-fleet-initial-setup/` as the historical run |
+| `docs/plans/2026-08-07-remote-docker-onboarding.md` | **archived** to `runs/2026-08-07-coder-fleet-initial-setup/` as the historical run |
 | AGENTS.md coder-specific sections | generalized into the new admin guide; coder-specific knowledge (gotchas G1–G12, topology decisions) moves into the playbook's `notes/` and `playbook.md` |
 
 ### 7.2 Existing gitignored data (`secrets/`, `servers/`)
 
 Folded into a **handover execution**:
-`executions/2026-08-11-coder-fleet-current-state/` containing the existing
+`runs/2026-08-11-coder-fleet-current-state/` containing the existing
 inventory, audit log, secrets-pointers, and still-live keys/tokens. This
 preserves continuity under the new rules (per-run secrets only) without
 losing anything. The old top-level `secrets/` and `servers/` folders are then
@@ -227,7 +227,7 @@ removed.
 - `playbooks/wordpress-migration/` and `playbooks/mail-server-config/`
   scaffolded from the template (README, empty playbook.md with placeholder
   sections, templates/)
-- `.gitignore` gains `executions/` (already-covered patterns stay)
+- `.gitignore` gains `runs/` (already-covered patterns stay)
 - `AGENTS.md` rewritten: doctrine (§6), repo model, run lifecycle, folder
   discipline, SSH/key setup (generalized from current §9), file map
 - `README.md` rewritten as the general ops-repo overview

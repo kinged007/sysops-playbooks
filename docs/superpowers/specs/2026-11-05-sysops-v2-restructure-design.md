@@ -70,13 +70,13 @@ incidents/                    # GITIGNORED except README.md + inbox.example.md
 logs/audit/YYYY-MM.jsonl      # GITIGNORED local audit trail, one file per month
 .agents/skills/<name>/        # committed procedures (playbooks merged here)
   SKILL.md + scripts/ + templates/ + references/
-runs/                         # gitignored execution history (rename of executions/)
+runs/                         # gitignored execution history (renamed from the old executions folder)
 docs/superpowers/{specs,plans}/
 tests/test_ops.py             # CLI self-test run by CI
 tests/test_examples.py        # synthetic-value check on committed examples
 ```
 
-`runs/` starts as a symlink or rename of `executions/`; old dated folders
+`runs/` started as a rename of the old executions folder; old dated folders
 stay readable, no history deleted.
 
 ## 4. Public / private split
@@ -96,7 +96,7 @@ incidents/*
 !incidents/inbox.example.md
 vault/
 runs/
-executions/
+runs/
 logs/
 ops.config.yaml
 .ops-wake.state
@@ -450,16 +450,16 @@ is the manual escape hatch.
    `logs/audit/` created by `ops init`.
    No moves.
 2. Write `fleet/*.example.yaml` from scratch with synthetic values (RFC 5737
-   IPs, `example.*` domains); they are not derived from `executions/`.
+   IPs, `example.*` domains); they are not derived from `runs/`.
    Operator fills real `fleet/*.yaml` locally from the existing
-   `executions/*/inventory.md`.
+   `runs/*/inventory.md`.
 3. Index secrets: `vault/index.yaml` with `<client>-<provider>-<purpose>`
    names pointing at current locations first, consolidate files second,
    fill `used_by` where known. Nothing with values committed at any step.
 4. Port one playbook end-to-end (`9router` — richest tooling) to
    `.agents/skills/9router/` as the pattern; then `coder`,
    `secret-rotation`, rest follow.
-5. Cut over: symlink `executions/` → `runs/`; update AGENTS.md (§10 mapping,
+5. Cut over: rename the executions folder to `runs/`; update AGENTS.md (§10 mapping,
    prompt-injection rule, best practices); wire `ops log/ssh/wake` into the
    lifecycle; extend CI (leak scans + `pytest -q`).
 6. Update README (public/private map, cron example for `ops wake`),
@@ -467,5 +467,5 @@ is the manual escape hatch.
 
 ## 16. Decisions
 
-1. `executions/` is renamed to `runs/`, which gives a clear lane split with
-   `incidents/`. An `executions` symlink to `runs/` stays for compatibility.
+1. The executions folder is renamed to `runs/`, which gives a clear lane split with
+   `incidents/`. The temporary compatibility symlink is removed; `runs/` is the only path.

@@ -31,7 +31,7 @@ Constraints from prior sessions (recalled from the Aug 11-12 netdata session):
 **Approach A — playbook-only.** A new playbook `playbooks/netdata-monitoring/` containing the
 canonical procedure (placeholders only), plan/runbook templates, an MCP config template, and
 gotchas. No project-level opencode config. Per-run state (real IPs, secrets, generated MCP
-configs, logs) lives only in `executions/<run>/`, which is gitignored by repo policy.
+configs, logs) lives only in `runs/<run>/`, which is gitignored by repo policy.
 
 Rejected alternatives:
 - **B — repo-scoped MCP registration** (`.opencode/opencode.json`): always-on within the
@@ -46,8 +46,8 @@ playbooks/netdata-monitoring/
 ├── README.md              — purpose, when to use, prerequisites, risk level, servers involved,
 │                             mandatory "read notes/ BEFORE any run" line
 ├── playbook.md            — canonical procedure; placeholders only; WRITE flags; rollbacks
-├── plan-template.md       — copied to executions/<run>/plan.md
-├── runbook-template.md    — copied to executions/<run>/runbook.md
+├── plan-template.md       — copied to runs/<run>/plan.md
+├── runbook-template.md    — copied to runs/<run>/runbook.md
 ├── templates/
 │   └── mcp-config.json    — per-node MCP server config template (placeholders)
 ├── scripts/               — (kept empty unless a run proves a script is needed)
@@ -58,7 +58,7 @@ playbooks/netdata-monitoring/
 ## 4. Run flow (seven gates)
 
 ### Bootstrap / Prep
-- Operator creates `executions/<YYYY-MM-DD>-<client>-netdata-<tag>/`
+- Operator creates `runs/<YYYY-MM-DD>-<client>-netdata-<tag>/`
 - Copies `plan-template.md` → `plan.md`, `runbook-template.md` → `runbook.md`
 - Fills `inventory.md` with SSH aliases (only), never raw hostnames/IPs in committed files
 - Creates `secrets/` (gitignored by repo policy)
@@ -82,7 +82,7 @@ playbooks/netdata-monitoring/
      protection = yes`) + restart
    - Read MCP API key (`/var/lib/netdata/mcp_dev_preview_api_key`) → `secrets/`
    - Verify anonymous MCP access now fails, keyed access works
-7. **Generate per-node MCP config artifact** → `executions/<run>/mcp/<alias>.mcp.json`
+7. **Generate per-node MCP config artifact** → `runs/<run>/mcp/<alias>.mcp.json`
    (template in §5), written automatically when the node is confirmed connected
 8. Verify: `/api/v1/info` reachable, alerts endpoints return data, claim status correct
 
@@ -95,7 +95,7 @@ playbooks/netdata-monitoring/
 
 ## 5. Per-node MCP config artifact
 
-Generated into `executions/<run>/mcp/<alias>.mcp.json` on connect:
+Generated into `runs/<run>/mcp/<alias>.mcp.json` on connect:
 
 ```json
 {
@@ -113,7 +113,7 @@ Generated into `executions/<run>/mcp/<alias>.mcp.json` on connect:
 ```
 
 - Placeholders are the ONLY form in committed files (`templates/mcp-config.json`)
-- The generated file is gitignored (inside `executions/`)
+- The generated file is gitignored (inside `runs/`)
 - `NETDATA_MCP_KEY_<ALIAS>` value stored in run `secrets/`; operator sets it as env var
   when installing the artifact elsewhere (global config, remote agent, other machine)
 - README documents: how to install (merge into `~/.config/opencode/opencode.json` or a
@@ -148,7 +148,7 @@ Generated into `executions/<run>/mcp/<alias>.mcp.json` on connect:
 - Reads (SSH inspection, MCP `tools/call` on read endpoints) are free
 - Every production WRITE (hostname, install, hardening config + restart, claim/unclaim)
   is flagged **WRITE** in plan.md and requires approval per the run's permission mode
-- Real values (IPs, tokens, keys) appear ONLY in `executions/<run>/` — never in committed
+- Real values (IPs, tokens, keys) appear ONLY in `runs/<run>/` — never in committed
   files, shell history, or logs
 - Rollback documented for every WRITE step (e.g. revert netdata.conf + restart for
   hardening; re-run kickstart for claim)

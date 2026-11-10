@@ -456,6 +456,11 @@ Condensed checklist for adding another remote. Fill in `<REMOTE>` (alias),
       `coder-workspace-01`, `-02`, `-03`, …; sequential, never reused)
 - [ ] `tailscale ip` → record IP; `tailscale status` → confirm name.
 - [ ] From host: `tailscale ping coder-workspace-NN` → expect pong.
+- [ ] Swap check (mandatory — see G17): `free -h; swapon -s`. If no swap,
+      **WRITE** an 8G swapfile (`fallocate -l 8G /swapfile; chmod 600
+      /swapfile; mkswap /swapfile; swapon /swapfile`, persist in fstab,
+      `vm.swappiness=10`). Rollback: `swapoff /swapfile`, remove file +
+      fstab line. Verify with `free -h`.
 - [ ] Add the node to the tailnet ACL (SSH 22 + Docker 2376) — see §6. Do this
       **before** testing TLS from the host, or the 2376 TCP check will time out.
       Apply via the admin console **or** the API (POST the full policy with

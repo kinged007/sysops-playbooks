@@ -3,7 +3,7 @@
 Snapshot of `playbooks/<name>/playbook.md` being executed, with real values
 filled in. State lives here and in `logs/` — any agent session can resume from
 these files alone. This folder is persistent per playbook variant
-(`executions/<playbook>[/-<suffix>]/`); subsequent invocations append to it,
+(`runs/<playbook>[/-<suffix>]/`); subsequent invocations append to it,
 never replace it. `logs/` is append-only — each session adds timestamp-prefixed
 files (e.g. `logs/2026-08-29T143000-01-discover.log`).
 
@@ -11,7 +11,7 @@ files (e.g. `logs/2026-08-29T143000-01-discover.log`).
 |---|---|
 | Run | <run name> |
 | Playbook | <playbook-name> |
-| Execution folder | `executions/<playbook>/` or `executions/<playbook>-<suffix>/` |
+| Execution folder | `runs/<playbook>/` or `runs/<playbook>-<suffix>/` |
 | Started | <date> |
 | Permission mode | <A / B> (set at plan approval) |
 

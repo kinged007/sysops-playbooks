@@ -411,14 +411,16 @@ def test_incident_close_id_is_a_literal_prefix(ops, tmp_path):
     assert ops.main(["incident", "close", ""]) == 2
 
 
-def test_init_links_executions_to_runs(tmp_path, monkeypatch):
+def test_init_removes_legacy_executions_symlink(tmp_path, monkeypatch):
     module = load_ops()
     monkeypatch.setattr(module, "ROOT", tmp_path)
     done = module.subprocess.CompletedProcess([], 0, "", "")
     monkeypatch.setattr(module.subprocess, "run", lambda *a, **k: done)
+    (tmp_path / "executions").symlink_to("runs")
     assert module.main(["init"]) == 0
     assert module.main(["init"]) == 0
-    assert (tmp_path / "executions").is_symlink()
+    assert not os.path.lexists(tmp_path / "executions")
+    assert (tmp_path / "runs").is_dir()
 
 
 def test_missing_python_module_gives_clear_message():
