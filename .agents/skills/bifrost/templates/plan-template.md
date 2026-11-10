@@ -4,7 +4,7 @@
 |---|---|
 | Client | <client> |
 | Playbook | `<playbook-name>` |
-| Execution folder | `executions/<playbook>/` or `executions/<playbook>-<suffix>/` |
+| Execution folder | `runs/<playbook>/` or `runs/<playbook>-<suffix>/` |
 | Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
 | Status | draft → approved → executing → closed |
 

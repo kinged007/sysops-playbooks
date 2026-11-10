@@ -4,7 +4,7 @@
 
 **Goal:** Create the `playbooks/netdata-monitoring/` playbook in `sysops-playbooks` so any future run can install, harden, and monitor netdata on operator-provided servers — with per-node MCP config artifacts recorded in the run's execution folder, generalized (placeholders only).
 
-**Architecture:** A new playbook folder following the repo's existing conventions (`_playbook-template`, `coder-remote-servers`): README, canonical `playbook.md` (install + harden + claim + ops phases, every production WRITE flagged with rollback), plan/runbook templates, an MCP config template, and `notes/gotchas.md` (G1–G9 lessons learned from the Aug 11–12 netdata sessions). No project-level opencode config; real values only ever appear in `executions/<run>/`.
+**Architecture:** A new playbook folder following the repo's existing conventions (`_playbook-template`, `coder-remote-servers`): README, canonical `playbook.md` (install + harden + claim + ops phases, every production WRITE flagged with rollback), plan/runbook templates, an MCP config template, and `notes/gotchas.md` (G1–G9 lessons learned from the Aug 11–12 netdata sessions). No project-level opencode config; real values only ever appear in `runs/<run>/`.
 
 **Tech Stack:** Markdown playbooks, JSON template, curl JSON-RPC recipes against netdata's local agent MCP endpoint (`http://<NODE_ADDRESS>:19999/mcp`), SSH for production access.
 
@@ -18,8 +18,8 @@
 |---|---|
 | `playbooks/netdata-monitoring/README.md` | Purpose, when to use, prerequisites, risk level, files table |
 | `playbooks/netdata-monitoring/playbook.md` | Canonical procedure: pre-flight, state discovery, hostname ask, install/update (operator command recorded), hardening, MCP artifact generation, claim, ops (check-all-nodes), verification/rollback |
-| `playbooks/netdata-monitoring/plan-template.md` | Per-run plan skeleton (copied to `executions/<run>/plan.md`) |
-| `playbooks/netdata-monitoring/runbook-template.md` | Per-run runbook skeleton (copied to `executions/<run>/runbook.md`) |
+| `playbooks/netdata-monitoring/plan-template.md` | Per-run plan skeleton (copied to `runs/<run>/plan.md`) |
+| `playbooks/netdata-monitoring/runbook-template.md` | Per-run runbook skeleton (copied to `runs/<run>/runbook.md`) |
 | `playbooks/netdata-monitoring/templates/mcp-config.json` | Placeholder-only per-node MCP server config (source for the generated artifact) |
 | `playbooks/netdata-monitoring/notes/gotchas.md` | G1–G9 lessons learned (mandatory read before any run) |
 
@@ -121,15 +121,15 @@ live in the execution's `inventory.md` and `secrets/`, never here.
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical procedure (placeholders only) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
+| `plan-template.md` | Copied to `runs/<run>/plan.md` |
+| `runbook-template.md` | Copied to `runs/<run>/runbook.md` |
 | `templates/mcp-config.json` | Per-node MCP server config template (placeholders) |
 | `notes/gotchas.md` | G1–G9: real pitfalls hit on the fleet, with fixes |
 
 ## MCP config artifact (per node, per run)
 When a node is confirmed connected, the run writes
-`executions/<run>/mcp/<alias>.mcp.json` from `templates/mcp-config.json` with
-real values filled in. It is gitignored (inside `executions/`). To use it
+`runs/<run>/mcp/<alias>.mcp.json` from `templates/mcp-config.json` with
+real values filled in. It is gitignored (inside `runs/`). To use it
 later — e.g. in a dedicated or remote agent — merge the `"mcp"` block into
 that agent's `opencode.json` and set the referenced env var
 (`NETDATA_MCP_KEY_<ALIAS>`) to the key stored in the run's `secrets/`. The
@@ -385,10 +385,10 @@ free.
       (`NETDATA_MCP_KEY_<ALIAS>`) for future agent configs
 
 ## 5. Generate the per-node MCP config artifact (local file, no production write)
-- [ ] Copy `templates/mcp-config.json` to `executions/<RUN>/mcp/<ALIAS>.mcp.json`
+- [ ] Copy `templates/mcp-config.json` to `runs/<RUN>/mcp/<ALIAS>.mcp.json`
 - [ ] Fill in real values: server key `netdata-<ALIAS>`, `url`
       `http://<NODE_ADDRESS>:19999/mcp`, env var name `NETDATA_MCP_KEY_<ALIAS>`
-- [ ] Validate: `python -m json.tool executions/<RUN>/mcp/<ALIAS>.mcp.json`
+- [ ] Validate: `python -m json.tool runs/<RUN>/mcp/<ALIAS>.mcp.json`
 - [ ] Note in the runbook: how to install this artifact later (merge into an
       agent's `opencode.json`; set the env var to the key in `secrets/`)
 
@@ -489,7 +489,7 @@ git ls-files --cached --others --exclude-standard | ForEach-Object { if (Test-Pa
   if ($c -match 'tskey-|BEGIN (CERTIFICATE|PRIVATE|RSA)') { Write-Output "LEAK: $_" }
 }}
 ```
-Expected: `git status` shows only the new playbook files (no `executions/`,
+Expected: `git status` shows only the new playbook files (no `runs/`,
 no `secrets/`); no `LEAK:` lines.
 
 - [ ] **Step 3: Confirm no real hostnames/IPs anywhere in the new playbook**

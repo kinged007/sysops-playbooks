@@ -123,8 +123,6 @@ bin/ops                  shim that runs ops.py without installing
 docs/                    specs and plans
 ```
 
-`executions` is a symlink to `runs/` for compatibility. Use `runs/`.
-
 Everything real (hosts, IPs, domains, keys, run state) is gitignored.
 Committed files use placeholders and synthetic values (RFC 5737 IPs,
 `example.*` domains).
@@ -260,7 +258,7 @@ Operator notes and skill notes override these defaults.
 `.gitleaks.toml`, `.pre-commit-config.yaml`, `pyproject.toml`, `.gitignore`.
 Placeholders and synthetic values only.
 
-**Never committed:** `runs/`, `executions`, `fleet/*.yaml` (non-example),
+**Never committed:** `runs/`, `fleet/*.yaml` (non-example),
 `vault/`, `incidents/*` (other than the two allowlisted files), `logs/`,
 `ops.config.yaml`, `*.pem`, `*.key`, `*.tfvars`, `.env`.
 

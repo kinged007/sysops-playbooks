@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build `playbooks/9router/scripts/9router-sync.py` that reads `model-inventory/models.{json,csv}` from each `executions/*9router*` variant, applies global filters + provider mapping to produce 9Router-routed model ids, diff-syncs provider custom models and 5 combos via `/api/*` (JWT cookie auth), and regenerates CLI configs (`opencode.json`, `hermes-config.yaml`, `codex-config.toml`, `claude-settings.json`) — only writing when a diff exists.
+**Goal:** Build `playbooks/9router/scripts/9router-sync.py` that reads `model-inventory/models.{json,csv}` from each `runs/*9router*` variant, applies global filters + provider mapping to produce 9Router-routed model ids, diff-syncs provider custom models and 5 combos via `/api/*` (JWT cookie auth), and regenerates CLI configs (`opencode.json`, `hermes-config.yaml`, `codex-config.toml`, `claude-settings.json`) — only writing when a diff exists.
 
-**Architecture:** Single Python script, zero new infra. Discovery mirrors `model-inventory.py` (`find_config()` + glob `executions/*9router*`). Global filter -> provider-mapped routed ids (`{alias}/{model_id}`) -> diff against live `/api/models` + `/api/models/custom` + `/api/models/disabled` (custom is primary for dynamic providers). Per-combo pipeline reuses `apply_filters`/`sort_models` patterns from `model-inventory.py` with added `free` tri-state, `cost_per_task` range, provider/model whitelist/blacklist (fnmatch + regex fallback), then stable `favorites` promotion (patterns in config order to top). Combo sync uses `/api/combos` GET/POST/PUT (JWT from `POST /api/auth/login` with `secrets/dashboard-password.txt`). CLI generation reuses `generate-configs.py` fetch+writers but writes to the config's execution folder `generated/` sibling.
+**Architecture:** Single Python script, zero new infra. Discovery mirrors `model-inventory.py` (`find_config()` + glob `runs/*9router*`). Global filter -> provider-mapped routed ids (`{alias}/{model_id}`) -> diff against live `/api/models` + `/api/models/custom` + `/api/models/disabled` (custom is primary for dynamic providers). Per-combo pipeline reuses `apply_filters`/`sort_models` patterns from `model-inventory.py` with added `free` tri-state, `cost_per_task` range, provider/model whitelist/blacklist (fnmatch + regex fallback), then stable `favorites` promotion (patterns in config order to top). Combo sync uses `/api/combos` GET/POST/PUT (JWT from `POST /api/auth/login` with `secrets/dashboard-password.txt`). CLI generation reuses `generate-configs.py` fetch+writers but writes to the config's execution folder `generated/` sibling.
 
 **Tech Stack:** Python 3.12, PyYAML, requests (fallback urllib), fnmatch, csv/json, 9Router REST (`/api/models*`, `/api/combos`, `/v1/models`, `/api/auth/login`), existing `generate-configs.py` writer functions as reference.
 
@@ -16,7 +16,7 @@
 |------|----------------|
 | `playbooks/9router/scripts/9router-sync.py` | Main automation: discovery, auth, filtering, provider mapping, provider/combo sync, CLI generation, CLI args (`--config`, `--dry-run`, `--force`, `--verbose`) |
 | `playbooks/9router/templates/9router-sync.config.example.yaml` | Committed example config (placeholders only): global filters, `provider_mapping`, 5 `combos` blocks, `cli` output options |
-| `executions/9router/9router-sync.config.yaml` | (gitignored) operator variant config — created by copying example, not committed; script discovers it via glob |
+| `runs/9router/9router-sync.config.yaml` | (gitignored) operator variant config — created by copying example, not committed; script discovers it via glob |
 | `tests/scripts/test_9router_sync.py` | Unit tests for filtering, mapping, favorites, sorting, diff logic (no live 9Router required) |
 | `docs/superpowers/plans/2026-09-02-9router-sync-automation.md` | This plan |
 
@@ -36,8 +36,8 @@ Existing files referenced but not structurally changed (read-only):
 
 ```yaml
 # 9Router Sync Config — example (placeholders only, committed)
-# Copy to executions/9router/9router-sync.config.yaml (gitignored) or any
-# executions/*9router*/**/9router-sync*.yaml  — script auto-discovers via glob.
+# Copy to runs/9router/9router-sync.config.yaml (gitignored) or any
+# runs/*9router*/**/9router-sync*.yaml  — script auto-discovers via glob.
 # All ${VAR} expanded at runtime (see model-inventory.py expand_env).
 
 # Execution discovery: script processes EACH matching config file found.
@@ -140,7 +140,7 @@ options:
 - [ ] **Step 2: Verify file is not gitignored incorrectly**
 
 Run: `git check-ignore -v playbooks/9router/templates/9router-sync.config.example.yaml`
-Expected: no output (file is tracked). If it shows `executions/` rule, the path is correct (templates is tracked).
+Expected: no output (file is tracked). If it shows `runs/` rule, the path is correct (templates is tracked).
 
 - [ ] **Step 3: Commit**
 
@@ -181,7 +181,7 @@ Expected: `ModuleNotFoundError: No module named 'playbooks_9router_scripts_9rout
 #!/usr/bin/env python3
 """
 9router-sync.py — Sync model-inventory -> 9Router providers + combos + CLI configs.
-Config discovery mirrors model-inventory.py: scans executions/*9router*/**/9router-sync*.yaml
+Config discovery mirrors model-inventory.py: scans runs/*9router*/**/9router-sync*.yaml
 """
 from __future__ import annotations
 import argparse, csv, json, os, pathlib, re, sys, fnmatch, datetime
@@ -199,7 +199,7 @@ except ImportError:
 DEFAULT_SYNC_CONFIG_CANDIDATES = [
     pathlib.Path("9router-sync.config.yaml"),
     pathlib.Path("playbooks/9router/templates/9router-sync.config.example.yaml"),
-    pathlib.Path("executions/9router/9router-sync.config.yaml"),
+    pathlib.Path("runs/9router/9router-sync.config.yaml"),
 ]
 
 def sanitize_key(value: Any) -> str:
@@ -254,15 +254,15 @@ def find_sync_configs(cli_path: Optional[str] = None, search_root: Optional[path
         if cand.name == "9router-sync.config.example.yaml": continue
         if cand.exists(): found.append(cand)
         if found: return found  # first wins if static exists
-    # 2) glob executions/*9router* for 9router-sync*.yaml
+    # 2) glob runs/*9router* for 9router-sync*.yaml
     roots: List[pathlib.Path] = []
     if search_root: roots.append(search_root)
     else:
-        for base in [pathlib.Path("executions"), pathlib.Path("D:/Data/git/sysops-playbooks/executions")]:
+        for base in [pathlib.Path("runs"), pathlib.Path("D:/Data/git/sysops-playbooks/runs")]:
             if base.exists(): roots.append(base)
         try:
             repo_root = pathlib.Path(__file__).resolve().parents[3]
-            rr = repo_root / "executions"
+            rr = repo_root / "runs"
             if rr.exists() and rr not in roots: roots.append(rr)
         except: pass
     candidates: List[pathlib.Path] = []
@@ -288,10 +288,10 @@ def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
     if config_path and config_path.exists():
         candidates.append(config_path.parent / ".env")
         candidates.append(config_path.parent / "secrets" / ".env")
-    for base in [pathlib.Path("executions/9router"), pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router")]:
+    for base in [pathlib.Path("runs/9router"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router")]:
         candidates.extend([base / ".env", base / "secrets" / ".env", base / "secrets" / "api_keys.env"])
     try:
-        for d in pathlib.Path("executions").glob("9router-*"):
+        for d in pathlib.Path("runs").glob("9router-*"):
             candidates.extend([d / ".env", d / "secrets" / ".env"])
     except: pass
     candidates.extend([cwd / ".env", pathlib.Path(".env")])
@@ -312,7 +312,7 @@ def load_execution_env(config_path: Optional[pathlib.Path] = None) -> None:
                 if v: os.environ[k]=v
         except Exception as e: print(f"WARN load {cand}: {e}", file=sys.stderr)
     # per-key .txt
-    for base in [pathlib.Path("executions/9router/secrets"), pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/secrets")]:
+    for base in [pathlib.Path("runs/9router/secrets"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets")]:
         if not base.exists(): continue
         for p in base.glob("*.txt"):
             key=p.stem.upper().replace("-","_")
@@ -459,15 +459,15 @@ def find_inventory_dir(config_dir: pathlib.Path) -> Optional[pathlib.Path]:
     candidates = [
         config_dir / "model-inventory",
         config_dir / "model-inventory-output",
-        pathlib.Path("executions/9router/model-inventory"),
-        pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/model-inventory"),
+        pathlib.Path("runs/9router/model-inventory"),
+        pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/model-inventory"),
     ]
     for c in candidates:
         if (c / "models.json").exists() or (c / "models.csv").exists():
             return c
-    # glob fallback: any model-inventory under executions/*9router*
+    # glob fallback: any model-inventory under runs/*9router*
     try:
-        for root in [pathlib.Path("executions"), pathlib.Path("D:/Data/git/sysops-playbooks/executions")]:
+        for root in [pathlib.Path("runs"), pathlib.Path("D:/Data/git/sysops-playbooks/runs")]:
             if not root.exists(): continue
             for nine_dir in root.glob("*9router*"):
                 for pat in ("model-inventory/models.json","model-inventory/models.csv"):
@@ -839,7 +839,7 @@ def get_ninerouter_creds(config: Dict[str,Any], config_path: pathlib.Path) -> Tu
     url = sanitize_key(expand_env(ncfg.get("url") or os.environ.get("NINEROUTER_URL") or ""))
     if not url:
         # try secrets file
-        for cand in [config_path.parent / "secrets" / "ninerouter-url.txt", pathlib.Path("executions/9router/secrets/ninerouter-url.txt"), pathlib.Path("D:/Data/git/sysops-playbooks/executions/9router/secrets/ninerouter-url.txt")]:
+        for cand in [config_path.parent / "secrets" / "ninerouter-url.txt", pathlib.Path("runs/9router/secrets/ninerouter-url.txt"), pathlib.Path("D:/Data/git/sysops-playbooks/runs/9router/secrets/ninerouter-url.txt")]:
             if cand.exists():
                 try: url=sanitize_key(cand.read_text(encoding="utf-8").strip())
                 except: pass
@@ -847,7 +847,7 @@ def get_ninerouter_creds(config: Dict[str,Any], config_path: pathlib.Path) -> Tu
     api_key = ""
     key_file = ncfg.get("api_key_file") or "secrets/9router-api-key.txt"
     # try explicit file relative to config
-    for cand in [config_path.parent / key_file, pathlib.Path(key_file), pathlib.Path("executions/9router/secrets/9router-api-key.txt")]:
+    for cand in [config_path.parent / key_file, pathlib.Path(key_file), pathlib.Path("runs/9router/secrets/9router-api-key.txt")]:
         if cand.exists():
             try: api_key=sanitize_key(cand.read_text(encoding="utf-8").strip())
             except: pass
@@ -856,7 +856,7 @@ def get_ninerouter_creds(config: Dict[str,Any], config_path: pathlib.Path) -> Tu
         api_key=sanitize_key(os.environ.get("NINEROUTER_KEY") or os.environ.get("9ROUTER_API_KEY") or "")
     pwd=""
     pwd_file = ncfg.get("dashboard_password_file") or "secrets/dashboard-password.txt"
-    for cand in [config_path.parent / pwd_file, pathlib.Path(pwd_file), pathlib.Path("executions/9router/secrets/dashboard-password.txt")]:
+    for cand in [config_path.parent / pwd_file, pathlib.Path(pwd_file), pathlib.Path("runs/9router/secrets/dashboard-password.txt")]:
         if cand.exists():
             try: pwd=cand.read_text(encoding="utf-8").strip()
             except: pass
@@ -1365,7 +1365,7 @@ def main():
     configs=find_sync_configs(args.config)
     if not configs:
         print("ERR: no 9router-sync config found", file=sys.stderr)
-        print("Hint: copy playbooks/9router/templates/9router-sync.config.example.yaml to executions/9router/9router-sync.config.yaml", file=sys.stderr)
+        print("Hint: copy playbooks/9router/templates/9router-sync.config.example.yaml to runs/9router/9router-sync.config.yaml", file=sys.stderr)
         sys.exit(2)
     print(f"Found {len(configs)} config(s): {[str(p) for p in configs]}")
     ok=True
@@ -1383,7 +1383,7 @@ def main():
 - [ ] **Step 2: Manual smoke test (dry-run)**
 
 Run: `python playbooks/9router/scripts/9router-sync.py --dry-run --verbose`
-Expected: Finds `executions/9router/9router-sync.config.yaml` (or example), loads inventory, prints filtered counts, diffs, no POST.
+Expected: Finds `runs/9router/9router-sync.config.yaml` (or example), loads inventory, prints filtered counts, diffs, no POST.
 
 - [ ] **Step 3: Commit**
 
@@ -1430,7 +1430,7 @@ Expected: `compile ok`.
 ### Task 12: Documentation + execution folder bootstrap
 
 **Files:**
-- Create: `executions/9router/9router-sync.config.yaml` (gitignored, local only — do NOT commit; document creation step)
+- Create: `runs/9router/9router-sync.config.yaml` (gitignored, local only — do NOT commit; document creation step)
 - Modify: `playbooks/9router/README.md` (add section for sync automation)
 
 - [ ] **Step 1: Append to playbook README**
@@ -1442,16 +1442,16 @@ Add section after "Generated configs":
 
 `playbooks/9router/scripts/9router-sync.py` keeps 9Router in sync with `model-inventory`.
 
-- Source: `executions/9router/model-inventory/models.{json,csv}` (generated by `model-inventory.py`)
-- Config: `executions/9router/9router-sync.config.yaml` (copy from `templates/9router-sync.config.example.yaml`; gitignored)
+- Source: `runs/9router/model-inventory/models.{json,csv}` (generated by `model-inventory.py`)
+- Config: `runs/9router/9router-sync.config.yaml` (copy from `templates/9router-sync.config.example.yaml`; gitignored)
 - Run: `python playbooks/9router/scripts/9router-sync.py --dry-run --verbose` (local) or cron/systemd
 - What it does: global filter -> provider-mapped routed ids -> diff sync `/api/models/custom` + `/api/models/disabled` + `/api/combos` (only if diff) -> regenerate `generated/` CLI configs.
-- Discovery: processes **every** `executions/*9router*/**/9router-sync*.yaml` found, writing outputs alongside each config.
+- Discovery: processes **every** `runs/*9router*/**/9router-sync*.yaml` found, writing outputs alongside each config.
 ```
 
 - [ ] **Step 2: Verify template copy**
 
-Run: `cp playbooks/9router/templates/9router-sync.config.example.yaml executions/9router/9router-sync.config.yaml && echo "copied"`
+Run: `cp playbooks/9router/templates/9router-sync.config.example.yaml runs/9router/9router-sync.config.yaml && echo "copied"`
 Expected: file exists locally (gitignored, not committed).
 
 - [ ] **Step 3: Commit docs**

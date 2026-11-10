@@ -13,8 +13,8 @@ committing): see `AGENTS.md`.
 Conventions: every step that WRITES to a production system is flagged
 **WRITE** and needs approval per the run's permission mode (A: per-write
 confirm / B: plan-as-approved). Rollback is given for every write. Reads are
-free. Execution folder is persistent per variant: `executions/bifrost/` or
-`executions/bifrost-<suffix>/`; `logs/` is append-only with
+free. Execution folder is persistent per variant: `runs/bifrost/` or
+`runs/bifrost-<suffix>/`; `logs/` is append-only with
 timestamp-prefixed files.
 
 > **Docs-first rule:** Bifrost docs move fast and versions matter (snippets
@@ -34,7 +34,7 @@ timestamp-prefixed files.
   exposed, operator-available secrets
 - [ ] Confirm access (read):
   `ssh -o BatchMode=yes <ALIAS> 'hostname; whoami; ss -tlnp | head -n 20'`
-- [ ] Scan `executions/` for `bifrost` / `bifrost-<suffix>` folders and legacy
+- [ ] Scan `runs/` for `bifrost` / `bifrost-<suffix>` folders and legacy
   dated folders containing `bifrost`; present matches to the operator: reuse
   or create new variant with suffix `<SUFFIX>`
 - [ ] Pin the Bifrost version for this run (e.g. `<TAG>` like `v2.4.0`;
@@ -103,7 +103,7 @@ Ask explicitly; never assume.
 - [ ] **Backup**: if execution `secrets/` already holds values, keep previous
   as `<name>.prev-<timestamp>` before regenerating.
 - [ ] **WRITE**: generate and store (only in
-  `executions/bifrost[-<suffix>]/secrets/`, never in plan/runbook/logs):
+  `runs/bifrost[-<suffix>]/secrets/`, never in plan/runbook/logs):
   ```bash
   openssl rand -base64 32   # BIFROST_ENCRYPTION_KEY (stable across restarts/upgrades/restores)
   openssl rand -hex 32      # BIFROST_SETUP_TOKEN (first admin account only)
@@ -399,7 +399,7 @@ are accepted via `Authorization: Bearer`, `x-bf-vk`, `x-api-key`,
 - [ ] Every **WRITE** this run has a rollback recorded in the runbook
   (previous image tag, `.prev-*` configs, DB backup path, proxy/firewall
   revert, vault/`secrets/` restore + restart).
-- [ ] Leak check: `git status` shows no `executions/`, `secrets/`, `*.pem`,
+- [ ] Leak check: `git status` shows no `runs/`, `secrets/`, `*.pem`,
   `*.key`, `.tfvars`, `.env`; no secret values in plan/runbook/logs.
 - [ ] Findings → execution `notes.md`; propose promotion into playbook
   references/` (operator approves, never mid-run).

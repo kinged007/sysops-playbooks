@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Restructure this repo from a single-purpose Coder-fleet guide into a general sysops playbook repository: static per-subject `playbooks/`, gitignored self-contained `executions/`, a rewritten general AGENTS.md admin guide, and a strict production-safety doctrine.
+**Goal:** Restructure this repo from a single-purpose Coder-fleet guide into a general sysops playbook repository: static per-subject `playbooks/`, gitignored self-contained `runs/`, a rewritten general AGENTS.md admin guide, and a strict production-safety doctrine.
 
-**Architecture:** Two-tier model. `playbooks/<name>/` holds committed, static, reusable procedures (README, playbook.md, plan/runbook templates, scripts, templates, notes). `executions/<YYYY-MM-DD>-<client>-<playbook>-<tag>/` holds every per-run artifact (plan, runbook snapshot, inventory, notes, secrets, logs) and is fully gitignored. Existing Coder content migrates into `playbooks/coder-remote-servers/`; existing gitignored fleet data folds into a handover execution; the old dated plan is archived into a historical execution.
+**Architecture:** Two-tier model. `playbooks/<name>/` holds committed, static, reusable procedures (README, playbook.md, plan/runbook templates, scripts, templates, notes). `runs/<YYYY-MM-DD>-<client>-<playbook>-<tag>/` holds every per-run artifact (plan, runbook snapshot, inventory, notes, secrets, logs) and is fully gitignored. Existing Coder content migrates into `playbooks/coder-remote-servers/`; existing gitignored fleet data folds into a handover execution; the old dated plan is archived into a historical execution.
 
 **Tech Stack:** Git, Markdown, PowerShell (host OS), bash scripts (migrated as-is). No build system, no tests — verification is `git status`/`git ls-files` checks and secret scans.
 
@@ -18,7 +18,7 @@
 
 ---
 
-### Task 1: Ignore `executions/` in .gitignore
+### Task 1: Ignore `runs/` in .gitignore
 
 **Files:**
 - Modify: `.gitignore`
@@ -32,19 +32,19 @@ Edit `.gitignore`, in the "Private fleet operations" section (line 9-11), add:
 servers/
 
 # ---- Per-run execution folders (self-contained: plans, secrets, logs) ----
-executions/
+runs/
 ```
 
 - [ ] **Step 2: Verify the ignore works**
 
-Run: `git check-ignore -v executions/2026-08-11-test-run/plan.md`
-Expected: output matching `.gitignore` with the `executions/` rule. (File need not exist — `check-ignore` works on paths.)
+Run: `git check-ignore -v runs/2026-08-11-test-run/plan.md`
+Expected: output matching `.gitignore` with the `runs/` rule. (File need not exist — `check-ignore` works on paths.)
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add .gitignore
-git commit -m "chore: ignore executions/ per-run folders"
+git commit -m "chore: ignore runs/ per-run folders"
 ```
 
 ---
@@ -52,10 +52,10 @@ git commit -m "chore: ignore executions/ per-run folders"
 ### Task 2: Fold existing fleet data into a handover execution
 
 **Files:**
-- Create: `executions/2026-08-11-coder-fleet-current-state/README.md`
-- Move: `secrets/*` → `executions/2026-08-11-coder-fleet-current-state/secrets/`
-- Move: `servers/*` → `executions/2026-08-11-coder-fleet-current-state/` (as `inventory.md`, `audit-log.md`, `secrets-pointers.md`)
-- Create: `executions/2026-08-11-coder-fleet-current-state/logs/.gitkeep`
+- Create: `runs/2026-08-11-coder-fleet-current-state/README.md`
+- Move: `secrets/*` → `runs/2026-08-11-coder-fleet-current-state/secrets/`
+- Move: `servers/*` → `runs/2026-08-11-coder-fleet-current-state/` (as `inventory.md`, `audit-log.md`, `secrets-pointers.md`)
+- Create: `runs/2026-08-11-coder-fleet-current-state/logs/.gitkeep`
 - Delete: `secrets/`, `servers/` (top-level folders)
 
 This preserves the fleet's operational memory under the new per-run-secrets rule. Real values stay in this folder; nothing here can ever be committed.
@@ -72,23 +72,23 @@ Expected: NO output. (If output appears, stop — something sensitive is tracked
 
 Run:
 ```powershell
-New-Item -ItemType Directory -Path "executions\2026-08-11-coder-fleet-current-state\secrets", "executions\2026-08-11-coder-fleet-current-state\logs" -Force | Out-Null
-New-Item -ItemType File -Path "executions\2026-08-11-coder-fleet-current-state\logs\.gitkeep" -Force | Out-Null
+New-Item -ItemType Directory -Path "runs\2026-08-11-coder-fleet-current-state\secrets", "runs\2026-08-11-coder-fleet-current-state\logs" -Force | Out-Null
+New-Item -ItemType File -Path "runs\2026-08-11-coder-fleet-current-state\logs\.gitkeep" -Force | Out-Null
 ```
 
 - [ ] **Step 3: Move the fleet data**
 
 Run:
 ```powershell
-Move-Item -Path secrets\* -Destination executions\2026-08-11-coder-fleet-current-state\secrets\
-Move-Item -Path servers\audit-log.md -Destination executions\2026-08-11-coder-fleet-current-state\audit-log.md
-Move-Item -Path servers\inventory.md -Destination executions\2026-08-11-coder-fleet-current-state\inventory.md
-Move-Item -Path servers\secrets-pointers.md -Destination executions\2026-08-11-coder-fleet-current-state\secrets-pointers.md
+Move-Item -Path secrets\* -Destination runs\2026-08-11-coder-fleet-current-state\secrets\
+Move-Item -Path servers\audit-log.md -Destination runs\2026-08-11-coder-fleet-current-state\audit-log.md
+Move-Item -Path servers\inventory.md -Destination runs\2026-08-11-coder-fleet-current-state\inventory.md
+Move-Item -Path servers\secrets-pointers.md -Destination runs\2026-08-11-coder-fleet-current-state\secrets-pointers.md
 ```
 
 - [ ] **Step 4: Write the handover README**
 
-Create `executions/2026-08-11-coder-fleet-current-state/README.md`:
+Create `runs/2026-08-11-coder-fleet-current-state/README.md`:
 
 ```markdown
 # Handover: Coder Fleet Current State (2026-08-11)
@@ -121,7 +121,7 @@ Run:
 git status --short
 git ls-files | Select-String -Pattern 'secrets|servers'
 ```
-Expected: git status shows only the previous task's commit (clean working tree); `git ls-files` output is empty. All moved files are under `executions/` which is ignored.
+Expected: git status shows only the previous task's commit (clean working tree); `git ls-files` output is empty. All moved files are under `runs/` which is ignored.
 
 - [ ] **Step 7: Commit (nothing staged — this task only moves gitignored files; commit is empty-record)**
 
@@ -134,20 +134,20 @@ git commit --allow-empty -m "chore: fold pre-restructure fleet data into handove
 ### Task 3: Archive the historical onboarding plan
 
 **Files:**
-- Create: `executions/2026-08-07-coder-fleet-initial-setup/README.md`
-- Move: `docs/plans/2026-08-07-remote-docker-onboarding.md` → `executions/2026-08-07-coder-fleet-initial-setup/plan.md`
+- Create: `runs/2026-08-07-coder-fleet-initial-setup/README.md`
+- Move: `docs/plans/2026-08-07-remote-docker-onboarding.md` → `runs/2026-08-07-coder-fleet-initial-setup/plan.md`
 
 - [ ] **Step 1: Create the execution folder**
 
-Run: `New-Item -ItemType Directory -Path "executions\2026-08-07-coder-fleet-initial-setup" -Force | Out-Null`
+Run: `New-Item -ItemType Directory -Path "runs\2026-08-07-coder-fleet-initial-setup" -Force | Out-Null`
 
 - [ ] **Step 2: Move the plan (tracked file — use git mv so history is preserved)**
 
-Run: `git mv docs/plans/2026-08-07-remote-docker-onboarding.md executions/2026-08-07-coder-fleet-initial-setup/plan.md`
+Run: `git mv docs/plans/2026-08-07-remote-docker-onboarding.md runs/2026-08-07-coder-fleet-initial-setup/plan.md`
 
 - [ ] **Step 3: Write the archive README**
 
-Create `executions/2026-08-07-coder-fleet-initial-setup/README.md`:
+Create `runs/2026-08-07-coder-fleet-initial-setup/README.md`:
 
 ```markdown
 # Execution: Coder Fleet Initial Setup (2026-08-07)
@@ -170,7 +170,7 @@ Remove-Item -Path docs\plans -Recurse -Force
 - [ ] **Step 5: Verify + commit**
 
 Run: `git status --short`
-Expected: `D  docs/plans/2026-08-07-remote-docker-onboarding.md` (renamed to ignored `executions/...`). The move must NOT leave a tracked copy behind: `git ls-files | Select-String 'remote-docker-onboarding'` → empty.
+Expected: `D  docs/plans/2026-08-07-remote-docker-onboarding.md` (renamed to ignored `runs/...`). The move must NOT leave a tracked copy behind: `git ls-files | Select-String 'remote-docker-onboarding'` → empty.
 
 Note: `git mv` has already staged the rename. Do NOT use `git add -A` here — the working tree contains an unrelated uncommitted `AGENTS.md` edit (pre-existing G2 netdata note) that must NOT enter this commit.
 
@@ -228,8 +228,8 @@ never go here — see plan-template.md>
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical step-by-step procedure (placeholders only) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` at run start |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` at run start |
+| `plan-template.md` | Copied to `runs/<run>/plan.md` at run start |
+| `runbook-template.md` | Copied to `runs/<run>/runbook.md` at run start |
 | `templates/` | All templates: compose, scaffolds, configs, code templates |
 | `scripts/` | Scripts the playbook uses |
 | `notes/` | Lessons learned, gotchas, pitfalls from past runs |
@@ -278,7 +278,7 @@ usernames, or credentials. Real values go in the execution's `plan.md`.
 | Client | <client> |
 | Playbook | `<playbook-name>` |
 | Date | <YYYY-MM-DD> |
-| Execution folder | `executions/<YYYY-MM-DD>-<client>-<playbook>-<tag>/` |
+| Execution folder | `runs/<YYYY-MM-DD>-<client>-<playbook>-<tag>/` |
 | Permission mode | **UNSET — set by operator at approval** (A: per-write confirm / B: plan-as-approved) |
 | Status | draft → approved → executing → closed |
 
@@ -428,8 +428,8 @@ Real values live in the execution's `inventory.md`, never here.
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical procedure (placeholders only) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
+| `plan-template.md` | Copied to `runs/<run>/plan.md` |
+| `runbook-template.md` | Copied to `runs/<run>/runbook.md` |
 | `templates/workspace-docker.yml` | Canonical dind compose (bind IP + `DOCKER_TLS_SAN` = placeholders) |
 | `templates/docker-devcontainer/` | Unified Coder template (local + remote via vars) |
 | `templates/remote-docker-workspace.hcl` | Simpler standalone remote template (code-server only) |
@@ -551,7 +551,7 @@ Always: GET the current policy, edit it, and POST the full content back with
 `Content-Type: application/hujson`; verify with a follow-up GET. Scope required
 is `policy_file`. Fetch the tailnet name from the host's
 `tailscale status --json` (`MagicDNSSuffix`, e.g. `tailcXXXX.ts.net`).
-The key can be stored in gitignored `executions/<run>/secrets/`.
+The key can be stored in gitignored `runs/<run>/secrets/`.
 
 **G9 — Coder CLI session expires.** `coder whoami` → "signed out". User runs
 `coder login <url>` (browser). The CLI URL is stored in the coderv2 config; check
@@ -683,8 +683,8 @@ the execution's `inventory.md`, never here.
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical procedure (placeholders only) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
+| `plan-template.md` | Copied to `runs/<run>/plan.md` |
+| `runbook-template.md` | Copied to `runs/<run>/runbook.md` |
 | `templates/` | Compose files, wp-config scaffolds, nginx/vhost templates |
 | `scripts/` | Backup/transfer/restore scripts |
 | `notes/` | Lessons learned from past migrations |
@@ -783,8 +783,8 @@ The mail server + DNS provider. Real values live in the execution's
 | Path | Purpose |
 |---|---|
 | `playbook.md` | Canonical procedure (placeholders only) |
-| `plan-template.md` | Copied to `executions/<run>/plan.md` |
-| `runbook-template.md` | Copied to `executions/<run>/runbook.md` |
+| `plan-template.md` | Copied to `runs/<run>/plan.md` |
+| `runbook-template.md` | Copied to `runs/<run>/runbook.md` |
 | `templates/` | MTA config templates, DKIM scripts, DNS record examples |
 | `scripts/` | Baseline inventory, verification scripts |
 | `notes/` | Lessons learned from past configurations |
@@ -925,7 +925,7 @@ each production write, or is it OK to execute the plan as approved?"*
   passwords in SSH command lines — keys and scoped tokens only.
 - Sensitive data transfers between servers use scoped methods (SCP/rsync over
   SSH keys, encrypted archives). Never pipe credentials through shell.
-- Playbooks contain placeholders only. Real values belong in `executions/`.
+- Playbooks contain placeholders only. Real values belong in `runs/`.
 
 ### 1.6 Playbooks are read-only during a run
 
@@ -938,7 +938,7 @@ after the run, with operator approval. Never edit `playbooks/` mid-run.
 
 ```
 playbooks/<name>/   ← committed, static, reusable procedures (the only tracked ops content)
-executions/<run>/   ← gitignored, self-contained per-run state (plans, secrets, logs, inventory)
+runs/<run>/   ← gitignored, self-contained per-run state (plans, secrets, logs, inventory)
 ```
 
 - **Playbook** = one subject (e.g. `coder-remote-servers`, `wordpress-migration`,
@@ -946,7 +946,7 @@ executions/<run>/   ← gitignored, self-contained per-run state (plans, secrets
   plan/runbook templates, `templates/` (compose/scaffolds/configs), `scripts/`,
   `notes/` (lessons learned — **read before any run**).
 - **Execution** = one run of a playbook against one client's servers. Named
-  `executions/<YYYY-MM-DD>-<client>-<playbook>-<short-tag>/`, fully
+  `runs/<YYYY-MM-DD>-<client>-<playbook>-<short-tag>/`, fully
   gitignored, containing `plan.md`, `runbook.md` (playbook snapshot with real
   values + step statuses), `inventory.md`, `notes.md`, `secrets/`, `logs/`.
 - Executions of different playbooks (or clients) are fully independent; a
@@ -955,7 +955,7 @@ executions/<run>/   ← gitignored, self-contained per-run state (plans, secrets
 ## 3. Execution lifecycle — the seven gates
 
 ```
-1. BOOTSTRAP    operator creates executions/<run>/ folder
+1. BOOTSTRAP    operator creates runs/<run>/ folder
 2. PREP         copy plan-template.md + runbook-template.md from the playbook;
                 fill in real hosts/IPs/credentials in plan.md
 3. NOTE-READ    read playbook notes/ (mandatory) + playbook.md; propose the
@@ -980,7 +980,7 @@ Any agent session can resume a run from the execution folder alone.
 2. A run touches ONLY its own execution folder. No reads from other runs.
 3. Credentials are generated per run and stored in that run's `secrets/`.
    There is no shared vault.
-4. Before any commit: `git status` must show no `executions/`, no `.pem`/
+4. Before any commit: `git status` must show no `runs/`, no `.pem`/
    `.key`/`.tfvars`, no real IPs/hostnames. See §7.
 5. Parked runs keep their credentials until the operator deletes the folder.
 
@@ -1021,12 +1021,12 @@ Any agent session can resume a run from the execution folder alone.
 `playbooks/`, `docs/`, `.gitignore`, `.gitattributes` — placeholders only,
 zero real IPs/hostnames/usernames/domains/keys.
 
-**NEVER committed:** anything under `executions/`, `secrets/`, `servers/`
+**NEVER committed:** anything under `runs/`, `secrets/`, `servers/`
 (if they exist), any `*.pem`, `*.key`, `*.tfvars`, `.env` anywhere.
 
 Before every commit, run:
 ```powershell
-git status                       # executions/ and secrets must NOT appear
+git status                       # runs/ and secrets must NOT appear
 git ls-files --cached --others --exclude-standard | ForEach-Object { if (Test-Path $_) {
   $c = Get-Content $_ -Raw
   if ($c -match 'tskey-|BEGIN (CERTIFICATE|PRIVATE|RSA)') { Write-Output "LEAK: $_" }
@@ -1043,7 +1043,7 @@ rotate the credential if it was ever committed.
 | `README.md` | Public overview | ✅ |
 | `playbooks/_playbook-template/` | Skeleton for new playbooks | ✅ |
 | `playbooks/<name>/` | One folder per subject: README, playbook.md, plan/runbook templates, templates/, scripts/, notes/ | ✅ |
-| `executions/<run>/` | Per-run state: plan, runbook, inventory, notes, secrets, logs | ❌ gitignored |
+| `runs/<run>/` | Per-run state: plan, runbook, inventory, notes, secrets, logs | ❌ gitignored |
 | `docs/` | Plans, specs, runbook archives | ✅ |
 
 ## 9. Common questions
@@ -1104,7 +1104,7 @@ playbooks/              ← static, reusable procedures (committed)
   coder-remote-servers/    Coder workspaces across remote servers (Tailscale + mTLS)
   wordpress-migration/     scaffolded
   mail-server-config/      scaffolded
-executions/             ← per-run state (GITIGNORED)
+runs/             ← per-run state (GITIGNORED)
   <date>-<client>-<playbook>-<tag>/
     plan.md  runbook.md  inventory.md  notes.md  secrets/  logs/
 ```
@@ -1126,7 +1126,7 @@ executions/             ← per-run state (GITIGNORED)
 
 ## Starting a run
 
-1. Create `executions/<YYYY-MM-DD>-<client>-<playbook>-<tag>/`
+1. Create `runs/<YYYY-MM-DD>-<client>-<playbook>-<tag>/`
 2. Copy the playbook's `plan-template.md` + `runbook-template.md` into it;
    fill in real hosts and credentials
 3. Read the playbook's `notes/` (mandatory)
@@ -1142,13 +1142,13 @@ executions/             ← per-run state (GITIGNORED)
 | `playbooks/coder-remote-servers/` | Coder workspace fleet: remote dind daemons, Tailscale, mTLS, wildcard app subdomains |
 | `playbooks/wordpress-migration/` | (scaffolded) WordPress site migration between servers |
 | `playbooks/mail-server-config/` | (scaffolded) mail server configuration |
-| `executions/` | **Private** per-run state — gitignored, never committed |
+| `runs/` | **Private** per-run state — gitignored, never committed |
 | `AGENTS.md` | Full admin guide: doctrine, lifecycle, folder discipline |
 | `docs/` | Plans, specs, design docs |
 
 ## Security rules
 
-1. **Never commit execution state.** `executions/` is gitignored; real IPs,
+1. **Never commit execution state.** `runs/` is gitignored; real IPs,
    hostnames, and credentials live only there.
 2. **Placeholders only in committed files.** Real values use
    `<PLACEHOLDER>` tokens.
@@ -1195,7 +1195,7 @@ git status
 git ls-files
 ```
 Expected: working tree clean; tracked files = `.gitattributes`, `.gitignore`,
-`AGENTS.md`, `README.md`, `playbooks/**`, `docs/**` only. NO `executions/`,
+`AGENTS.md`, `README.md`, `playbooks/**`, `docs/**` only. NO `runs/`,
 `secrets/`, `servers/`, no `.pem`/`.key`/`.tfvars`.
 
 - [ ] **Step 2: Identifier scan over all tracked files**
@@ -1235,8 +1235,8 @@ Expected: no output.
 
 Run:
 ```powershell
-Get-ChildItem executions\2026-08-11-coder-fleet-current-state -Recurse -File | Select-Object -ExpandProperty FullName
-Get-ChildItem executions\2026-08-07-coder-fleet-initial-setup -File | Select-Object -ExpandProperty Name
+Get-ChildItem runs\2026-08-11-coder-fleet-current-state -Recurse -File | Select-Object -ExpandProperty FullName
+Get-ChildItem runs\2026-08-07-coder-fleet-initial-setup -File | Select-Object -ExpandProperty Name
 ```
 Expected: handover contains README.md, audit-log.md, inventory.md,
 secrets-pointers.md, secrets/*.txt + private-fleet-data.md, logs/.gitkeep;

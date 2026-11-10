@@ -45,7 +45,7 @@ design beyond doc pointers is out of scope.
 
 - Key-based SSH access to the target host (`~/.ssh/config` alias). The
   playbook uses `<ALIAS>`; real hostnames live only in
-  `executions/bifrost[-<suffix>]/inventory.md` and `secrets/`.
+  `runs/bifrost[-<suffix>]/inventory.md` and `secrets/`.
 - Target tooling per mode: Docker Engine + Compose v2 (Docker/Compose/Helm
   paths), or Node.js ≥ 20 + npx (npx path), or Go 1.27.x + Node 25 (source
   builds; plugins require same Go version, Linux/macOS only, no
@@ -78,8 +78,8 @@ in the execution's `inventory.md` and `secrets/`, never here.
 | Path | Purpose |
 |---|---|
 | `SKILL.md` | Canonical procedure (placeholders only; **WRITE**-flagged) |
-| `plan-template.md` | Copied to `executions/bifrost/plan.md` on first run (or `executions/bifrost-<suffix>/plan.md`) |
-| `runbook-template.md` | Copied to `executions/bifrost/runbook.md` on first run |
+| `plan-template.md` | Copied to `runs/bifrost/plan.md` on first run (or `runs/bifrost-<suffix>/plan.md`) |
+| `runbook-template.md` | Copied to `runs/bifrost/runbook.md` on first run |
 | `templates/docker-compose.yml` | Pinned-image compose with `./data:/app/data`, healthcheck |
 | `templates/config.json.example` | Minimal DB-backed config with `env.` key references |
 | `templates/nginx-bifrost.conf` | Nginx reverse-proxy vhost (TLS, streaming-safe) |
@@ -89,7 +89,7 @@ in the execution's `inventory.md` and `secrets/`, never here.
 | references/gotchas.md` | G1–G8 pitfalls — **read before any run** |
 
 > Execution folders are **persistent per skill variant**. The first run
-> creates `executions/bifrost/` (or `executions/bifrost-<suffix>/` when the
+> creates `runs/bifrost/` (or `runs/bifrost-<suffix>/` when the
 > operator supplies a suffix like `prod`/`staging`/`personal`). All
 > subsequent invocations for the same variant **reuse and append to the same
 > folder** — `secrets/` and `inventory.md` persist, `logs/` is append-only.

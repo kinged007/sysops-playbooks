@@ -133,3 +133,14 @@ strips the `"` from heredoc/echo content, producing invalid JSON
 string`). **Fix: write config files (daemon.json etc.) locally with LF
 endings and `scp` them to the remote** — never build JSON via echo/heredoc
 through the shell.
+
+**G17 — no swap on a workspace host = kswapd death spiral.**
+Symptom (confirmed 2026-11-10 on coder-workspace-03): `23897/24031M used,
+134M avail, Swap: 0`, `kswapd0 94% + sy 57.6 + wa 33.7`, page cache evicted
+(397M), Coder agents time out while nothing looks wrong per-process — the
+hog hides because CPU-sort never shows it (dind held 17.2G across
+workspaces; OOM killer fired). Without swap the kernel cannot make reclaim
+progress and burns CPU trying. **Fix: every remote gets a swapfile at
+onboarding** (8G, fstab-persisted, `vm.swappiness=10`; see §9 checklist) +
+earlyoom as backstop. Verify with `free -h; swapon -s` — `Swap: 0` on any
+workspace host is a must-fix finding.

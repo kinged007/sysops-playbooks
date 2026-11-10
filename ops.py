@@ -299,8 +299,13 @@ def cmd_init(args) -> int:
         inbox.touch()
     (ROOT / "logs" / "audit").mkdir(parents=True, exist_ok=True)
     (ROOT / "runs").mkdir(exist_ok=True)
-    if not os.path.lexists(ROOT / "executions"):
-        (ROOT / "executions").symlink_to("runs")
+    legacy = ROOT / "executions"
+    if os.path.lexists(legacy):
+        if legacy.is_symlink() or legacy.is_file():
+            legacy.unlink()
+            print("removed legacy executions symlink (use runs/)")
+        else:
+            print("warning: legacy executions/ directory still exists; move it to runs/")
     hooks = subprocess.run(["git", "config", HOOKS_PATH_KEY, ".githooks"], cwd=ROOT,
                            capture_output=True, text=True)
     if hooks.returncode != 0:

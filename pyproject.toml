@@ -24,7 +24,7 @@ pythonpath = ["."]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-exclude = [".agents", ".commandcode", "runs", "executions", "vault", "incidents"]
+exclude = [".agents", ".commandcode", "runs", "vault", "incidents"]
 
 [tool.ruff.lint]
 select = ["E", "F"]
@@ -40,5 +40,5 @@ warn_return_any = false
 warn_unused_ignores = false
 disallow_untyped_defs = false
 check_untyped_defs = false
-exclude = "(\\.agents|runs|executions|vault|incidents)"
+exclude = "(\\.agents|runs|vault|incidents)"
 

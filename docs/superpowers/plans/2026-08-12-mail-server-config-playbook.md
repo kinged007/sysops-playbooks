@@ -312,7 +312,7 @@ git ls-files --cached --others --exclude-standard | ForEach-Object { if (Test-Pa
   if ($c -match 'tskey-|BEGIN (CERTIFICATE|PRIVATE|RSA)') { Write-Output "LEAK: $_" }
 }}
 ```
-Expected: no `executions/` in status; zero LEAK lines; only playbook files modified/added.
+Expected: no `runs/` in status; zero LEAK lines; only playbook files modified/added.
 
 - [ ] **Step 2: Placeholder scan**
 
