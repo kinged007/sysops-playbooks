@@ -264,8 +264,9 @@ Placeholders and synthetic values only.
 `vault/`, `incidents/*` (other than the two allowlisted files), `logs/`,
 `ops.config.yaml`, `*.pem`, `*.key`, `*.tfvars`, `.env`.
 
-Setup: run `uv tool install --editable .` from the repo root, then `ops init` once per
-clone (`bin/ops` works without the install). It creates the gitignored files and
+Setup: run `uv tool install --editable .` from the repo root, then `ops init`
+and `ops tools install` once per clone (`bin/ops` works without the install).
+It creates the gitignored files, downloads the pinned scanners, and
 sets `git config core.hooksPath .githooks`.
 
 Before every commit:
